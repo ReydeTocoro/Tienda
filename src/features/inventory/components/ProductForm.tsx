@@ -1,10 +1,13 @@
 import { useEffect, useState } from 'react'
+import { useLiveQuery } from 'dexie-react-hooks'
+import { db } from '../../../db/index'
 import type { Product } from '../../../types/product'
 import { UNITS, isMeasuredUnit } from '../../../types/unit'
 import { unitShortLabel } from '../../../shared/lib/units'
 import { addProduct, updateProduct } from '../../../db/repositories/products'
 import { useConfirm } from '../../../store/useConfirmStore'
 import { toast } from '../../../store/useToastStore'
+import { formatMoney } from '../../../shared/lib/currency'
 
 const MARGIN_PRESETS = [10, 15, 20, 25, 30, 50, 100]
 
@@ -28,18 +31,27 @@ const EMPTY = {
   stock: '',
   min: '',
   cat: '',
+  esPaquete: false,
+  unidadesPor: '',
+  codigoSuelta: '',
+  nombreSuelta: '',
+  precioSuelta: '',
 }
 
 interface ProductFormProps {
   product: Product | null
   onSaved: () => void
   onCancel: () => void
+  /** Bump `token` to push a freshly scanned barcode into the code field (Fase 3). */
+  scanSeed?: { code: string; token: number } | null
+  onOpenCamera?: () => void
 }
 
-export function ProductForm({ product, onSaved, onCancel }: ProductFormProps) {
+export function ProductForm({ product, onSaved, onCancel, scanSeed, onOpenCamera }: ProductFormProps) {
   const [f, setF] = useState(EMPTY)
   const confirm = useConfirm()
   const editing = !!product
+  const allProducts = useLiveQuery(() => db.products.toArray(), [], []) as Product[]
 
   useEffect(() => {
     if (product) {
@@ -56,11 +68,23 @@ export function ProductForm({ product, onSaved, onCancel }: ProductFormProps) {
         stock: product.stock ? String(product.stock) : '',
         min: product.min ? String(product.min) : '',
         cat: product.cat || '',
+        esPaquete: !!product.esPaquete,
+        unidadesPor: product.unidadesPor ? String(product.unidadesPor) : '',
+        codigoSuelta: product.codigoSuelta || '',
+        nombreSuelta: product.nombreSuelta || '',
+        precioSuelta: product.precioSuelta ? String(product.precioSuelta) : '',
       })
     } else {
       setF(EMPTY)
     }
   }, [product])
+
+  useEffect(() => {
+    if (scanSeed && scanSeed.token > 0) {
+      setF((s) => ({ ...s, code: scanSeed.code }))
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scanSeed?.token])
 
   const isMeasured = isMeasuredUnit(f.unit)
   const unitLbl = unitShortLabel(f.unit)
@@ -89,10 +113,22 @@ export function ProductForm({ product, onSaved, onCancel }: ProductFormProps) {
     }
   }
 
+  function toggleEsPaquete(checked: boolean) {
+    setF((s) => ({
+      ...s,
+      esPaquete: checked,
+      codigoSuelta: checked && !s.codigoSuelta && s.code ? s.code + '-SUELTA' : s.codigoSuelta,
+    }))
+  }
+
   const cost = parseFloat(f.cost) || 0
   const price = parseFloat(f.price) || 0
   const gain = price - cost
   const gainPct = cost > 0 ? (gain / cost) * 100 : 0
+
+  const unidadesPorNum = parseInt(f.unidadesPor) || 0
+  const precioSueltaNum = parseFloat(f.precioSuelta) || 0
+  const paqPreviewOk = f.esPaquete && unidadesPorNum >= 2 && f.nombreSuelta.trim()
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -113,6 +149,40 @@ export function ProductForm({ product, onSaved, onCancel }: ProductFormProps) {
       if (!ok) return
     }
 
+    const codigoSuelta = f.codigoSuelta.trim()
+    if (f.esPaquete) {
+      if (unidadesPorNum < 2) {
+        toast('⚠ Indica cuántas unidades trae el paquete (mínimo 2)', 'orange')
+        return
+      }
+      if (!codigoSuelta) {
+        toast('⚠ Escribe el código para la unidad suelta', 'orange')
+        return
+      }
+      if (!f.nombreSuelta.trim()) {
+        toast('⚠ Escribe el nombre de la unidad suelta', 'orange')
+        return
+      }
+      if (precioSueltaNum <= 0) {
+        toast('⚠ Escribe el precio de la unidad suelta', 'orange')
+        return
+      }
+      const collision = allProducts.find((p) => p.code === codigoSuelta && p.code !== product?.codigoSuelta)
+      if (collision) {
+        toast('⚠ El código de la unidad suelta ya existe en inventario', 'orange')
+        return
+      }
+    }
+
+    // Warn (non-blocking) if this package already generated a loose-unit sibling that its
+    // own price/name won't retroactively sync to — legacy L3646-3694 vs L3990-3998.
+    if (editing && f.esPaquete && product?.codigoSuelta) {
+      const existingSuelta = allProducts.find((p) => p.code === product.codigoSuelta)
+      if (existingSuelta && (existingSuelta.name !== f.nombreSuelta.trim() || existingSuelta.price !== precioSueltaNum)) {
+        toast('ℹ️ La unidad suelta ya generada no se actualiza automáticamente — edítala aparte si hace falta', 'blue')
+      }
+    }
+
     const prod: Product = {
       code,
       name,
@@ -124,11 +194,11 @@ export function ProductForm({ product, onSaved, onCancel }: ProductFormProps) {
       brand: f.brand.trim(),
       unit: f.unit,
       pricePer: isMeasured ? parseFloat(f.pricePer) || 0 : 0,
-      esPaquete: product?.esPaquete ?? false,
-      unidadesPor: product?.unidadesPor,
-      codigoSuelta: product?.codigoSuelta,
-      nombreSuelta: product?.nombreSuelta,
-      precioSuelta: product?.precioSuelta,
+      esPaquete: f.esPaquete,
+      unidadesPor: f.esPaquete ? unidadesPorNum : undefined,
+      codigoSuelta: f.esPaquete ? codigoSuelta : undefined,
+      nombreSuelta: f.esPaquete ? f.nombreSuelta.trim() : undefined,
+      precioSuelta: f.esPaquete ? precioSueltaNum : undefined,
       esUnidadSuelta: product?.esUnidadSuelta,
       codigoPaquete: product?.codigoPaquete,
       nombrePaquete: product?.nombrePaquete,
@@ -156,13 +226,24 @@ export function ProductForm({ product, onSaved, onCancel }: ProductFormProps) {
 
       <div className="grid grid-cols-2 gap-2.5">
         <Field label="Código / Barcode">
-          <input
-            className="input"
-            value={f.code}
-            onChange={(e) => set('code', e.target.value)}
-            placeholder="001 o barcode"
-            disabled={editing}
-          />
+          <div className="flex gap-1.5">
+            <input
+              className="input flex-1"
+              value={f.code}
+              onChange={(e) => set('code', e.target.value)}
+              placeholder="001 o barcode"
+              disabled={editing}
+            />
+            {onOpenCamera && !editing && (
+              <button
+                type="button"
+                onClick={onOpenCamera}
+                className="flex h-[42px] w-11 flex-shrink-0 items-center justify-center rounded-[10px] border border-br2 bg-s2 text-lime"
+              >
+                📷
+              </button>
+            )}
+          </div>
         </Field>
         <Field label="Nombre *">
           <input className="input" value={f.name} onChange={(e) => set('name', e.target.value)} placeholder="Nombre del producto" />
@@ -265,6 +346,57 @@ export function ProductForm({ product, onSaved, onCancel }: ProductFormProps) {
         <Field label="Categoría" span2>
           <input className="input" value={f.cat} onChange={(e) => set('cat', e.target.value)} placeholder="Bebidas, Snacks, Limpieza..." />
         </Field>
+
+        <div className="col-span-2 rounded-xl border border-purple/25 bg-purple/10 p-3">
+          <label className="mb-2.5 flex cursor-pointer items-center gap-2 text-[12px] font-bold text-purple">
+            <input type="checkbox" checked={f.esPaquete} onChange={(e) => toggleEsPaquete(e.target.checked)} className="h-4 w-4 accent-purple" />
+            📦 Este producto es un paquete que se puede vender por unidades sueltas
+          </label>
+          {f.esPaquete && (
+            <div className="grid grid-cols-2 gap-2.5">
+              <Field label="Unidades por paquete *">
+                <input
+                  className="input"
+                  type="number"
+                  min={2}
+                  step={1}
+                  value={f.unidadesPor}
+                  onChange={(e) => set('unidadesPor', e.target.value)}
+                  placeholder="Ej: 6"
+                />
+              </Field>
+              <Field label="Código unidad suelta *">
+                <input
+                  className="input font-mono"
+                  value={f.codigoSuelta}
+                  onChange={(e) => set('codigoSuelta', e.target.value)}
+                  placeholder="Ej: GAL-SUELTA"
+                />
+              </Field>
+              <Field label="Nombre de la unidad suelta *" span2>
+                <input className="input" value={f.nombreSuelta} onChange={(e) => set('nombreSuelta', e.target.value)} placeholder="Ej: Galleta suelta" />
+              </Field>
+              <Field label="Precio de venta de la unidad suelta *" span2>
+                <input
+                  className="input"
+                  type="number"
+                  min={0}
+                  step="0.01"
+                  value={f.precioSuelta}
+                  onChange={(e) => set('precioSuelta', e.target.value)}
+                  placeholder="0.00"
+                />
+              </Field>
+              {paqPreviewOk && (
+                <div className="col-span-2 rounded-lg bg-purple/10 px-3.5 py-2.5 font-mono text-[13px] leading-relaxed text-purple">
+                  Al abrir 1 paquete → se crean <b>{unidadesPorNum} "{f.nombreSuelta}"</b>
+                  <br />
+                  Precio unitario: <b>{formatMoney(precioSueltaNum)}</b> c/u → Total por paquete: <b>{formatMoney(precioSueltaNum * unidadesPorNum)}</b>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
       </div>
 
       <div className="mt-3 flex gap-2">
