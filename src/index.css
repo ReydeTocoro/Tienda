@@ -1,0 +1,66 @@
+@import 'tailwindcss';
+@import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Playfair+Display:wght@700;900&family=DM+Sans:wght@300;400;500;600;700&display=swap');
+
+/* Colores portados tal cual del index.html original (legacy/index.html L166-192). */
+@theme {
+  --font-sans: 'DM Sans', sans-serif;
+  --font-display: 'Playfair Display', serif;
+  --font-mono: 'DM Mono', ui-monospace, monospace;
+
+  --color-bg: #0a0a0a;
+  --color-s1: #141414;
+  --color-s2: #1c1c1c;
+  --color-s3: #242424;
+  --color-br: #2a2a2a;
+  --color-br2: #363636;
+  --color-lime: #c8f060;
+  --color-orange: #f0a060;
+  --color-blue: #60b8f0;
+  --color-purple: #b060f0;
+  --color-red: #ff6b6b;
+  --color-green: #6bffb8;
+  --color-txt: #f0ede8;
+  --color-txt2: #a0a0a0;
+  --color-muted: #555555;
+
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+}
+
+/* Variante clara (activada con la clase `.light` en <body>, igual que hoy `body.light`). */
+.light {
+  --color-bg: #f5f3ef;
+  --color-s1: #ffffff;
+  --color-s2: #f0ede8;
+  --color-s3: #e8e4de;
+  --color-br: #ddd9d3;
+  --color-br2: #ccc8c2;
+  --color-txt: #1a1a1a;
+  --color-txt2: #666666;
+  --color-muted: #999999;
+  --color-lime: #5a9a00;
+  --color-orange: #c06000;
+  --color-blue: #0070b8;
+  --color-purple: #7020c8;
+  --color-red: #cc2200;
+  --color-green: #007840;
+}
+
+* {
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--color-bg);
+  color: var(--color-txt);
+  font-family: var(--font-sans);
+}
