@@ -154,6 +154,7 @@ export function VentaPage() {
       <div className="flex flex-shrink-0 gap-2 px-3 py-2">
         <div className="relative flex-1">
           <input
+            id="venta-search-input"
             ref={searchRef}
             value={search}
             onChange={(e) => {

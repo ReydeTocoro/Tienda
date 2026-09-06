@@ -7,6 +7,7 @@ import { formatPurchaseId, formatSaleId } from '../../shared/lib/id'
 import { ReceiptSheet } from '../../shared/components/ReceiptSheet'
 import { PurchaseFormSheet } from './components/PurchaseFormSheet'
 import { CorrectionModal } from './components/CorrectionModal'
+import { usePermission } from '../pin/usePermission'
 
 const PAY_PILL: Record<string, string> = {
   efectivo: 'bg-green/10 text-green',
@@ -22,6 +23,14 @@ export function HistorialPage() {
   const [receiptSale, setReceiptSale] = useState<Sale | null>(null)
   const [purchaseOpen, setPurchaseOpen] = useState(false)
   const [correctingSale, setCorrectingSale] = useState<Sale | null>(null)
+  const { requireAdmin } = usePermission()
+
+  async function requestCorrection(sale: Sale) {
+    const ok = await requireAdmin('🔐 Corregir Factura', 'Se requiere PIN para modificar una venta')
+    if (!ok) return
+    setCorrectingSale(sale)
+    setReceiptSale(null)
+  }
 
   const rows: Row[] = useMemo(() => {
     const a: Row[] = sales.map((s) => ({ kind: 'venta', date: s.date, sale: s }))
@@ -99,14 +108,7 @@ export function HistorialPage() {
       <ReceiptSheet
         sale={receiptSale}
         onClose={() => setReceiptSale(null)}
-        onCorrect={
-          receiptSale
-            ? () => {
-                setCorrectingSale(receiptSale)
-                setReceiptSale(null)
-              }
-            : undefined
-        }
+        onCorrect={receiptSale ? () => requestCorrection(receiptSale) : undefined}
       />
       <PurchaseFormSheet open={purchaseOpen} onClose={() => setPurchaseOpen(false)} />
       <CorrectionModal sale={correctingSale} onClose={() => setCorrectingSale(null)} onCorrected={() => setCorrectingSale(null)} />

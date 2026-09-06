@@ -6,17 +6,32 @@ import { ClientesPage } from './features/customers/ClientesPage'
 import { FiadosPage } from './features/fiados/FiadosPage'
 import { HistorialPage } from './features/history/HistorialPage'
 import { ReportePage } from './features/reports/ReportePage'
+import { AdminGate } from './features/pin/AdminGate'
 
 export const router = createBrowserRouter([
   {
     element: <AppShell />,
     children: [
       { path: '/', element: <VentaPage /> },
-      { path: '/inventario', element: <InventarioPage /> },
+      {
+        path: '/inventario',
+        element: (
+          <AdminGate title="🔒 Acceso restringido" subtitle="Esta sección requiere PIN de administrador">
+            <InventarioPage />
+          </AdminGate>
+        ),
+      },
       { path: '/clientes', element: <ClientesPage /> },
       { path: '/fiados', element: <FiadosPage /> },
       { path: '/historial', element: <HistorialPage /> },
-      { path: '/reporte', element: <ReportePage /> },
+      {
+        path: '/reporte',
+        element: (
+          <AdminGate title="🔒 Acceso restringido" subtitle="Los reportes requieren PIN de administrador">
+            <ReportePage />
+          </AdminGate>
+        ),
+      },
     ],
   },
 ])

@@ -20,6 +20,7 @@ import { exportExcel, exportCSV, downloadImportTemplate } from './lib/exportProd
 import { parseImportFile, buildParsedRows, type ParsedImportRow, type DupAction } from './lib/importProducts'
 import { applyImport } from '../../db/repositories/inventoryOps'
 import { getSettings } from '../../db/repositories/settings'
+import { usePermission } from '../pin/usePermission'
 
 export function InventarioPage() {
   const products = useLiveQuery(() => db.products.toArray(), [], []) as Product[]
@@ -27,6 +28,7 @@ export function InventarioPage() {
   const [editing, setEditing] = useState<Product | null>(null)
   const [search, setSearch] = useState('')
   const confirm = useConfirm()
+  const { requireAdmin } = usePermission()
 
   // Entrada rápida + scanning
   const [entradaOpen, setEntradaOpen] = useState(false)
@@ -99,6 +101,8 @@ export function InventarioPage() {
   }, [products, search])
 
   async function handleDelete(p: Product) {
+    const isAdmin = await requireAdmin('🔐 Eliminar Producto', 'Se requiere PIN para eliminar del inventario')
+    if (!isAdmin) return
     const ok = await confirm({ message: `¿Eliminar ${p.name}?`, danger: true, confirmLabel: 'Eliminar' })
     if (!ok) return
     await deleteProduct(p.code)

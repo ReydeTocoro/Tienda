@@ -11,6 +11,8 @@ import { CierreZModal } from './components/CierreZModal'
 import { ExtraFormSheet } from './components/ExtraFormSheet'
 import { CierresHistoryList } from './components/CierresHistoryList'
 import { CorrectionsHistoryList } from './components/CorrectionsHistoryList'
+import { SecuritySettingsSection } from './components/SecuritySettingsSection'
+import { usePermission } from '../pin/usePermission'
 
 const PAY_LABEL: Record<string, string> = { efectivo: '💵 Efectivo', transferencia: '📲 Transferencia' }
 
@@ -20,8 +22,14 @@ export function ReportePage() {
   const [reporteXOpen, setReporteXOpen] = useState(false)
   const [cierreZOpen, setCierreZOpen] = useState(false)
   const [extraOpen, setExtraOpen] = useState(false)
+  const { requireAdmin } = usePermission()
 
   const agg = useDayAggregation(dayKey, { onlyOpen: false })
+
+  async function openCierreZ() {
+    const ok = await requireAdmin('🔐 Cierre de Caja', 'Acción definitiva — requiere PIN de seguridad')
+    if (ok) setCierreZOpen(true)
+  }
 
   // Global fiado portfolio (all-time), independent of the selected date.
   const allSales = useLiveQuery(() => db.sales.toArray(), [], [] as Sale[])
@@ -168,7 +176,7 @@ export function ReportePage() {
       <button onClick={() => setReporteXOpen(true)} className="mt-2 mb-2.5 w-full rounded-xl border-2 border-blue/30 bg-blue/10 py-3 text-[13px] font-bold text-blue">
         📊 Reporte X — Lectura parcial (sin cerrar caja)
       </button>
-      <button onClick={() => setCierreZOpen(true)} className="mb-2.5 w-full rounded-xl border border-red/30 bg-red/10 py-3.5 text-[15px] font-bold text-red">
+      <button onClick={openCierreZ} className="mb-2.5 w-full rounded-xl border border-red/30 bg-red/10 py-3.5 text-[15px] font-bold text-red">
         🔒 Reporte Z — Cierre definitivo de caja
       </button>
       <button onClick={() => setExtraOpen(true)} className="mb-1 w-full rounded-[10px] border border-br2 py-2.5 text-[13px] text-txt2">
@@ -180,6 +188,8 @@ export function ReportePage() {
 
       <p className="mb-2 mt-5 text-[13px] font-bold uppercase tracking-wide text-orange">✏️ Correcciones de facturas</p>
       <CorrectionsHistoryList />
+
+      <SecuritySettingsSection />
 
       <ReceiptSheet sale={receiptSale} onClose={() => setReceiptSale(null)} />
       <ReporteXModal open={reporteXOpen} dayKey={dayKey} onClose={() => setReporteXOpen(false)} />

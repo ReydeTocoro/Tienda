@@ -8,6 +8,7 @@ import { addProduct, updateProduct } from '../../../db/repositories/products'
 import { useConfirm } from '../../../store/useConfirmStore'
 import { toast } from '../../../store/useToastStore'
 import { formatMoney } from '../../../shared/lib/currency'
+import { usePermission } from '../../pin/usePermission'
 
 const MARGIN_PRESETS = [10, 15, 20, 25, 30, 50, 100]
 
@@ -50,6 +51,7 @@ interface ProductFormProps {
 export function ProductForm({ product, onSaved, onCancel, scanSeed, onOpenCamera }: ProductFormProps) {
   const [f, setF] = useState(EMPTY)
   const confirm = useConfirm()
+  const { requireAdmin } = usePermission()
   const editing = !!product
   const allProducts = useLiveQuery(() => db.products.toArray(), [], []) as Product[]
 
@@ -132,6 +134,8 @@ export function ProductForm({ product, onSaved, onCancel, scanSeed, onOpenCamera
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
+    const ok = await requireAdmin('🔐 Agregar / Editar Stock', 'Se requiere PIN para modificar inventario')
+    if (!ok) return
     const code = f.code.trim()
     const name = f.name.trim()
     if (!name) {

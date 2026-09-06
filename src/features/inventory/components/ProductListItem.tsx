@@ -1,6 +1,9 @@
 import type { Product } from '../../../types/product'
 import { unitShortLabel, unitFullName } from '../../../shared/lib/units'
 import { formatMoney } from '../../../shared/lib/currency'
+import { adjustStock } from '../../../db/repositories/products'
+import { usePermission } from '../../pin/usePermission'
+import { toast } from '../../../store/useToastStore'
 
 interface ProductListItemProps {
   product: Product
@@ -9,6 +12,19 @@ interface ProductListItemProps {
 }
 
 export function ProductListItem({ product: p, onEdit, onDelete }: ProductListItemProps) {
+  const { requireAdmin } = usePermission()
+
+  async function quickStock(delta: number) {
+    const ok = await requireAdmin('🔐 Ajuste de Stock', 'Se requiere PIN para modificar unidades de stock')
+    if (!ok) return
+    if (delta < 0 && p.stock <= 0) {
+      toast('⚠ Ya está en 0', 'orange')
+      return
+    }
+    const next = await adjustStock(p.code, delta)
+    toast(`${delta > 0 ? '+' : ''}${delta} → Stock: ${next}`, delta > 0 ? 'green' : 'orange')
+  }
+
   const low = p.stock <= p.min
   const ul = unitShortLabel(p.unit || 'unidad')
   const isMeasured = p.unit && p.unit !== 'unidad' && p.pricePer > 0
@@ -61,6 +77,12 @@ export function ProductListItem({ product: p, onEdit, onDelete }: ProductListIte
           <div className="font-mono text-[16px] font-bold text-lime">{priceDisplay}</div>
           <div className="text-[11px] text-muted">Costo: {formatMoney(p.cost)}</div>
           <div className="mt-2 flex justify-end gap-1.5">
+            <button onClick={() => quickStock(-1)} title="Descontar 1" className="rounded-[8px] border border-br2 px-2.5 py-1 text-[12px] text-txt2">
+              −1
+            </button>
+            <button onClick={() => quickStock(1)} title="Sumar 1" className="rounded-[8px] border border-br2 px-2.5 py-1 text-[12px] text-txt2">
+              +1
+            </button>
             <button onClick={onEdit} className="rounded-[8px] border border-br2 px-2.5 py-1 text-[12px] text-txt2">
               ✏
             </button>
