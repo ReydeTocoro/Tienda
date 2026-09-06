@@ -58,7 +58,7 @@ export function PackageCard({ product: p, onEdit, onDelete }: PackageCardProps) 
   }
 
   return (
-    <div className="mb-2.5 rounded-[14px] border-2 border-purple/20 bg-s1 p-3.5">
+    <div className="mb-2.5 rounded-[14px] border-2 border-purple/20 bg-s1 p-3.5 transition-colors lg:mb-0 lg:h-full lg:hover:border-purple/35">
       <div className="mb-2.5 flex items-center justify-between">
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-1.5 text-[15px] font-bold">
@@ -72,10 +72,10 @@ export function PackageCard({ product: p, onEdit, onDelete }: PackageCardProps) 
           </div>
         </div>
         <div className="ml-2 flex flex-shrink-0 gap-1.5">
-          <button onClick={onEdit} className="rounded-[8px] border border-br2 px-2.5 py-1 text-[12px] text-txt2">
+          <button onClick={onEdit} className="rounded-[8px] border border-br2 px-2.5 py-1 text-[12px] text-txt2 transition-colors hover:border-lime/40 hover:text-lime">
             ✏
           </button>
-          <button onClick={onDelete} className="rounded-[8px] bg-red px-2.5 py-1 text-[12px] text-white">
+          <button onClick={onDelete} className="rounded-[8px] bg-red px-2.5 py-1 text-[12px] text-white transition-opacity hover:opacity-85">
             🗑
           </button>
         </div>
@@ -104,7 +104,7 @@ export function PackageCard({ product: p, onEdit, onDelete }: PackageCardProps) 
         <button
           onClick={handleAbrir}
           disabled={p.stock <= 0}
-          className="rounded-[11px] border-2 border-purple/30 bg-purple/10 px-1.5 py-2.5 text-[12px] font-bold text-purple disabled:pointer-events-none disabled:opacity-40"
+          className="rounded-[11px] border-2 border-purple/30 bg-purple/10 px-1.5 py-2.5 text-[12px] font-bold text-purple transition-colors hover:bg-purple/20 disabled:pointer-events-none disabled:opacity-40"
         >
           📦 Abrir
           <br />
@@ -113,7 +113,7 @@ export function PackageCard({ product: p, onEdit, onDelete }: PackageCardProps) 
         <button
           onClick={handleVenderUnidad}
           disabled={qSueltas <= 0 && p.stock <= 0}
-          className="rounded-[11px] border-2 border-green/30 bg-green/10 px-1.5 py-2.5 text-[12px] font-bold text-green disabled:pointer-events-none disabled:opacity-40"
+          className="rounded-[11px] border-2 border-green/30 bg-green/10 px-1.5 py-2.5 text-[12px] font-bold text-green transition-colors hover:bg-green/20 disabled:pointer-events-none disabled:opacity-40"
         >
           🔓 Vender
           <br />
@@ -122,7 +122,7 @@ export function PackageCard({ product: p, onEdit, onDelete }: PackageCardProps) 
         <button
           onClick={handleVenderPaquete}
           disabled={p.stock <= 0}
-          className="rounded-[11px] border-2 border-blue/30 bg-blue/10 px-1.5 py-2.5 text-[12px] font-bold text-blue disabled:pointer-events-none disabled:opacity-40"
+          className="rounded-[11px] border-2 border-blue/30 bg-blue/10 px-1.5 py-2.5 text-[12px] font-bold text-blue transition-colors hover:bg-blue/20 disabled:pointer-events-none disabled:opacity-40"
         >
           📤 Vender
           <br />

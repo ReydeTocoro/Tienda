@@ -31,7 +31,7 @@ export function ProductCard({ product: p, qtyInCart, onClick }: ProductCardProps
       onClick={onClick}
       disabled={outOfStock}
       className={`relative flex flex-col gap-0.5 rounded-xl border p-2.5 pb-2 text-left transition active:scale-[0.96] ${
-        outOfStock ? 'pointer-events-none opacity-45' : 'active:bg-s2'
+        outOfStock ? 'pointer-events-none opacity-45' : 'hover:-translate-y-0.5 hover:border-lime/40 hover:shadow-lg active:bg-s2'
       } ${lowStock ? 'border-orange' : 'border-br bg-s1'}`}
     >
       {qtyInCart > 0 && (

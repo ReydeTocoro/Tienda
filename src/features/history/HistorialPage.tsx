@@ -39,10 +39,10 @@ export function HistorialPage() {
   }, [sales, purchases])
 
   return (
-    <div className="p-3.5">
+    <div className="p-3.5 lg:mx-auto lg:max-w-[1400px] lg:p-6">
       <div className="mb-3.5 flex items-center justify-between">
-        <p className="font-display text-[21px] font-bold">Historial</p>
-        <button onClick={() => setPurchaseOpen(true)} className="rounded-[10px] border border-br2 px-3 py-2 text-[12px] text-txt2">
+        <p className="font-display text-[21px] font-bold lg:text-[26px]">Historial</p>
+        <button onClick={() => setPurchaseOpen(true)} className="rounded-[10px] border border-br2 px-3 py-2 text-[12px] text-txt2 transition-colors hover:bg-s2">
           + Compra
         </button>
       </div>
@@ -53,56 +53,58 @@ export function HistorialPage() {
           <p className="text-[13px]">Sin registros aún</p>
         </div>
       ) : (
-        rows.map((r, i) =>
-          r.kind === 'venta' ? (
-            <button
-              key={'v' + i}
-              onClick={() => setReceiptSale(r.sale)}
-              className="mb-2 block w-full rounded-xl border border-br bg-s1 p-3 text-left"
-            >
-              <div className="flex items-start justify-between">
-                <div>
-                  <div className="font-mono text-[12px] text-lime">
-                    {formatSaleId(r.sale.id)}{' '}
-                    <span className="rounded-full bg-lime/10 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-lime">↑ Venta</span>{' '}
-                    <span className={`rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide ${PAY_PILL[r.sale.payMethod]}`}>
-                      {r.sale.payMethod}
-                    </span>
-                    {r.sale.corrected && (
-                      <span className="rounded-full bg-orange/10 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-orange">
-                        ✏️ corregida
+        <div className="lg:grid lg:grid-cols-2 lg:gap-3 xl:grid-cols-3">
+          {rows.map((r, i) =>
+            r.kind === 'venta' ? (
+              <button
+                key={'v' + i}
+                onClick={() => setReceiptSale(r.sale)}
+                className="mb-2 block w-full rounded-xl border border-br bg-s1 p-3 text-left transition-colors hover:border-br2 hover:bg-s2 lg:mb-0"
+              >
+                <div className="flex items-start justify-between">
+                  <div>
+                    <div className="font-mono text-[12px] text-lime">
+                      {formatSaleId(r.sale.id)}{' '}
+                      <span className="rounded-full bg-lime/10 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-lime">↑ Venta</span>{' '}
+                      <span className={`rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide ${PAY_PILL[r.sale.payMethod]}`}>
+                        {r.sale.payMethod}
                       </span>
-                    )}
+                      {r.sale.corrected && (
+                        <span className="rounded-full bg-orange/10 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-orange">
+                          ✏️ corregida
+                        </span>
+                      )}
+                    </div>
+                    <div className="mt-0.5 text-[10px] text-muted">{formatDateTime(r.sale.date)}</div>
+                    {r.sale.customerName && <div className="mt-0.5 text-[11px] text-blue">👤 {r.sale.customerName}</div>}
+                    {!r.sale.customerName && r.sale.fiadoName && <div className="mt-0.5 text-[11px] text-red">📋 Fiado: {r.sale.fiadoName}</div>}
                   </div>
-                  <div className="mt-0.5 text-[10px] text-muted">{formatDateTime(r.sale.date)}</div>
-                  {r.sale.customerName && <div className="mt-0.5 text-[11px] text-blue">👤 {r.sale.customerName}</div>}
-                  {!r.sale.customerName && r.sale.fiadoName && <div className="mt-0.5 text-[11px] text-red">📋 Fiado: {r.sale.fiadoName}</div>}
+                  <div className="font-mono text-[17px] font-semibold text-green">{formatMoney(r.sale.total)}</div>
                 </div>
-                <div className="font-mono text-[17px] font-semibold text-green">{formatMoney(r.sale.total)}</div>
-              </div>
-              <div className="mt-1.5 text-[12px] text-txt2">
-                {r.sale.items
-                  .map((it) => `${it.name} ×${it.qty}`)
-                  .join(', ')
-                  .slice(0, 85)}
-              </div>
-            </button>
-          ) : (
-            <div key={'c' + i} className="mb-2 rounded-xl border border-br bg-s1 p-3">
-              <div className="flex items-start justify-between">
-                <div>
-                  <div className="font-mono text-[12px] text-orange">
-                    {formatPurchaseId(r.id)}{' '}
-                    <span className="rounded-full bg-orange/10 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-orange">↓ Compra</span>
+                <div className="mt-1.5 text-[12px] text-txt2">
+                  {r.sale.items
+                    .map((it) => `${it.name} ×${it.qty}`)
+                    .join(', ')
+                    .slice(0, 85)}
+                </div>
+              </button>
+            ) : (
+              <div key={'c' + i} className="mb-2 rounded-xl border border-br bg-s1 p-3 lg:mb-0">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <div className="font-mono text-[12px] text-orange">
+                      {formatPurchaseId(r.id)}{' '}
+                      <span className="rounded-full bg-orange/10 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-orange">↓ Compra</span>
+                    </div>
+                    <div className="mt-0.5 text-[10px] text-muted">{formatDateTime(r.date)}</div>
                   </div>
-                  <div className="mt-0.5 text-[10px] text-muted">{formatDateTime(r.date)}</div>
+                  <div className="font-mono text-[17px] font-semibold text-red">{formatMoney(r.total)}</div>
                 </div>
-                <div className="font-mono text-[17px] font-semibold text-red">{formatMoney(r.total)}</div>
+                <div className="mt-1.5 text-[12px] text-txt2">{r.desc}</div>
               </div>
-              <div className="mt-1.5 text-[12px] text-txt2">{r.desc}</div>
-            </div>
-          ),
-        )
+            ),
+          )}
+        </div>
       )}
 
       <ReceiptSheet

@@ -34,7 +34,7 @@ export function ProductListItem({ product: p, onEdit, onDelete }: ProductListIte
   const lineMargin = p.cost > 0 ? ((p.price - p.cost) / p.cost) * 100 : 0
 
   return (
-    <div className="mb-2.5 rounded-[14px] border border-br bg-s1 p-3.5">
+    <div className="mb-2.5 rounded-[14px] border border-br bg-s1 p-3.5 transition-colors lg:mb-0 lg:h-full lg:hover:border-br2 lg:hover:bg-s2">
       <div className="flex items-center justify-between gap-2.5">
         <div className="min-w-0 flex-1">
           <div className="text-[14px] font-bold">
@@ -77,16 +77,16 @@ export function ProductListItem({ product: p, onEdit, onDelete }: ProductListIte
           <div className="font-mono text-[16px] font-bold text-lime">{priceDisplay}</div>
           <div className="text-[11px] text-muted">Costo: {formatMoney(p.cost)}</div>
           <div className="mt-2 flex justify-end gap-1.5">
-            <button onClick={() => quickStock(-1)} title="Descontar 1" className="rounded-[8px] border border-br2 px-2.5 py-1 text-[12px] text-txt2">
+            <button onClick={() => quickStock(-1)} title="Descontar 1" className="rounded-[8px] border border-br2 px-2.5 py-1 text-[12px] text-txt2 transition-colors hover:border-orange/40 hover:text-orange">
               −1
             </button>
-            <button onClick={() => quickStock(1)} title="Sumar 1" className="rounded-[8px] border border-br2 px-2.5 py-1 text-[12px] text-txt2">
+            <button onClick={() => quickStock(1)} title="Sumar 1" className="rounded-[8px] border border-br2 px-2.5 py-1 text-[12px] text-txt2 transition-colors hover:border-green/40 hover:text-green">
               +1
             </button>
-            <button onClick={onEdit} className="rounded-[8px] border border-br2 px-2.5 py-1 text-[12px] text-txt2">
+            <button onClick={onEdit} className="rounded-[8px] border border-br2 px-2.5 py-1 text-[12px] text-txt2 transition-colors hover:border-lime/40 hover:text-lime">
               ✏
             </button>
-            <button onClick={onDelete} className="rounded-[8px] bg-red px-2.5 py-1 text-[12px] text-white">
+            <button onClick={onDelete} className="rounded-[8px] bg-red px-2.5 py-1 text-[12px] text-white transition-opacity hover:opacity-85">
               🗑
             </button>
           </div>

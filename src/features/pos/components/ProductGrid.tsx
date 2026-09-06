@@ -35,17 +35,17 @@ export function ProductGrid({ products, cart, search, activeCat, onSetCat, onPic
 
   return (
     <div className="flex h-full flex-col overflow-hidden border-r border-br bg-bg">
-      <div className="flex flex-shrink-0 items-center justify-between border-b border-br bg-s1 px-3 py-2">
-        <span className="text-[13px] font-bold">Productos</span>
+      <div className="flex flex-shrink-0 items-center justify-between border-b border-br bg-s1 px-3 py-2 lg:px-4 lg:py-2.5">
+        <span className="text-[13px] font-bold lg:text-[14px]">Productos</span>
         <span className="font-mono text-[11px] text-muted">{filtered.length}</span>
       </div>
-      <div className="flex flex-shrink-0 gap-1.5 overflow-x-auto border-b border-br bg-s1 px-2.5 py-2 [scrollbar-width:none]">
+      <div className="flex flex-shrink-0 gap-1.5 overflow-x-auto border-b border-br bg-s1 px-2.5 py-2 [scrollbar-width:none] lg:px-4">
         {cats.map((c) => (
           <button
             key={c}
             onClick={() => onSetCat(c)}
-            className={`flex-shrink-0 whitespace-nowrap rounded-full border px-2.5 py-1 text-[11px] font-semibold ${
-              activeCat === c ? 'border-lime bg-lime/15 text-lime' : 'border-br2 text-txt2'
+            className={`flex-shrink-0 whitespace-nowrap rounded-full border px-2.5 py-1 text-[11px] font-semibold transition-colors ${
+              activeCat === c ? 'border-lime bg-lime/15 text-lime' : 'border-br2 text-txt2 hover:border-br2 hover:bg-s2 hover:text-txt'
             }`}
           >
             {c === '__all__' ? 'Todos' : c}
@@ -60,7 +60,7 @@ export function ProductGrid({ products, cart, search, activeCat, onSetCat, onPic
           </div>
         </div>
       ) : (
-        <div className="grid flex-1 grid-cols-2 content-start gap-1.5 overflow-y-auto p-2 md:grid-cols-3 xl:grid-cols-4">
+        <div className="grid flex-1 grid-cols-2 content-start gap-1.5 overflow-y-auto p-2 md:grid-cols-3 lg:gap-2 lg:p-3 xl:grid-cols-4 2xl:grid-cols-5">
           {filtered.map((p) => (
             <ProductCard key={p.code} product={p} qtyInCart={cart.find((c) => c.code === p.code)?.qty ?? 0} onClick={() => onPick(p)} />
           ))}
@@ -68,7 +68,7 @@ export function ProductGrid({ products, cart, search, activeCat, onSetCat, onPic
       )}
       <button
         onClick={onOpenFree}
-        className="m-2 flex flex-shrink-0 items-center justify-center gap-1.5 rounded-[10px] border border-dashed border-br2 p-2 text-[12px] text-txt2"
+        className="m-2 flex flex-shrink-0 items-center justify-center gap-1.5 rounded-[10px] border border-dashed border-br2 p-2 text-[12px] text-txt2 transition-colors hover:border-br2 hover:bg-s1 hover:text-txt lg:m-3"
       >
         <span>🏷️</span> Producto sin registrar
       </button>

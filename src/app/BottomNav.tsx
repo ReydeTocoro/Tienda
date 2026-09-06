@@ -1,40 +1,12 @@
 import { NavLink, useNavigate } from 'react-router-dom'
-import { useLiveQuery } from 'dexie-react-hooks'
-import { ShoppingCart, Package, Users, ClipboardList, Archive, BarChart3 } from 'lucide-react'
-import type { ComponentType, MouseEvent } from 'react'
-import { db } from '../db/index'
-import { groupFiados, groupTotals } from '../features/fiados/lib/fiadoGrouping'
+import type { MouseEvent } from 'react'
+import { NAV_ITEMS, useNavBadges, type NavItem } from './navConfig'
 import { usePermission } from '../features/pin/usePermission'
 
-interface NavItem {
-  to: string
-  label: string
-  icon: ComponentType<{ size?: number; className?: string }>
-  end?: boolean
-  badgeKey?: 'lowStock' | 'fiados'
-  requiresAdmin?: boolean
-}
-
-const ITEMS: NavItem[] = [
-  { to: '/', label: 'Venta', icon: ShoppingCart, end: true },
-  { to: '/inventario', label: 'Stock', icon: Package, badgeKey: 'lowStock', requiresAdmin: true },
-  { to: '/clientes', label: 'Clientes', icon: Users },
-  { to: '/fiados', label: 'Fiados', icon: ClipboardList, badgeKey: 'fiados' },
-  { to: '/historial', label: 'Historial', icon: Archive },
-  { to: '/reporte', label: 'Reporte', icon: BarChart3, requiresAdmin: true },
-]
-
-/** No role-picker screen (decision 3): every route is reachable directly, but Inventario/
- * Reporte prompt for the admin PIN the first time in a session — legacy
- * `navInventario`/`navReporte` (index.html L1953-1971). */
+/** Mobile chrome — thumb-friendly bottom tab bar. Hidden at `lg:` and up, where `Sidebar`
+ * takes over as the desktop nav (see `AppShell`). */
 export function BottomNav() {
-  const lowStockCount = useLiveQuery(() => db.products.filter((p) => p.stock > 0 && p.min > 0 && p.stock <= p.min).count(), [], 0)
-  const fiadoCount = useLiveQuery(
-    () => db.sales.toArray().then((sales) => groupFiados(sales).filter((g) => groupTotals(g).totalDebt > 0).length),
-    [],
-    0,
-  )
-  const badges = { lowStock: lowStockCount, fiados: fiadoCount }
+  const badges = useNavBadges()
   const { requireAdmin } = usePermission()
   const navigate = useNavigate()
 
@@ -47,8 +19,8 @@ export function BottomNav() {
   }
 
   return (
-    <nav className="z-50 flex flex-shrink-0 border-t border-br bg-s1 pb-[env(safe-area-inset-bottom,0px)]">
-      {ITEMS.map((item) => {
+    <nav className="z-50 flex flex-shrink-0 border-t border-br bg-s1 pb-[env(safe-area-inset-bottom,0px)] lg:hidden">
+      {NAV_ITEMS.map((item) => {
         const { to, label, icon: Icon, end, badgeKey } = item
         const count = badgeKey ? badges[badgeKey] : 0
         return (

@@ -143,99 +143,104 @@ export function InventarioPage() {
   }
 
   return (
-    <div className="p-3.5">
-      <p className="mb-3.5 font-display text-[21px] font-bold">Inventario</p>
+    <div className="p-3.5 lg:mx-auto lg:max-w-[1600px] lg:p-6">
+      <p className="mb-3.5 font-display text-[21px] font-bold lg:text-[26px]">Inventario</p>
 
-      <EntradaRapida
-        ref={entradaRef}
-        products={products}
-        open={entradaOpen}
-        onToggle={() => setEntradaOpen((o) => !o)}
-        onOpenCamera={() => {
-          setCamTarget('entrada')
-          setCameraOpen(true)
-        }}
-        onOpenMassive={() => setMassiveOpen(true)}
-        searchInputRef={entradaSearchRef}
-      />
+      <div className="lg:flex lg:items-start lg:gap-6">
+        {/* Tools column — restock + product form. Sticky on desktop so it stays in view while
+            the product list on the right scrolls. */}
+        <div className="lg:sticky lg:top-6 lg:w-[380px] lg:flex-shrink-0">
+          <EntradaRapida
+            ref={entradaRef}
+            products={products}
+            open={entradaOpen}
+            onToggle={() => setEntradaOpen((o) => !o)}
+            onOpenCamera={() => {
+              setCamTarget('entrada')
+              setCameraOpen(true)
+            }}
+            onOpenMassive={() => setMassiveOpen(true)}
+            searchInputRef={entradaSearchRef}
+          />
 
-      <div className="mb-3.5 grid grid-cols-2 gap-2.5">
-        <div className="col-span-2 rounded-[14px] border border-br bg-s1 p-3.5">
-          <div className="mb-2.5 text-[10px] font-semibold uppercase tracking-wider text-muted">💰 Inversión en Stock</div>
-          <div className="grid grid-cols-2 gap-2.5">
-            <Stat label="Costo total invertido" value={formatMoney(summary.totalCostValue)} color="text-orange" />
-            <Stat label="Valor de venta total" value={formatMoney(summary.totalSaleValue)} color="text-lime" />
-            <Stat label="Ganancia potencial" value={'+' + formatMoney(summary.totalProfit)} color="text-green" small />
-            <Stat label="Margen promedio" value={summary.avgMargin.toFixed(1) + '%'} color="text-blue" small />
+          <div className="mb-3.5 rounded-[14px] border border-br bg-s1 p-3.5">
+            <div className="mb-2.5 text-[10px] font-semibold uppercase tracking-wider text-muted">💰 Inversión en Stock</div>
+            <div className="grid grid-cols-2 gap-2.5">
+              <Stat label="Costo total invertido" value={formatMoney(summary.totalCostValue)} color="text-orange" />
+              <Stat label="Valor de venta total" value={formatMoney(summary.totalSaleValue)} color="text-lime" />
+              <Stat label="Ganancia potencial" value={'+' + formatMoney(summary.totalProfit)} color="text-green" small />
+              <Stat label="Margen promedio" value={summary.avgMargin.toFixed(1) + '%'} color="text-blue" small />
+            </div>
+            <div className="mt-3 flex flex-wrap gap-3 border-t border-br pt-2.5 text-[12px]">
+              <span className="text-txt2">
+                📦 {products.length} producto{products.length !== 1 ? 's' : ''}
+              </span>
+              {summary.lowStock > 0 && <span className="text-orange">⚠ {summary.lowStock} stock bajo</span>}
+              {summary.outStock > 0 && <span className="text-red">✗ {summary.outStock} sin stock</span>}
+              {summary.lowStock === 0 && summary.outStock === 0 && <span className="text-green">✓ Todo en orden</span>}
+            </div>
           </div>
-          <div className="mt-3 flex flex-wrap gap-3 border-t border-br pt-2.5 text-[12px]">
-            <span className="text-txt2">
-              📦 {products.length} producto{products.length !== 1 ? 's' : ''}
-            </span>
-            {summary.lowStock > 0 && <span className="text-orange">⚠ {summary.lowStock} stock bajo</span>}
-            {summary.outStock > 0 && <span className="text-red">✗ {summary.outStock} sin stock</span>}
-            {summary.lowStock === 0 && summary.outStock === 0 && <span className="text-green">✓ Todo en orden</span>}
+
+          <div className="mb-3.5 lg:mb-0">
+            <ProductForm
+              product={editing}
+              onSaved={() => setEditing(null)}
+              onCancel={() => setEditing(null)}
+              scanSeed={formSeed}
+              onOpenCamera={() => {
+                setCamTarget('form')
+                setCameraOpen(true)
+              }}
+            />
           </div>
         </div>
-      </div>
 
-      <div className="mb-3.5">
-        <ProductForm
-          product={editing}
-          onSaved={() => setEditing(null)}
-          onCancel={() => setEditing(null)}
-          scanSeed={formSeed}
-          onOpenCamera={() => {
-            setCamTarget('form')
-            setCameraOpen(true)
-          }}
-        />
-      </div>
+        {/* Browse column — search, bulk tools, and the product list as a card grid on desktop. */}
+        <div className="lg:min-w-0 lg:flex-1">
+          <input className="search-input" placeholder="🔍 Buscar producto..." value={search} onChange={(e) => setSearch(e.target.value)} />
 
-      <input className="search-input" placeholder="🔍 Buscar producto..." value={search} onChange={(e) => setSearch(e.target.value)} />
+          <div className="mb-2 grid grid-cols-2 gap-2 lg:grid-cols-4">
+            <button onClick={() => exportExcel(products, settings?.storeName ?? 'Mi Tienda')} className="rounded-[10px] border border-green/25 bg-green/10 py-2.5 text-[12px] font-semibold text-green transition-colors hover:bg-green/15">
+              📊 Exportar Excel
+            </button>
+            <button onClick={() => exportCSV(products, settings?.storeName ?? 'Mi Tienda')} className="rounded-[10px] border border-blue/25 bg-blue/10 py-2.5 text-[12px] font-semibold text-blue transition-colors hover:bg-blue/15">
+              📄 Exportar CSV
+            </button>
+            <button onClick={() => downloadImportTemplate(products, settings?.storeName ?? 'Mi Tienda')} className="rounded-[10px] border border-br2 bg-s2 py-2.5 text-[12px] text-txt2 transition-colors hover:bg-s3">
+              📋 Plantilla CSV
+            </button>
+            <button onClick={() => fileInputRef.current?.click()} className="rounded-[10px] border border-purple/25 bg-purple/10 py-2.5 text-[12px] font-semibold text-purple transition-colors hover:bg-purple/15">
+              📥 Importar CSV/Excel
+            </button>
+          </div>
+          <div className="mb-3.5 grid grid-cols-2 gap-2 lg:max-w-md">
+            <button onClick={() => setCyclicOpen(true)} className="rounded-[10px] border border-orange/25 bg-orange/10 py-2.5 text-[12px] font-semibold text-orange transition-colors hover:bg-orange/15">
+              🔢 Conteo Cíclico
+            </button>
+            <button onClick={() => setAuditOpen(true)} className="rounded-[10px] border border-br2 bg-s2 py-2.5 text-[12px] text-txt2 transition-colors hover:bg-s3">
+              📋 Log de Auditoría
+            </button>
+          </div>
+          <input ref={fileInputRef} type="file" accept=".xlsx,.xls,.csv,.txt,.json" className="hidden" onChange={handleFileSelected} />
 
-      <div className="mb-2 grid grid-cols-2 gap-2">
-        <button onClick={() => exportExcel(products, settings?.storeName ?? 'Mi Tienda')} className="rounded-[10px] border border-green/25 bg-green/10 py-2.5 text-[12px] font-semibold text-green">
-          📊 Exportar Excel
-        </button>
-        <button onClick={() => exportCSV(products, settings?.storeName ?? 'Mi Tienda')} className="rounded-[10px] border border-blue/25 bg-blue/10 py-2.5 text-[12px] font-semibold text-blue">
-          📄 Exportar CSV
-        </button>
-      </div>
-      <div className="mb-2 grid grid-cols-2 gap-2">
-        <button onClick={() => downloadImportTemplate(products, settings?.storeName ?? 'Mi Tienda')} className="rounded-[10px] border border-br2 bg-s2 py-2.5 text-[12px] text-txt2">
-          📋 Plantilla CSV
-        </button>
-        <button onClick={() => fileInputRef.current?.click()} className="rounded-[10px] border border-purple/25 bg-purple/10 py-2.5 text-[12px] font-semibold text-purple">
-          📥 Importar CSV/Excel
-        </button>
-      </div>
-      <div className="mb-3.5 grid grid-cols-2 gap-2">
-        <button onClick={() => setCyclicOpen(true)} className="rounded-[10px] border border-orange/25 bg-orange/10 py-2.5 text-[12px] font-semibold text-orange">
-          🔢 Conteo Cíclico
-        </button>
-        <button onClick={() => setAuditOpen(true)} className="rounded-[10px] border border-br2 bg-s2 py-2.5 text-[12px] text-txt2">
-          📋 Log de Auditoría
-        </button>
-      </div>
-      <input ref={fileInputRef} type="file" accept=".xlsx,.xls,.csv,.txt,.json" className="hidden" onChange={handleFileSelected} />
-
-      {!filtered.length ? (
-        <div className="p-10 text-center text-muted">
-          <div className="mb-2.5 text-4xl">📦</div>
-          <p className="text-[13px]">Sin productos aún</p>
-        </div>
-      ) : (
-        <div>
-          {filtered.map((p) =>
-            p.esPaquete ? (
-              <PackageCard key={p.code} product={p} onEdit={() => setEditing(p)} onDelete={() => handleDelete(p)} />
-            ) : (
-              <ProductListItem key={p.code} product={p} onEdit={() => setEditing(p)} onDelete={() => handleDelete(p)} />
-            ),
+          {!filtered.length ? (
+            <div className="p-10 text-center text-muted">
+              <div className="mb-2.5 text-4xl">📦</div>
+              <p className="text-[13px]">Sin productos aún</p>
+            </div>
+          ) : (
+            <div className="lg:grid lg:grid-cols-2 lg:items-start lg:gap-3 xl:grid-cols-3">
+              {filtered.map((p) =>
+                p.esPaquete ? (
+                  <PackageCard key={p.code} product={p} onEdit={() => setEditing(p)} onDelete={() => handleDelete(p)} />
+                ) : (
+                  <ProductListItem key={p.code} product={p} onEdit={() => setEditing(p)} onDelete={() => handleDelete(p)} />
+                ),
+              )}
+            </div>
           )}
         </div>
-      )}
+      </div>
 
       <MassiveScanModal open={massiveOpen} onClose={() => setMassiveOpen(false)} products={products} />
       <ImportPreviewModal

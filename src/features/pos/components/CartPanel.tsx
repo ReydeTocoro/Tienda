@@ -44,8 +44,8 @@ export function CartPanel({ products, onEditMeasured, onOpenDiscount, onCheckout
 
   return (
     <div className="flex h-full flex-col overflow-hidden bg-bg">
-      <div className="flex flex-shrink-0 items-center justify-between border-b border-br bg-s1 px-3 py-2">
-        <span className="text-[13px] font-bold">Carrito</span>
+      <div className="flex flex-shrink-0 items-center justify-between border-b border-br bg-s1 px-3 py-2 lg:px-4 lg:py-2.5">
+        <span className="text-[13px] font-bold lg:text-[14px]">Carrito</span>
         <span className="font-mono text-[11px] text-lime">{totalItems > 0 ? `${totalItems} ítem${totalItems !== 1 ? 's' : ''}` : ''}</span>
       </div>
 
@@ -86,7 +86,7 @@ export function CartPanel({ products, onEditMeasured, onOpenDiscount, onCheckout
                   <div className="flex items-center justify-center gap-1">
                     <button
                       onClick={() => changeQty(i, -1)}
-                      className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-md border border-br2 bg-s3 text-[14px]"
+                      className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-md border border-br2 bg-s3 text-[14px] transition-colors hover:border-lime/40 hover:text-lime"
                     >
                       −
                     </button>
@@ -94,7 +94,7 @@ export function CartPanel({ products, onEditMeasured, onOpenDiscount, onCheckout
                     <button
                       disabled={item.isFree}
                       onClick={() => changeQty(i, 1, stockByCode.get(item.code))}
-                      className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-md border border-br2 bg-s3 text-[14px] disabled:opacity-30"
+                      className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-md border border-br2 bg-s3 text-[14px] transition-colors hover:border-lime/40 hover:text-lime disabled:opacity-30 disabled:hover:border-br2 disabled:hover:text-txt"
                     >
                       +
                     </button>
@@ -105,7 +105,7 @@ export function CartPanel({ products, onEditMeasured, onOpenDiscount, onCheckout
                   {measured ? `/${ul}` : ''}
                 </div>
                 <div className="font-mono text-[13px] font-medium text-lime">{formatMoney(item.price * item.qty)}</div>
-                <button onClick={() => removeItem(i)} className="flex h-6 w-6 items-center justify-center rounded-md text-[13px] text-muted">
+                <button onClick={() => removeItem(i)} className="flex h-6 w-6 items-center justify-center rounded-md text-[13px] text-muted transition-colors hover:bg-red/10 hover:text-red">
                   ✕
                 </button>
               </div>
@@ -140,8 +140,8 @@ export function CartPanel({ products, onEditMeasured, onOpenDiscount, onCheckout
                 <button
                   key={m.key}
                   onClick={() => setPayMethod(m.key)}
-                  className={`rounded-xl border-2 py-2.5 text-center ${
-                    payMethod === m.key ? 'border-lime bg-lime/15 text-lime' : 'border-br2 bg-s2 text-txt2'
+                  className={`rounded-xl border-2 py-2.5 text-center transition-colors ${
+                    payMethod === m.key ? 'border-lime bg-lime/15 text-lime' : 'border-br2 bg-s2 text-txt2 hover:border-br2 hover:bg-s3 hover:text-txt'
                   }`}
                 >
                   <div className="mb-1 text-[20px]">{m.icon}</div>
@@ -170,16 +170,16 @@ export function CartPanel({ products, onEditMeasured, onOpenDiscount, onCheckout
           )}
 
           <div className="flex gap-2 border-t border-br px-3 py-2.5">
-            <button onClick={clear} title="Vaciar carrito" className="rounded-[10px] border border-br2 px-3 py-2.5 text-txt2">
+            <button onClick={clear} title="Vaciar carrito" className="rounded-[10px] border border-br2 px-3 py-2.5 text-txt2 transition-colors hover:border-red/40 hover:text-red">
               🗑
             </button>
-            <button onClick={() => setNotesOpen((o) => !o)} title="Agregar nota" className="rounded-[10px] border border-br2 px-3 py-2.5 text-txt2">
+            <button onClick={() => setNotesOpen((o) => !o)} title="Agregar nota" className="rounded-[10px] border border-br2 px-3 py-2.5 text-txt2 transition-colors hover:border-br2 hover:bg-s2">
               📝
             </button>
-            <button onClick={onOpenDiscount} title="Descuento manual" className="rounded-[10px] border border-br2 px-3 py-2.5 text-txt2">
+            <button onClick={onOpenDiscount} title="Descuento manual" className="rounded-[10px] border border-br2 px-3 py-2.5 text-txt2 transition-colors hover:border-br2 hover:bg-s2">
               %
             </button>
-            <button onClick={onCheckout} className="flex-1 rounded-[10px] bg-green py-2.5 text-[14px] font-bold text-black">
+            <button onClick={onCheckout} className="flex-1 rounded-[10px] bg-green py-2.5 text-[14px] font-bold text-black transition-transform hover:brightness-110 active:scale-[0.98]">
               ✓ Cobrar
             </button>
           </div>

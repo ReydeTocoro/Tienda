@@ -48,20 +48,29 @@ export function ClientesPage() {
   }
 
   return (
-    <div className="p-3.5">
-      <p className="mb-3.5 font-display text-[21px] font-bold">Clientes</p>
+    <div className="p-3.5 lg:mx-auto lg:max-w-[1400px] lg:p-6">
+      <p className="mb-3.5 font-display text-[21px] font-bold lg:text-[26px]">Clientes</p>
 
-      <div className="mb-3.5 grid grid-cols-3 gap-2">
+      <div className="mb-3.5 grid grid-cols-3 gap-2 lg:max-w-lg lg:gap-3">
         <StatBox label="Total" value={String(list.length)} color="text-blue" />
         <StatBox label="Facturado" value={formatMoney(totalRevenue)} color="text-lime" small />
         <StatBox label="Top" value={top ? top.customer.name.split(' ')[0] : '—'} color="text-purple" small />
       </div>
 
-      <button onClick={openNew} className="mb-3 w-full rounded-[10px] bg-lime py-3 text-[15px] font-bold text-black">
-        + Agregar Cliente
-      </button>
-
-      <input className="search-input" placeholder="🔍 Nombre, cédula o teléfono..." value={search} onChange={(e) => setSearch(e.target.value)} />
+      <div className="lg:flex lg:items-center lg:gap-3">
+        <button
+          onClick={openNew}
+          className="mb-3 w-full rounded-[10px] bg-lime py-3 text-[15px] font-bold text-black transition-opacity hover:opacity-90 lg:order-2 lg:mb-3.5 lg:w-auto lg:flex-shrink-0 lg:px-6"
+        >
+          + Agregar Cliente
+        </button>
+        <input
+          className="search-input lg:order-1 lg:mb-3.5 lg:flex-1"
+          placeholder="🔍 Nombre, cédula o teléfono..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+        />
+      </div>
 
       {!filtered.length ? (
         <div className="p-10 text-center text-muted">
@@ -69,23 +78,29 @@ export function ClientesPage() {
           <p className="text-[13px]">Sin clientes aún</p>
         </div>
       ) : (
-        filtered.map(({ customer: c, spent, pts, salesCount, tier: t }) => (
-          <button key={c.id} onClick={() => setProfile(c)} className="mb-2 flex w-full items-center gap-3 rounded-[14px] border border-br bg-s1 p-3.5 text-left">
-            <CustomerAvatar name={c.name} spent={spent} size={46} />
-            <div className="min-w-0 flex-1">
-              <div className="overflow-hidden text-ellipsis whitespace-nowrap text-[14px] font-bold">{c.name}</div>
-              <div className="mt-0.5 text-[11px] text-muted">
-                {c.cedula ? '🪪 ' + c.cedula + ' · ' : ''}
-                {c.phone || 'Sin teléfono'} · {salesCount} compra{salesCount !== 1 ? 's' : ''}
+        <div className="lg:grid lg:grid-cols-2 lg:gap-3 xl:grid-cols-3">
+          {filtered.map(({ customer: c, spent, pts, salesCount, tier: t }) => (
+            <button
+              key={c.id}
+              onClick={() => setProfile(c)}
+              className="mb-2 flex w-full items-center gap-3 rounded-[14px] border border-br bg-s1 p-3.5 text-left transition-colors hover:border-br2 hover:bg-s2 lg:mb-0"
+            >
+              <CustomerAvatar name={c.name} spent={spent} size={46} />
+              <div className="min-w-0 flex-1">
+                <div className="overflow-hidden text-ellipsis whitespace-nowrap text-[14px] font-bold">{c.name}</div>
+                <div className="mt-0.5 text-[11px] text-muted">
+                  {c.cedula ? '🪪 ' + c.cedula + ' · ' : ''}
+                  {c.phone || 'Sin teléfono'} · {salesCount} compra{salesCount !== 1 ? 's' : ''}
+                </div>
+                <span className={`mt-1 inline-flex rounded-full border px-2 py-0.5 text-[10px] font-semibold ${t.badgeClass}`}>{t.label}</span>
               </div>
-              <span className={`mt-1 inline-flex rounded-full border px-2 py-0.5 text-[10px] font-semibold ${t.badgeClass}`}>{t.label}</span>
-            </div>
-            <div className="flex-shrink-0 text-right">
-              <div className="font-mono text-[14px] text-lime">{formatMoney(spent)}</div>
-              <div className="text-[11px] text-muted">⭐ {pts} pts</div>
-            </div>
-          </button>
-        ))
+              <div className="flex-shrink-0 text-right">
+                <div className="font-mono text-[14px] text-lime">{formatMoney(spent)}</div>
+                <div className="text-[11px] text-muted">⭐ {pts} pts</div>
+              </div>
+            </button>
+          ))}
+        </div>
       )}
 
       <ClientFormSheet

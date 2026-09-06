@@ -39,13 +39,13 @@ export function Header() {
   }
 
   return (
-    <header className="z-50 flex flex-shrink-0 items-center justify-between border-b border-br bg-s1 px-4 py-2.5">
-      <button onClick={openEdit} className="text-left" title="Clic para cambiar el nombre">
-        <h1 className="font-display text-[17px] font-black text-lime">🏪 {settings?.storeName ?? 'Mi Tienda Pro'}</h1>
+    <header className="z-50 flex flex-shrink-0 items-center justify-between border-b border-br bg-s1 px-4 py-2.5 lg:px-6 lg:py-3">
+      <button onClick={openEdit} className="text-left transition-opacity hover:opacity-80" title="Clic para cambiar el nombre">
+        <h1 className="font-display text-[17px] font-black text-lime lg:text-[19px]">🏪 {settings?.storeName ?? 'Mi Tienda Pro'}</h1>
         <div className="mt-px text-[9px] uppercase tracking-widest text-muted">Sistema de caja</div>
       </button>
-      <div className="flex items-center gap-2.5">
-        <button onClick={toggleTheme} title="Cambiar tema" className="text-[17px] leading-none opacity-70">
+      <div className="flex items-center gap-2.5 lg:gap-4">
+        <button onClick={toggleTheme} title="Cambiar tema" className="text-[17px] leading-none opacity-70 transition-opacity hover:opacity-100">
           {settings?.theme === 'light' ? '☀️' : '🌙'}
         </button>
         <div className="text-right font-mono text-[11px] text-txt2">

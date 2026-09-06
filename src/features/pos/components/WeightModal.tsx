@@ -51,9 +51,12 @@ export function WeightModal({ product: p, editIndex, onClose }: WeightModalProps
   }
 
   return (
-    <div className="fixed inset-0 z-[2000] flex items-end justify-center bg-black/[0.88]" onClick={(e) => e.target === e.currentTarget && onClose()}>
-      <div className="w-full max-w-[420px] rounded-t-[22px] border border-br2 bg-s1 p-[18px] pb-8 animate-[sheetUp_0.22s_ease]">
-        <div className="mx-auto mb-4 h-1 w-10 rounded bg-br2" />
+    <div
+      className="fixed inset-0 z-[2000] flex items-end justify-center bg-black/[0.88] lg:items-center lg:p-6"
+      onClick={(e) => e.target === e.currentTarget && onClose()}
+    >
+      <div className="w-full max-w-[420px] rounded-t-[22px] border border-br2 bg-s1 p-[18px] pb-8 animate-[sheetUp_0.22s_ease] lg:rounded-[22px] lg:pb-[18px] lg:animate-[dialogIn_0.18s_ease]">
+        <div className="mx-auto mb-4 h-1 w-10 rounded bg-br2 lg:hidden" />
         <div className="mb-3.5 flex items-start justify-between">
           <div>
             <div className="font-display text-[17px] font-bold leading-tight">{p.name}</div>

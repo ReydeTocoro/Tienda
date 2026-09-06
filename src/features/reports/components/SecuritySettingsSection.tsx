@@ -64,8 +64,9 @@ export function SecuritySettingsSection() {
   }
 
   return (
-    <>
-      <p className="mb-2 mt-5 text-[13px] font-bold uppercase tracking-wide text-txt2">🔐 Seguridad — PIN</p>
+    <div className="lg:grid lg:grid-cols-2 lg:items-start lg:gap-6">
+      <div>
+      <p className="mb-2 mt-5 text-[13px] font-bold uppercase tracking-wide text-txt2 lg:mt-0">🔐 Seguridad — PIN</p>
       <div className="mb-3.5 rounded-xl border border-br2 bg-s2 p-3.5">
         <div className="mb-3 text-[13px] text-txt2">
           El PIN protege: agregar/quitar stock, cierre de caja, pago de fiados y corrección de facturas. Máximo <b className="text-red">5 intentos</b> antes de bloqueo temporal.
@@ -85,7 +86,7 @@ export function SecuritySettingsSection() {
               <button
                 key={n}
                 onClick={() => setPinLength(n as 4 | 6)}
-                className={`rounded-lg border px-3 py-1 font-mono text-[12px] font-bold ${pinLength === n ? 'border-lime bg-lime/15 text-lime' : 'border-br2 text-txt2'}`}
+                className={`rounded-lg border px-3 py-1 font-mono text-[12px] font-bold transition-colors ${pinLength === n ? 'border-lime bg-lime/15 text-lime' : 'border-br2 text-txt2 hover:bg-s3'}`}
               >
                 {n} dígitos
               </button>
@@ -120,7 +121,7 @@ export function SecuritySettingsSection() {
           </div>
         </div>
 
-        <button onClick={savePin} className="mt-1 w-full rounded-[10px] bg-lime py-2.5 text-[14px] font-bold text-black">
+        <button onClick={savePin} className="mt-1 w-full rounded-[10px] bg-lime py-2.5 text-[14px] font-bold text-black transition-opacity hover:opacity-90">
           💾 Guardar PIN
         </button>
         {status && <div className={`mt-1.5 text-center text-[11px] ${status.ok ? 'text-green' : 'text-red'}`}>{status.text}</div>}
@@ -131,8 +132,10 @@ export function SecuritySettingsSection() {
         </div>
         {settings?.pinChangedAt && <div className="mt-1.5 text-center text-[10px] text-muted">Último cambio: {formatDateTime(settings.pinChangedAt)}</div>}
       </div>
+      </div>
 
-      <p className="mb-2 mt-5 text-[13px] font-bold uppercase tracking-wide text-txt2">📡 Lector de Código de Barras</p>
+      <div>
+      <p className="mb-2 mt-5 text-[13px] font-bold uppercase tracking-wide text-txt2 lg:mt-0">📡 Lector de Código de Barras</p>
       <div className="mb-3.5 rounded-xl border border-br2 bg-s2 p-3.5">
         <div className="mb-3 flex items-center justify-between">
           <div>
@@ -141,7 +144,7 @@ export function SecuritySettingsSection() {
           </div>
           <button
             onClick={toggleScanner}
-            className={`rounded-[10px] border px-4 py-2 text-[12px] font-bold ${scannerEnabled ? 'border-lime/30 bg-lime/10 text-lime' : 'border-red/30 bg-red/10 text-red'}`}
+            className={`rounded-[10px] border px-4 py-2 text-[12px] font-bold transition-colors ${scannerEnabled ? 'border-lime/30 bg-lime/10 text-lime hover:bg-lime/20' : 'border-red/30 bg-red/10 text-red hover:bg-red/20'}`}
           >
             {scannerEnabled ? 'Desactivar' : 'Activar'}
           </button>
@@ -150,10 +153,12 @@ export function SecuritySettingsSection() {
           🎹 <kbd className="rounded border border-br2 bg-s1 px-1.5 py-0.5 font-mono text-[11px]">F8</kbd> activa / desactiva el lector desde cualquier página.
         </div>
       </div>
+      </div>
 
+      <div className="lg:col-span-2">
       <p className="mb-2 mt-5 text-[13px] font-bold uppercase tracking-wide text-txt2">⌨️ Atajos de Teclado</p>
       <div className="mb-3.5 rounded-xl border border-br2 bg-s2 p-3.5 text-[12px] leading-loose">
-        <div className="grid grid-cols-[auto_1fr] items-center gap-x-3.5 gap-y-1">
+        <div className="grid grid-cols-[auto_1fr] items-center gap-x-3.5 gap-y-1 lg:grid-cols-[auto_1fr_auto_1fr]">
           <Kbd>F1–F6</Kbd>
           <span className="text-txt2">Navegar entre páginas (Venta, Stock, Clientes…)</span>
           <Kbd>/</Kbd>
@@ -168,7 +173,8 @@ export function SecuritySettingsSection() {
           <span className="text-txt2">Ingresar PIN (cuando el modal está abierto)</span>
         </div>
       </div>
-    </>
+      </div>
+    </div>
   )
 }
 

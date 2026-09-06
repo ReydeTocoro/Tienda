@@ -147,11 +147,11 @@ export function VentaPage() {
   }
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="mx-auto flex h-full max-w-[1800px] flex-col">
       <ClientBar onOpen={() => setPickerOpen(true)} />
       <VentaKpiBar onClickLowStock={() => setLowStockOnly(true)} />
 
-      <div className="flex flex-shrink-0 gap-2 px-3 py-2">
+      <div className="flex flex-shrink-0 gap-2 px-3 py-2 lg:px-4">
         <div className="relative flex-1">
           <input
             id="venta-search-input"
@@ -164,26 +164,37 @@ export function VentaPage() {
             onKeyDown={handleSearchKeyDown}
             placeholder="🔍  Buscar producto por nombre o código..."
             autoComplete="off"
-            className="input"
+            className="input lg:h-[42px] lg:text-[15px]"
           />
           <SearchDropdown matches={searchMatches(products, search)} query={search} focusIndex={ddFocus} onHover={setDdFocus} onSelect={pickAndClear} />
         </div>
-        <button onClick={() => setCameraOpen(true)} title="Escanear código" className="flex h-[42px] w-11 flex-shrink-0 items-center justify-center rounded-[10px] border border-br2 bg-s2 text-lime">
+        <button
+          onClick={() => setCameraOpen(true)}
+          title="Escanear código"
+          className="flex h-[42px] w-11 flex-shrink-0 items-center justify-center rounded-[10px] border border-br2 bg-s2 text-lime transition-colors hover:border-lime/40 hover:bg-s3"
+        >
           📷
         </button>
-        <button onClick={() => setCalcOpen((o) => !o)} title="Calculadora" className="flex h-[42px] w-11 flex-shrink-0 items-center justify-center rounded-[10px] border border-br2 bg-s2 text-blue">
+        <button
+          onClick={() => setCalcOpen((o) => !o)}
+          title="Calculadora"
+          className="flex h-[42px] w-11 flex-shrink-0 items-center justify-center rounded-[10px] border border-br2 bg-s2 text-blue transition-colors hover:border-blue/40 hover:bg-s3"
+        >
           🧮
         </button>
       </div>
 
       {lowStockOnly && (
-        <button onClick={() => setLowStockOnly(false)} className="mx-3 mb-2 flex-shrink-0 rounded-lg border border-orange/30 bg-orange/10 px-3 py-1.5 text-left text-[12px] text-orange">
+        <button
+          onClick={() => setLowStockOnly(false)}
+          className="mx-3 mb-2 flex-shrink-0 rounded-lg border border-orange/30 bg-orange/10 px-3 py-1.5 text-left text-[12px] text-orange transition-colors hover:bg-orange/15 lg:mx-4"
+        >
           ⚠ Mostrando solo stock bajo — toca para quitar el filtro
         </button>
       )}
 
       <div className="flex min-h-0 flex-1 overflow-hidden border-t border-br">
-        <div className="w-[52%] flex-shrink-0 md:w-[55%] xl:w-[58%]">
+        <div className="w-[52%] flex-shrink-0 md:w-[55%] lg:w-[56%] xl:w-[58%]">
           <ProductGrid
             products={products}
             cart={items}
