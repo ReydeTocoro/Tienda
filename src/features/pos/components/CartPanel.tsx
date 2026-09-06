@@ -127,7 +127,7 @@ export function CartPanel({ products, onEditMeasured, onOpenDiscount, onCheckout
                 <span className="font-mono text-green">-{formatMoney(discount)}</span>
               </div>
             )}
-            <div className="mt-2 flex items-center justify-between border-t border-br pt-3 text-[20px] font-bold">
+            <div className="mt-2 flex flex-wrap items-baseline justify-between gap-x-2 border-t border-br pt-3 text-[20px] font-bold">
               <span>TOTAL</span>
               <span className="font-mono text-lime">{formatMoney(total)}</span>
             </div>
