@@ -24,7 +24,7 @@ export function ImportPreviewModal({ open, fileName, parsed, errors, onClose, on
   const warnCount = parsed.filter((r) => r.warnings.length).length
 
   return (
-    <BottomSheet open={open} onClose={onClose} maxWidthClass="max-w-[720px]" zIndexClass="z-[3000]">
+    <BottomSheet open={open} onClose={onClose} maxWidthClass="max-w-[720px]">
       <p className="mb-1 font-display text-[18px] font-bold">📥 Vista previa de importación</p>
       <div className="mb-3.5 text-[12px] text-muted">
         <b>{fileName}</b> · {total} producto{total !== 1 ? 's' : ''} · <span className="text-green">{newCount} nuevo{newCount !== 1 ? 's' : ''}</span> ·{' '}

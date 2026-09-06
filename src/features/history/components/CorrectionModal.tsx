@@ -73,7 +73,7 @@ export function CorrectionModal({ sale, onClose, onCorrected }: CorrectionModalP
   }
 
   return (
-    <BottomSheet open={!!sale} onClose={onClose} zIndexClass="z-[4000]">
+    <BottomSheet open={!!sale} onClose={onClose}>
       <div className="mb-1 flex items-center gap-2">
         <span className="text-[22px]">✏️</span>
         <div>

@@ -22,7 +22,7 @@ export function AuditLogModal({ open, onClose }: AuditLogModalProps) {
   if (!open) return null
 
   return (
-    <BottomSheet open={open} onClose={onClose} maxWidthClass="max-w-[720px]" zIndexClass="z-[3000]">
+    <BottomSheet open={open} onClose={onClose} maxWidthClass="max-w-[720px]">
       <div className="mb-3.5 flex items-center justify-between">
         <div>
           <p className="font-display text-[18px] font-bold">📋 Log de Auditoría</p>

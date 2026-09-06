@@ -74,7 +74,7 @@ export function CyclicCountModal({ open, onClose, products }: CyclicCountModalPr
   if (!open) return null
 
   return (
-    <BottomSheet open={open} onClose={handleClose} maxWidthClass="max-w-[720px]" zIndexClass="z-[3000]">
+    <BottomSheet open={open} onClose={handleClose} maxWidthClass="max-w-[720px]">
       <div className="mb-3.5 flex items-center justify-between">
         <div>
           <p className="font-display text-[18px] font-bold">🔢 Conteo Cíclico de Stock</p>

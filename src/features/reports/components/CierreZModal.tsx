@@ -64,7 +64,7 @@ export function CierreZModal({ open, dayKey, onClose, onClosed }: CierreZModalPr
   }
 
   return (
-    <Modal open={open} onClose={onClose} maxWidthClass="max-w-[420px]" zIndexClass="z-[3100]">
+    <Modal open={open} onClose={onClose} maxWidthClass="max-w-[420px]">
       <div className="mb-1 font-display text-[18px] font-bold">🔒 Reporte Z — Cierre definitivo</div>
       <div className="mb-4 text-[12px] text-muted">Fecha: {dayKey}</div>
 

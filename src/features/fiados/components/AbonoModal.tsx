@@ -25,7 +25,7 @@ export function AbonoModal({ open, maxDebt, onClose, onConfirm }: AbonoModalProp
   }
 
   return (
-    <Modal open={open} onClose={onClose} zIndexClass="z-[2100]">
+    <Modal open={open} onClose={onClose}>
       <div className="mb-1 font-display text-[18px] font-bold">💰 Registrar Abono</div>
       <div className="mb-4 text-[12px] text-muted">
         Deuda total: <b className="text-red">{formatMoney(maxDebt)}</b>

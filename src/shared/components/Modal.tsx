@@ -1,27 +1,36 @@
-import type { ReactNode } from 'react'
+import { useEffect, useRef, type ReactNode } from 'react'
 
 interface ModalProps {
   open: boolean
   onClose: () => void
   children: ReactNode
   maxWidthClass?: string
-  zIndexClass?: string
 }
 
-/** Centered dialog — replaces the legacy centered `position:fixed` modals (producto libre,
- * abono, calculadora, etc). */
-export function Modal({ open, onClose, children, maxWidthClass = 'max-w-[380px]', zIndexClass = 'z-[1000]' }: ModalProps) {
-  if (!open) return null
+/** Centered dialog built on the native `<dialog>` element — gets backdrop, Escape-to-close,
+ * focus trap, and top-layer stacking for free instead of hand-rolled fixed/z-index/click-outside
+ * logic. Content stays conditionally rendered (`open && children`) so consumers that reset their
+ * own local state via unmount (not a `useEffect`) keep working exactly as before. */
+export function Modal({ open, onClose, children, maxWidthClass = 'max-w-[380px]' }: ModalProps) {
+  const ref = useRef<HTMLDialogElement>(null)
+
+  useEffect(() => {
+    const el = ref.current
+    if (!el) return
+    if (open && !el.open) el.showModal()
+    if (!open && el.open) el.close()
+  }, [open])
+
   return (
-    <div
-      className={`fixed inset-0 ${zIndexClass} flex items-center justify-center bg-black/80 p-5`}
+    <dialog
+      ref={ref}
+      onClose={onClose}
       onClick={(e) => {
-        if (e.target === e.currentTarget) onClose()
+        if (e.target === ref.current) ref.current?.close()
       }}
+      className={`m-auto w-full ${maxWidthClass} rounded-[18px] border border-br2 bg-s1 p-[22px] text-txt backdrop:bg-black/80 open:animate-[sheetUp_0.2s_ease]`}
     >
-      <div className={`w-full ${maxWidthClass} rounded-[18px] border border-br2 bg-s1 p-[22px] animate-[sheetUp_0.2s_ease]`}>
-        {children}
-      </div>
-    </div>
+      {open && children}
+    </dialog>
   )
 }

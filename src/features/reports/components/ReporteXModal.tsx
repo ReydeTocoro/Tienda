@@ -22,7 +22,7 @@ export function ReporteXModal({ open, dayKey, onClose }: ReporteXModalProps) {
   const storeName = settings?.storeName ?? 'Mi Tienda Pro'
 
   return (
-    <BottomSheet open={open} onClose={onClose} zIndexClass="z-[3000]">
+    <BottomSheet open={open} onClose={onClose}>
       <div className="mb-1 flex items-center justify-between">
         <div className="font-display text-[18px] font-bold text-blue">📊 Reporte X</div>
         <span className="rounded-full border border-blue/30 bg-blue/10 px-2.5 py-0.5 text-[11px] font-bold text-blue">LECTURA PARCIAL</span>

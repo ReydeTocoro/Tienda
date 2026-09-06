@@ -26,7 +26,7 @@ export function QuickDiscountModal({ open, onClose }: QuickDiscountModalProps) {
   }
 
   return (
-    <BottomSheet open={open} onClose={onClose} maxWidthClass="max-w-[420px]" zIndexClass="z-[2500]">
+    <BottomSheet open={open} onClose={onClose} maxWidthClass="max-w-[420px]">
       <div className="mb-3.5 font-display text-[18px] font-bold">% Descuento manual</div>
       <div className="mb-3.5 flex flex-wrap gap-2">
         {PRESETS.map((p) => (
