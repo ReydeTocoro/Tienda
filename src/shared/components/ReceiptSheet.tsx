@@ -33,9 +33,9 @@ ${formatDateTime(sale.date)}${sale.customerName ? '\n👤 ' + sale.customerName 
 ━━━━━━━━━━━━━━━━━━━━
 ${itemLines}
 ━━━━━━━━━━━━━━━━━━━━
-Subtotal:  ${formatMoney(sale.subtotal ?? sale.total)}${sale.discount ? '\nDescuento: -' + formatMoney(sale.discount) : ''}
+Subtotal:  ${formatMoney(sale.subtotal ?? sale.total)}${sale.discount ? '\nDescuento: -' + formatMoney(sale.discount) : ''}${sale.roundingAdjustment ? '\nAjuste:    ' + (sale.roundingAdjustment > 0 ? '+' : '') + formatMoney(sale.roundingAdjustment) : ''}
 TOTAL:     ${formatMoney(sale.total)}
-Pago:      ${sale.payMethod.charAt(0).toUpperCase() + sale.payMethod.slice(1)}
+Pago:      ${sale.payMethod.charAt(0).toUpperCase() + sale.payMethod.slice(1)}${sale.amountReceived !== undefined ? '\nRecibido:  ' + formatMoney(sale.amountReceived) : ''}${sale.changeGiven !== undefined ? '\nCambio:    ' + formatMoney(sale.changeGiven) : ''}
 ━━━━━━━━━━━━━━━━━━━━
 ¡Gracias por su compra!`
 }
@@ -108,6 +108,15 @@ export function ReceiptSheet({ sale, onClose, onCorrect }: ReceiptSheetProps) {
             <span>-{formatMoney(sale.discount)}</span>
           </div>
         )}
+        {!!sale.roundingAdjustment && (
+          <div className="flex justify-between text-orange">
+            <span>Ajuste</span>
+            <span>
+              {sale.roundingAdjustment > 0 ? '+' : ''}
+              {formatMoney(sale.roundingAdjustment)}
+            </span>
+          </div>
+        )}
         <div className="flex justify-between text-[14px] font-bold">
           <span>TOTAL</span>
           <span>{formatMoney(sale.total)}</span>
@@ -119,6 +128,18 @@ export function ReceiptSheet({ sale, onClose, onCorrect }: ReceiptSheetProps) {
             {PAY_ICON[sale.payMethod]} {sale.payMethod.charAt(0).toUpperCase() + sale.payMethod.slice(1)}
           </span>
         </div>
+        {sale.amountReceived !== undefined && (
+          <div className="flex justify-between">
+            <span>Recibido</span>
+            <span>{formatMoney(sale.amountReceived)}</span>
+          </div>
+        )}
+        {sale.changeGiven !== undefined && (
+          <div className="flex justify-between font-bold text-lime">
+            <span>Cambio</span>
+            <span>{formatMoney(sale.changeGiven)}</span>
+          </div>
+        )}
         {ptsEarned > 0 && (
           <div className="mt-0.5 text-center text-[11px] text-lime">
             +{ptsEarned} puntos ganados · Total: {ptsTotal} pts

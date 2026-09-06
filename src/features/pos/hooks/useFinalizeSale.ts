@@ -5,15 +5,20 @@ import { computeCartDiscount, getPts } from '../../../shared/lib/loyalty'
 import { toast } from '../../../store/useToastStore'
 import type { Sale } from '../../../types/sale'
 
-/** Cart subtotal/discount/total. Pass the selected customer's live points (see
- * `useSelectedCustomerLoyalty`) — 0 when no customer is picked. */
+/** Cart subtotal/discount/total, plus the cash-register charge amount (defaults to `total`,
+ * overridden when the cashier types a different "Total a cobrar" — see `chargeOverride`).
+ * Pass the selected customer's live points (see `useSelectedCustomerLoyalty`) — 0 when no
+ * customer is picked. */
 export function useCartTotals(loyaltyPts = 0) {
   const items = useCartStore((s) => s.items)
   const manualDiscountPct = useCartStore((s) => s.manualDiscountPct)
+  const chargeOverride = useCartStore((s) => s.chargeOverride)
   const subtotal = items.reduce((a, i) => a + i.price * i.qty, 0)
   const { amount: discount, label: discountLabel } = computeCartDiscount(subtotal, loyaltyPts, manualDiscountPct)
   const total = subtotal - discount
-  return { subtotal, discount, discountLabel, total }
+  const chargeAmount = chargeOverride ?? total
+  const roundingAdjustment = chargeAmount - total
+  return { subtotal, discount, discountLabel, total, chargeAmount, roundingAdjustment }
 }
 
 /** Ports `finalizeSale()` (legacy index.html L3359-3415) onto the Dexie transaction in
@@ -35,12 +40,23 @@ export function useFinalizeSale() {
     const loyaltyPts = cart.customerId ? getPts(custSales, cart.customerId) : 0
     const { amount: discount } = computeCartDiscount(subtotal, loyaltyPts, cart.manualDiscountPct)
     const total = subtotal - discount
+    const chargeAmount = cart.chargeOverride ?? total
+    const roundingAdjustment = chargeAmount - total
 
+    if (cart.payMethod === 'efectivo' && cart.amountReceived > 0 && cart.amountReceived < chargeAmount) {
+      toast('⚠ El efectivo recibido no alcanza el total', 'orange')
+      return null
+    }
+
+    const isCash = cart.payMethod === 'efectivo' && cart.amountReceived > 0
     const sale = await finalizeSale({
       items: cart.items,
       subtotal,
       discount,
-      total,
+      total: chargeAmount,
+      roundingAdjustment: roundingAdjustment !== 0 ? roundingAdjustment : undefined,
+      amountReceived: isCash ? cart.amountReceived : undefined,
+      changeGiven: isCash ? cart.amountReceived - chargeAmount : undefined,
       payMethod: cart.payMethod,
       customerId: cart.customerId,
       customerName: cart.customerName,

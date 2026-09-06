@@ -23,6 +23,13 @@ export interface Sale {
   /** 'YYYY-MM-DD', indexed — derived from `date` at insert time. */
   dayKey: string
   notes?: string
+  /** Cash-register tender info (cash sales only). `roundingAdjustment` is the signed difference
+   * between what was actually charged (`total`) and the raw subtotal-minus-discount — common in
+   * cash-only stores that round to the nearest bill/coin. Kept explicit so books stay honest
+   * instead of `total` silently drifting from `subtotal - discount`. */
+  roundingAdjustment?: number
+  amountReceived?: number
+  changeGiven?: number
   fiadoPagos?: FiadoPago[]
   corrected?: boolean
   correctedAt?: string

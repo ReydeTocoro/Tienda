@@ -8,6 +8,9 @@ export interface FinalizeSaleInput {
   subtotal: number
   discount: number
   total: number
+  roundingAdjustment?: number
+  amountReceived?: number
+  changeGiven?: number
   payMethod: PayMethod
   customerId?: string | null
   customerName?: string | null
@@ -38,6 +41,9 @@ export async function finalizeSale(input: FinalizeSaleInput): Promise<Sale> {
       subtotal: input.subtotal,
       discount: input.discount,
       total: input.total,
+      roundingAdjustment: input.roundingAdjustment,
+      amountReceived: input.amountReceived,
+      changeGiven: input.changeGiven,
       ganancia,
       payMethod: input.payMethod,
       customerId: input.customerId ?? undefined,

@@ -22,6 +22,11 @@ interface CartState {
   fiadoName: string
   manualDiscountPct: number
   notes: string
+  /** Cash-register tender: null = charge the computed total as-is. Set when the cashier types a
+   * different "Total a cobrar" (e.g. rounding cash to the nearest bill). */
+  chargeOverride: number | null
+  /** Cash received from the customer — used to compute change for `payMethod === 'efectivo'`. */
+  amountReceived: number
 
   addUnitItem: (p: AddUnitSource, qty?: number) => void
   addWeightedItem: (item: CartItem, editIndex?: number | null) => void
@@ -33,6 +38,8 @@ interface CartState {
   setFiadoName: (n: string) => void
   setManualDiscountPct: (p: number) => void
   setNotes: (n: string) => void
+  setChargeOverride: (n: number | null) => void
+  setAmountReceived: (n: number) => void
   clear: () => void
 }
 
@@ -44,6 +51,8 @@ const initialSlice = {
   fiadoName: '',
   manualDiscountPct: 0,
   notes: '',
+  chargeOverride: null as number | null,
+  amountReceived: 0,
 }
 
 /** Replaces the legacy global `cart`/`selClient`/`payMethod` variables (index.html L1769-1772). */
@@ -130,6 +139,8 @@ export const useCartStore = create<CartState>((set, get) => ({
   setFiadoName: (fiadoName) => set({ fiadoName }),
   setManualDiscountPct: (manualDiscountPct) => set({ manualDiscountPct }),
   setNotes: (notes) => set({ notes }),
+  setChargeOverride: (chargeOverride) => set({ chargeOverride }),
+  setAmountReceived: (amountReceived) => set({ amountReceived }),
 
   clear: () => set({ ...initialSlice }),
 }))
