@@ -1,6 +1,7 @@
 import { db } from '../index'
 import type { Sale, PayMethod, FiadoPago } from '../../types/sale'
 import type { CartItem } from '../../types/cartItem'
+import type { CorrectionAuditEntry, SaleSnapshot } from '../../types/auditLog'
 
 export interface FinalizeSaleInput {
   items: CartItem[]
@@ -109,5 +110,73 @@ export async function payAllFiados(saleIds: number[], note: string): Promise<num
       await db.sales.update(id, { fiadoPagos: pagos })
     }
     return total
+  })
+}
+
+/** Post-hoc edit of an already-finalized sale — restores the original items' stock, applies
+ * the new items' stock, recalculates totals (discount is kept as-is) and logs a
+ * `correccion_venta` audit entry. Legacy `confirmarCorreccion()` (index.html L6994-6073). */
+export async function correctSale(saleId: number, newItems: CartItem[], reason: string): Promise<Sale> {
+  return db.transaction('rw', db.sales, db.products, db.auditLog, async () => {
+    const sale = await db.sales.get(saleId)
+    if (!sale) throw new Error('Venta no encontrada')
+
+    const before: SaleSnapshot = {
+      items: sale.items,
+      subtotal: sale.subtotal,
+      total: sale.total,
+      discount: sale.discount || 0,
+    }
+
+    const isTracked = (ci: CartItem) => !ci.isFree && ci.code !== 'CORR' && !ci.code.startsWith('FREE_')
+
+    for (const ci of sale.items) {
+      if (!isTracked(ci)) continue
+      const p = await db.products.get(ci.code)
+      if (p) await db.products.update(ci.code, { stock: p.stock + ci.qty })
+    }
+    for (const ci of newItems) {
+      if (!isTracked(ci)) continue
+      const p = await db.products.get(ci.code)
+      if (p) await db.products.update(ci.code, { stock: Math.max(0, p.stock - ci.qty) })
+    }
+
+    const newSub = newItems.reduce((s, i) => s + i.price * i.qty, 0)
+    const newDisc = sale.discount || 0
+    const newTotal = Math.max(0, newSub - newDisc)
+    let newGanancia = 0
+    for (const ci of newItems) {
+      if (ci.isFree || !isTracked(ci)) {
+        newGanancia += ci.price * ci.qty
+        continue
+      }
+      const p = await db.products.get(ci.code)
+      const cost = p?.cost ?? 0
+      newGanancia += (ci.price - cost) * ci.qty
+    }
+
+    const after: SaleSnapshot = { items: newItems, subtotal: newSub, total: newTotal, discount: newDisc }
+    const auditEntry: Omit<CorrectionAuditEntry, 'id'> = {
+      type: 'correccion_venta',
+      date: new Date().toISOString(),
+      saleId,
+      reason,
+      before,
+      after,
+      totalDiff: newTotal - before.total,
+    }
+    await db.auditLog.add(auditEntry)
+
+    const patch = {
+      items: newItems,
+      subtotal: newSub,
+      total: newTotal,
+      ganancia: newGanancia,
+      corrected: true,
+      correctedAt: new Date().toISOString(),
+      correctionReason: reason,
+    }
+    await db.sales.update(saleId, patch)
+    return { ...sale, ...patch }
   })
 }

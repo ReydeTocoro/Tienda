@@ -6,6 +6,7 @@ import { formatDateTime, formatMoney } from '../../shared/lib/currency'
 import { formatPurchaseId, formatSaleId } from '../../shared/lib/id'
 import { ReceiptSheet } from '../../shared/components/ReceiptSheet'
 import { PurchaseFormSheet } from './components/PurchaseFormSheet'
+import { CorrectionModal } from './components/CorrectionModal'
 
 const PAY_PILL: Record<string, string> = {
   efectivo: 'bg-green/10 text-green',
@@ -20,6 +21,7 @@ export function HistorialPage() {
   const purchases = useLiveQuery(() => db.purchases.orderBy('date').reverse().toArray(), [], [])
   const [receiptSale, setReceiptSale] = useState<Sale | null>(null)
   const [purchaseOpen, setPurchaseOpen] = useState(false)
+  const [correctingSale, setCorrectingSale] = useState<Sale | null>(null)
 
   const rows: Row[] = useMemo(() => {
     const a: Row[] = sales.map((s) => ({ kind: 'venta', date: s.date, sale: s }))
@@ -94,8 +96,20 @@ export function HistorialPage() {
         )
       )}
 
-      <ReceiptSheet sale={receiptSale} onClose={() => setReceiptSale(null)} />
+      <ReceiptSheet
+        sale={receiptSale}
+        onClose={() => setReceiptSale(null)}
+        onCorrect={
+          receiptSale
+            ? () => {
+                setCorrectingSale(receiptSale)
+                setReceiptSale(null)
+              }
+            : undefined
+        }
+      />
       <PurchaseFormSheet open={purchaseOpen} onClose={() => setPurchaseOpen(false)} />
+      <CorrectionModal sale={correctingSale} onClose={() => setCorrectingSale(null)} onCorrected={() => setCorrectingSale(null)} />
     </div>
   )
 }
