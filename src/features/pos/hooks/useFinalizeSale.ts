@@ -1,11 +1,12 @@
+import { db } from '../../../db/index'
 import { useCartStore } from '../../../store/useCartStore'
 import { finalizeSale } from '../../../db/repositories/sales'
-import { computeCartDiscount } from '../../../shared/lib/loyalty'
+import { computeCartDiscount, getPts } from '../../../shared/lib/loyalty'
 import { toast } from '../../../store/useToastStore'
 import type { Sale } from '../../../types/sale'
 
-/** Cart subtotal/discount/total — `loyaltyPts` is 0 until Fase 4 wires the customer picker
- * back into Venta (per the plan, loyalty stays stubbed until then). */
+/** Cart subtotal/discount/total. Pass the selected customer's live points (see
+ * `useSelectedCustomerLoyalty`) — 0 when no customer is picked. */
 export function useCartTotals(loyaltyPts = 0) {
   const items = useCartStore((s) => s.items)
   const manualDiscountPct = useCartStore((s) => s.manualDiscountPct)
@@ -30,7 +31,8 @@ export function useFinalizeSale() {
     }
 
     const subtotal = cart.items.reduce((a, i) => a + i.price * i.qty, 0)
-    const loyaltyPts = 0 // Fase 4 will pass the real customer points here
+    const custSales = cart.customerId ? await db.sales.where('customerId').equals(cart.customerId).toArray() : []
+    const loyaltyPts = cart.customerId ? getPts(custSales, cart.customerId) : 0
     const { amount: discount } = computeCartDiscount(subtotal, loyaltyPts, cart.manualDiscountPct)
     const total = subtotal - discount
 

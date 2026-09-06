@@ -1,10 +1,12 @@
 import { useLiveQuery } from 'dexie-react-hooks'
+import { db } from '../../db/index'
 import type { Sale } from '../../types/sale'
 import { getSettings } from '../../db/repositories/settings'
 import { BottomSheet } from './BottomSheet'
 import { formatMoney, formatDateTime } from '../lib/currency'
 import { formatSaleId } from '../lib/id'
 import { unitShortLabel, isMeasuredUnit } from '../lib/units'
+import { getPts } from '../lib/loyalty'
 import { toast } from '../../store/useToastStore'
 
 interface ReceiptSheetProps {
@@ -41,10 +43,16 @@ Pago:      ${sale.payMethod.charAt(0).toUpperCase() + sale.payMethod.slice(1)}
 export function ReceiptSheet({ sale, onClose, onCorrect }: ReceiptSheetProps) {
   const settings = useLiveQuery(() => getSettings())
   const storeName = settings?.storeName ?? 'Mi Tienda Pro'
+  const customerSales = useLiveQuery(
+    () => (sale?.customerId ? db.sales.where('customerId').equals(sale.customerId).toArray() : Promise.resolve([] as Sale[])),
+    [sale?.customerId],
+    [],
+  )
 
   if (!sale) return null
 
   const ptsEarned = sale.customerId ? Math.floor(sale.total / 10) : 0
+  const ptsTotal = sale.customerId ? getPts(customerSales, sale.customerId) : 0
   const text = buildReceiptText(sale, storeName)
 
   async function share() {
@@ -111,7 +119,11 @@ export function ReceiptSheet({ sale, onClose, onCorrect }: ReceiptSheetProps) {
             {PAY_ICON[sale.payMethod]} {sale.payMethod.charAt(0).toUpperCase() + sale.payMethod.slice(1)}
           </span>
         </div>
-        {ptsEarned > 0 && <div className="mt-0.5 text-center text-[11px] text-lime">+{ptsEarned} puntos ganados</div>}
+        {ptsEarned > 0 && (
+          <div className="mt-0.5 text-center text-[11px] text-lime">
+            +{ptsEarned} puntos ganados · Total: {ptsTotal} pts
+          </div>
+        )}
         {sale.notes && <div className="mt-2 rounded-md bg-s2 px-2 py-1.5 text-[11px] text-txt2">📝 {sale.notes}</div>}
         {sale.corrected && (
           <div className="mt-2 rounded-md border border-orange/30 bg-orange/10 px-2 py-1.5 text-[11px] text-orange">

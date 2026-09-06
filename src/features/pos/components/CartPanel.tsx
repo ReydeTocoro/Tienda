@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import type { Product } from '../../../types/product'
 import { useCartStore } from '../../../store/useCartStore'
 import { useCartTotals } from '../hooks/useFinalizeSale'
+import { useSelectedCustomerLoyalty } from '../hooks/useSelectedCustomerLoyalty'
 import { formatMoney } from '../../../shared/lib/currency'
 import { unitShortLabel, isMeasuredUnit } from '../../../shared/lib/units'
 
@@ -33,12 +34,13 @@ export function CartPanel({ products, onEditMeasured, onOpenDiscount, onCheckout
   const customerId = useCartStore((s) => s.customerId)
 
   const [notesOpen, setNotesOpen] = useState(false)
-  const { subtotal, discount, discountLabel, total } = useCartTotals(0)
+  const { pts: loyaltyPts } = useSelectedCustomerLoyalty()
+  const { subtotal, discount, discountLabel, total } = useCartTotals(loyaltyPts)
 
   const stockByCode = useMemo(() => new Map(products.map((p) => [p.code, p.stock])), [products])
   const totalItems = items.reduce((a, i) => a + i.qty, 0)
 
-  const discLabel = discountLabel === 'manual' ? `Desc. manual (${manualDiscountPct}%)` : discountLabel === 'loyalty' ? 'Desc. cliente' : ''
+  const discLabel = discountLabel === 'manual' ? `Desc. manual (${manualDiscountPct}%)` : discountLabel === 'loyalty' ? `Desc. cliente (${loyaltyPts} pts)` : ''
 
   return (
     <div className="flex h-full flex-col overflow-hidden bg-bg">

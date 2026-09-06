@@ -19,6 +19,8 @@ import { FreeProductModal } from './components/FreeProductModal'
 import { CalculatorModal } from './components/CalculatorModal'
 import { QuickDiscountModal } from './components/QuickDiscountModal'
 import { VentaKpiBar } from './components/VentaKpiBar'
+import { ClientBar } from './components/ClientBar'
+import { ClientPickerSheet } from './components/ClientPickerSheet'
 import { useFinalizeSale } from './hooks/useFinalizeSale'
 
 export function VentaPage() {
@@ -35,6 +37,7 @@ export function VentaPage() {
   const [receiptSale, setReceiptSale] = useState<Sale | null>(null)
   const [cameraOpen, setCameraOpen] = useState(false)
   const [flash, setFlash] = useState<{ show: boolean; success: boolean }>({ show: false, success: true })
+  const [pickerOpen, setPickerOpen] = useState(false)
 
   const searchRef = useRef<HTMLInputElement>(null)
   const items = useCartStore((s) => s.items)
@@ -145,6 +148,7 @@ export function VentaPage() {
 
   return (
     <div className="flex h-full flex-col">
+      <ClientBar onOpen={() => setPickerOpen(true)} />
       <VentaKpiBar onClickLowStock={() => setLowStockOnly(true)} />
 
       <div className="flex flex-shrink-0 gap-2 px-3 py-2">
@@ -209,6 +213,7 @@ export function VentaPage() {
       />
       <QuickDiscountModal open={discOpen} onClose={() => setDiscOpen(false)} />
       <ReceiptSheet sale={receiptSale} onClose={() => setReceiptSale(null)} />
+      <ClientPickerSheet open={pickerOpen} onClose={() => setPickerOpen(false)} />
       <CameraOverlay open={cameraOpen} videoRef={scanner.videoRef} onClose={() => setCameraOpen(false)} />
       <ScanFlashOverlay show={flash.show} success={flash.success} />
     </div>
