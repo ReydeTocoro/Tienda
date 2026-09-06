@@ -33,15 +33,15 @@ export function PurchaseFormSheet({ open, onClose }: PurchaseFormSheetProps) {
     <BottomSheet open={open} onClose={onClose}>
       <p className="mb-3.5 font-display text-[18px] font-bold">Registrar Compra a Proveedor</p>
       <div className="mb-2.5">
-        <label className="mb-1 block text-[10px] font-semibold uppercase tracking-wider text-muted">Proveedor</label>
+        <label className="mb-1 block field-label">Proveedor</label>
         <input className="input" value={provider} onChange={(e) => setProvider(e.target.value)} placeholder="Nombre del proveedor" />
       </div>
       <div className="mb-2.5">
-        <label className="mb-1 block text-[10px] font-semibold uppercase tracking-wider text-muted">Descripción</label>
+        <label className="mb-1 block field-label">Descripción</label>
         <input className="input" value={desc} onChange={(e) => setDesc(e.target.value)} placeholder="Qué compraste" />
       </div>
       <div className="mb-3.5">
-        <label className="mb-1 block text-[10px] font-semibold uppercase tracking-wider text-muted">Total pagado</label>
+        <label className="mb-1 block field-label">Total pagado</label>
         <input className="input" type="number" min={0} step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0.00" />
       </div>
       <div className="flex gap-2">

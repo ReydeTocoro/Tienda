@@ -30,7 +30,7 @@ export function AbonoModal({ open, maxDebt, onClose, onConfirm }: AbonoModalProp
       <div className="mb-4 text-[12px] text-muted">
         Deuda total: <b className="text-red">{formatMoney(maxDebt)}</b>
       </div>
-      <label className="mb-1 block text-[10px] font-semibold uppercase tracking-wider text-muted">Monto del abono *</label>
+      <label className="mb-1 block field-label">Monto del abono *</label>
       <input className="input mb-2.5 border-lime" type="number" min={0.01} max={maxDebt} step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0.00" autoFocus />
       <div className="mb-3.5 flex flex-wrap gap-1.5">
         <button onClick={() => setAmount(maxDebt.toFixed(2))} className="rounded-lg border border-green/25 bg-green/10 px-2.5 py-1 text-[12px] font-semibold text-green">
@@ -40,7 +40,7 @@ export function AbonoModal({ open, maxDebt, onClose, onConfirm }: AbonoModalProp
           Mitad {formatMoney(maxDebt / 2)}
         </button>
       </div>
-      <label className="mb-1 block text-[10px] font-semibold uppercase tracking-wider text-muted">Nota del abono (opcional)</label>
+      <label className="mb-1 block field-label">Nota del abono (opcional)</label>
       <input className="input mb-4" value={note} onChange={(e) => setNote(e.target.value)} placeholder="Ej: Efectivo, transferencia..." />
       <div className="flex gap-2">
         <button onClick={onClose} className="flex-1 rounded-[10px] border border-br2 py-2.5 text-[13px] text-txt2">

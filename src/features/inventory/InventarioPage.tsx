@@ -164,7 +164,7 @@ export function InventarioPage() {
           />
 
           <div className="mb-3.5 rounded-[14px] border border-br bg-s1 p-3.5">
-            <div className="mb-2.5 text-[10px] font-semibold uppercase tracking-wider text-muted">💰 Inversión en Stock</div>
+            <div className="mb-2.5 field-label">💰 Inversión en Stock</div>
             <div className="grid grid-cols-2 gap-2.5">
               <Stat label="Costo total invertido" value={formatMoney(summary.totalCostValue)} color="text-orange" />
               <Stat label="Valor de venta total" value={formatMoney(summary.totalSaleValue)} color="text-lime" />

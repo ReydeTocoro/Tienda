@@ -18,7 +18,7 @@ export function ClientBar({ onOpen }: ClientBarProps) {
         className={`flex min-w-0 flex-1 items-center justify-between rounded-xl border bg-s2 px-3.5 py-2.5 text-left ${customerName ? 'border-lime' : 'border-br2'}`}
       >
         <div className="min-w-0">
-          <div className="text-[10px] uppercase tracking-wider text-muted">Cliente</div>
+          <div className="field-label">Cliente</div>
           <div className="overflow-hidden text-ellipsis whitespace-nowrap text-[14px] font-semibold">
             {customerName ? `${customerName} · ${tier.label}` : 'Sin cliente'}
           </div>

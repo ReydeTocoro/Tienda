@@ -60,27 +60,27 @@ export function ClientFormSheet({ open, customer, onClose, onSaved }: ClientForm
       <p className="mb-3.5 font-display text-[18px] font-bold">{customer ? 'Editar Cliente' : 'Nuevo Cliente'}</p>
       <div className="grid grid-cols-2 gap-2.5">
         <div className="col-span-2 flex flex-col gap-1">
-          <label className="text-[10px] font-semibold uppercase tracking-wider text-muted">Nombre completo *</label>
+          <label className="field-label">Nombre completo *</label>
           <input className="input" value={f.name} onChange={(e) => set('name', e.target.value)} placeholder="Nombre del cliente" autoFocus />
         </div>
         <div className="flex flex-col gap-1">
-          <label className="text-[10px] font-semibold uppercase tracking-wider text-muted">🪪 Cédula / ID</label>
+          <label className="field-label">🪪 Cédula / ID</label>
           <input className="input" value={f.cedula} onChange={(e) => set('cedula', e.target.value)} placeholder="Número de cédula" />
         </div>
         <div className="flex flex-col gap-1">
-          <label className="text-[10px] font-semibold uppercase tracking-wider text-muted">Teléfono</label>
+          <label className="field-label">Teléfono</label>
           <input className="input" value={f.phone} onChange={(e) => set('phone', e.target.value)} placeholder="000-000-0000" />
         </div>
         <div className="flex flex-col gap-1">
-          <label className="text-[10px] font-semibold uppercase tracking-wider text-muted">Email</label>
+          <label className="field-label">Email</label>
           <input className="input" type="email" value={f.email} onChange={(e) => set('email', e.target.value)} placeholder="correo@email.com" />
         </div>
         <div className="flex flex-col gap-1">
-          <label className="text-[10px] font-semibold uppercase tracking-wider text-muted">Cumpleaños</label>
+          <label className="field-label">Cumpleaños</label>
           <input className="input" type="date" value={f.birthday} onChange={(e) => set('birthday', e.target.value)} />
         </div>
         <div className="col-span-2 flex flex-col gap-1">
-          <label className="text-[10px] font-semibold uppercase tracking-wider text-muted">Dirección / Notas</label>
+          <label className="field-label">Dirección / Notas</label>
           <input className="input" value={f.notes} onChange={(e) => set('notes', e.target.value)} placeholder="Dirección o notas" />
         </div>
       </div>

@@ -87,7 +87,7 @@ export function CorrectionModal({ sale, onClose, onCorrected }: CorrectionModalP
         ⚠️ Los cambios quedan en el historial de auditoría. El reporte se recalcula automáticamente.
       </div>
 
-      <div className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-muted">Productos en la factura</div>
+      <div className="mb-2 field-label">Productos en la factura</div>
       {items.map((it, i) => (
         <div key={i} className="mb-1.5 grid grid-cols-[1fr_80px_80px_28px] items-center gap-2 border-b border-br pb-1.5">
           <div>
@@ -102,7 +102,7 @@ export function CorrectionModal({ sale, onClose, onCorrected }: CorrectionModalP
         </div>
       ))}
 
-      <div className="mb-1 mt-3 text-[10px] font-semibold uppercase tracking-wider text-muted">Agregar producto</div>
+      <div className="mb-1 mt-3 field-label">Agregar producto</div>
       <div className="mb-1.5 grid grid-cols-3 gap-2">
         <input className="input" placeholder="Nombre" value={newName} onChange={(e) => setNewName(e.target.value)} />
         <input className="input" type="number" placeholder="Cant." value={newQty} onChange={(e) => setNewQty(e.target.value)} />
@@ -112,7 +112,7 @@ export function CorrectionModal({ sale, onClose, onCorrected }: CorrectionModalP
         + Agregar ítem
       </button>
 
-      <div className="mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted">Motivo de la corrección *</div>
+      <div className="mb-1.5 field-label">Motivo de la corrección *</div>
       <textarea
         rows={2}
         value={reason}

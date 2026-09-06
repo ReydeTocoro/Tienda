@@ -51,7 +51,7 @@ export function Sidebar() {
           )
         })}
       </div>
-      <div className="mt-auto px-6 pt-4 text-[10px] uppercase tracking-widest text-muted">Mi Tienda Pro</div>
+      <div className="mt-auto px-6 pt-4 tracking-widest field-label">Mi Tienda Pro</div>
     </nav>
   )
 }

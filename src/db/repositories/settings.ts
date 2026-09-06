@@ -13,7 +13,7 @@ export async function getSettings(): Promise<Settings> {
     storeName: 'Mi Tienda',
     pinHash: await sha256(DEFAULT_PIN),
     pinLength: 4,
-    theme: 'dark',
+    theme: 'light',
     hidScannerEnabled: true,
   }
   await db.settings.put(defaults)

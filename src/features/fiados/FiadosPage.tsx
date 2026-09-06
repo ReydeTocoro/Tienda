@@ -105,7 +105,7 @@ function StatBox({ label, value, color, small }: { label: string; value: string;
   return (
     <div className="rounded-xl border border-br bg-s1 p-3 text-center">
       <div className={`font-mono font-bold ${small ? 'text-[15px]' : 'text-[19px]'} ${color}`}>{value}</div>
-      <div className="mt-0.5 text-[9px] uppercase tracking-wide text-muted">{label}</div>
+      <div className="mt-0.5 field-label">{label}</div>
     </div>
   )
 }

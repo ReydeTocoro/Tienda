@@ -37,16 +37,16 @@ export function FreeProductModal({ open, onClose, prefillPrice }: FreeProductMod
       <div className="mb-1 font-display text-[18px] font-bold">🏷️ Producto libre</div>
       <div className="mb-4 text-[12px] text-muted">Sin stock registrado — describe y pon el precio</div>
 
-      <label className="mb-1 block text-[10px] font-semibold uppercase tracking-wider text-muted">Descripción *</label>
+      <label className="mb-1 block field-label">Descripción *</label>
       <input className="input mb-2.5 border-lime" value={desc} onChange={(e) => setDesc(e.target.value)} placeholder="Ej: Servicio, producto especial..." autoFocus />
 
       <div className="mb-2.5 grid grid-cols-2 gap-2.5">
         <div>
-          <label className="mb-1 block text-[10px] font-semibold uppercase tracking-wider text-muted">Precio unitario *</label>
+          <label className="mb-1 block field-label">Precio unitario *</label>
           <input className="input" type="number" min={0} step="0.01" value={price} onChange={(e) => setPrice(e.target.value)} placeholder="0.00" />
         </div>
         <div>
-          <label className="mb-1 block text-[10px] font-semibold uppercase tracking-wider text-muted">Cantidad</label>
+          <label className="mb-1 block field-label">Cantidad</label>
           <input className="input" type="number" min={0.001} step="0.001" value={qty} onChange={(e) => setQty(e.target.value)} />
         </div>
       </div>

@@ -22,9 +22,9 @@ export function AppShell() {
   const setScannerEnabled = useScannerStore((s) => s.setEnabled)
   const scannerHydrated = useRef(false)
 
-  // Applies settings.theme to <body class="light"> — legacy toggleTheme() (index.html L5176-5181).
+  // Applies settings.theme to <body class="dark"> — paper is the default identity now.
   useEffect(() => {
-    document.body.classList.toggle('light', settings?.theme === 'light')
+    document.body.classList.toggle('dark', settings?.theme === 'dark')
   }, [settings?.theme])
 
   // Hydrates useScannerStore.enabled from settings once on load; after that F8/Reporte owns it.

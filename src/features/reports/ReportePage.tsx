@@ -61,7 +61,7 @@ export function ReportePage() {
       <p className="mb-3.5 font-display text-[21px] font-bold lg:text-[26px]">Reporte de Caja</p>
 
       <div className="mb-3.5 lg:max-w-xs">
-        <label className="mb-1 block text-[10px] font-semibold uppercase tracking-wider text-muted">Filtrar por fecha</label>
+        <label className="mb-1 block field-label">Filtrar por fecha</label>
         <div className="flex gap-2">
           <input type="date" value={dayKey} onChange={(e) => setDayKey(e.target.value)} className="input flex-1" />
           <button onClick={() => setDayKey(todayKey())} className="rounded-[10px] bg-lime px-4 py-2 text-[13px] font-bold text-black transition-opacity hover:opacity-90">
@@ -76,7 +76,7 @@ export function ReportePage() {
         <Kpi label="Ticket promedio" value={formatMoney(agg.avgTicket)} color="text-blue" sub={`Desc. dados: ${formatMoney(agg.totalDescuentos)}`} />
         <Kpi label="Compras / Gastos" value={formatMoney(agg.totalCompras + agg.totalExOut)} color="text-red" sub={`Extras ingreso: +${formatMoney(agg.totalExIn)}`} />
         <div className="col-span-2 rounded-[14px] border border-br bg-s1 p-4 text-center lg:col-span-4">
-          <div className="text-[10px] uppercase tracking-wider text-muted">Flujo neto del día</div>
+          <div className="field-label">Flujo neto del día</div>
           <div className={`my-1.5 font-mono text-[26px] font-bold ${agg.netDay >= 0 ? 'text-lime' : 'text-red'}`}>{formatMoney(agg.netDay)}</div>
           <div className="text-[11px] text-txt2">
             {agg.netDay >= 0 ? '✓ Día positivo' : '⚠ Día negativo'}
@@ -87,7 +87,7 @@ export function ReportePage() {
 
       <div className="lg:grid lg:grid-cols-2 lg:items-start lg:gap-5">
         <div>
-          <p className="mb-2 text-[13px] font-bold uppercase tracking-wide text-txt2">Desglose por pago</p>
+          <p className="mb-2 field-label">Desglose por pago</p>
           <div className="mb-3.5 rounded-[14px] border border-br bg-s1 p-3.5">
             {(['efectivo', 'transferencia'] as const).map((m) => (
               <div key={m} className="flex justify-between border-b border-br py-2 last:border-b-0">
@@ -138,18 +138,18 @@ export function ReportePage() {
             )}
           </div>
           <div className="mb-3.5 rounded-xl border border-br bg-s1 p-3.5">
-            <div className="mb-2.5 text-[11px] font-bold uppercase tracking-wider text-muted">📊 Cartera de fiados (todos los tiempos)</div>
+            <div className="mb-2.5 field-label">📊 Cartera de fiados (todos los tiempos)</div>
             <div className="grid grid-cols-3 gap-2 text-center">
               <div>
-                <div className="text-[9px] uppercase tracking-wide text-muted">Por cobrar</div>
+                <div className="field-label">Por cobrar</div>
                 <div className="font-mono text-[16px] font-bold text-red">{formatMoney(fiadoStats.debt)}</div>
               </div>
               <div>
-                <div className="text-[9px] uppercase tracking-wide text-muted">Cobrado</div>
+                <div className="field-label">Cobrado</div>
                 <div className="font-mono text-[16px] font-bold text-green">{formatMoney(fiadoStats.paid)}</div>
               </div>
               <div>
-                <div className="text-[9px] uppercase tracking-wide text-muted">Deudores</div>
+                <div className="field-label">Deudores</div>
                 <div className="font-mono text-[16px] font-bold text-orange">{fiadoStats.debtors}</div>
               </div>
             </div>
@@ -157,7 +157,7 @@ export function ReportePage() {
         </div>
       </div>
 
-      <p className="mb-2 mt-3.5 text-[13px] font-bold uppercase tracking-wide text-txt2">Ventas del período</p>
+      <p className="mb-2 mt-3.5 field-label">Ventas del período</p>
       {!agg.ventasDay.length ? (
         <div className="p-6 text-center text-muted">
           <p className="text-[13px]">Sin ventas en esta fecha</p>
@@ -199,7 +199,7 @@ export function ReportePage() {
 
       <div className="lg:grid lg:grid-cols-2 lg:gap-6">
         <div>
-          <p className="mb-2 mt-5 text-[13px] font-bold uppercase tracking-wide text-txt2 lg:mt-0">📁 Historial de cierres</p>
+          <p className="mb-2 mt-5 lg:mt-0 field-label">📁 Historial de cierres</p>
           <CierresHistoryList />
         </div>
 
@@ -222,7 +222,7 @@ export function ReportePage() {
 function Kpi({ label, value, color, sub }: { label: string; value: string; color: string; sub: string }) {
   return (
     <div className="rounded-[14px] border border-br bg-s1 p-4 text-center">
-      <div className="text-[10px] uppercase tracking-wider text-muted">{label}</div>
+      <div className="field-label">{label}</div>
       <div className={`my-1.5 font-mono text-[22px] font-bold ${color}`}>{value}</div>
       <div className="text-[11px] text-txt2">{sub}</div>
     </div>

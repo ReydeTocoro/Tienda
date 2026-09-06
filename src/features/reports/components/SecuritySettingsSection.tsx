@@ -66,7 +66,7 @@ export function SecuritySettingsSection() {
   return (
     <div className="lg:grid lg:grid-cols-2 lg:items-start lg:gap-6">
       <div>
-      <p className="mb-2 mt-5 text-[13px] font-bold uppercase tracking-wide text-txt2 lg:mt-0">🔐 Seguridad — PIN</p>
+      <p className="mb-2 mt-5 lg:mt-0 field-label">🔐 Seguridad — PIN</p>
       <div className="mb-3.5 rounded-xl border border-br2 bg-s2 p-3.5">
         <div className="mb-3 text-[13px] text-txt2">
           El PIN protege: agregar/quitar stock, cierre de caja, pago de fiados y corrección de facturas. Máximo <b className="text-red">5 intentos</b> antes de bloqueo temporal.
@@ -80,7 +80,7 @@ export function SecuritySettingsSection() {
         )}
 
         <div className="mb-3.5 flex items-center gap-2">
-          <div className="flex-shrink-0 text-[10px] font-semibold uppercase tracking-wider text-muted">Longitud:</div>
+          <div className="flex-shrink-0 field-label">Longitud:</div>
           <div className="flex gap-1.5">
             {[4, 6].map((n) => (
               <button
@@ -96,7 +96,7 @@ export function SecuritySettingsSection() {
 
         <div className="mb-2.5 grid grid-cols-2 gap-2">
           <div>
-            <div className="mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted">Nuevo PIN</div>
+            <div className="mb-1.5 field-label">Nuevo PIN</div>
             <input
               type="password"
               inputMode="numeric"
@@ -108,7 +108,7 @@ export function SecuritySettingsSection() {
             />
           </div>
           <div>
-            <div className="mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted">Confirmar PIN</div>
+            <div className="mb-1.5 field-label">Confirmar PIN</div>
             <input
               type="password"
               inputMode="numeric"
@@ -135,7 +135,7 @@ export function SecuritySettingsSection() {
       </div>
 
       <div>
-      <p className="mb-2 mt-5 text-[13px] font-bold uppercase tracking-wide text-txt2 lg:mt-0">📡 Lector de Código de Barras</p>
+      <p className="mb-2 mt-5 lg:mt-0 field-label">📡 Lector de Código de Barras</p>
       <div className="mb-3.5 rounded-xl border border-br2 bg-s2 p-3.5">
         <div className="mb-3 flex items-center justify-between">
           <div>
@@ -156,7 +156,7 @@ export function SecuritySettingsSection() {
       </div>
 
       <div className="lg:col-span-2">
-      <p className="mb-2 mt-5 text-[13px] font-bold uppercase tracking-wide text-txt2">⌨️ Atajos de Teclado</p>
+      <p className="mb-2 mt-5 field-label">⌨️ Atajos de Teclado</p>
       <div className="mb-3.5 rounded-xl border border-br2 bg-s2 p-3.5 text-[12px] leading-loose">
         <div className="grid grid-cols-[auto_1fr] items-center gap-x-3.5 gap-y-1 lg:grid-cols-[auto_1fr_auto_1fr]">
           <Kbd>F1–F6</Kbd>

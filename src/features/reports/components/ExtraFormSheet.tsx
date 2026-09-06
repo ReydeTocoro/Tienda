@@ -34,15 +34,15 @@ export function ExtraFormSheet({ open, onClose }: ExtraFormSheetProps) {
     <BottomSheet open={open} onClose={onClose}>
       <p className="mb-3.5 font-display text-[18px] font-bold">Registrar Movimiento</p>
       <div className="mb-2.5">
-        <label className="mb-1 block text-[10px] font-semibold uppercase tracking-wider text-muted">Descripción</label>
+        <label className="mb-1 block field-label">Descripción</label>
         <input className="input" value={desc} onChange={(e) => setDesc(e.target.value)} placeholder="Pago luz, Flete, ingreso extra..." />
       </div>
       <div className="mb-2.5">
-        <label className="mb-1 block text-[10px] font-semibold uppercase tracking-wider text-muted">Monto</label>
+        <label className="mb-1 block field-label">Monto</label>
         <input className="input" type="number" min={0} step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0.00" />
       </div>
       <div className="mb-3.5">
-        <label className="mb-1 block text-[10px] font-semibold uppercase tracking-wider text-muted">Tipo</label>
+        <label className="mb-1 block field-label">Tipo</label>
         <select className="input" value={type} onChange={(e) => setType(e.target.value as ExtraType)}>
           <option value="egreso">↓ Egreso (Gasto)</option>
           <option value="ingreso">↑ Ingreso</option>

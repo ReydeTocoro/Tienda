@@ -106,15 +106,15 @@ export function CyclicCountModal({ open, onClose, products }: CyclicCountModalPr
       {diffs.length > 0 && (
         <div className="mb-3 grid grid-cols-3 gap-2 rounded-[10px] bg-s2 p-2.5 text-center">
           <div>
-            <div className="text-[9px] uppercase tracking-wide text-muted">Con diferencia</div>
+            <div className="field-label">Con diferencia</div>
             <div className="font-mono text-[16px] font-bold text-orange">{diffs.length}</div>
           </div>
           <div>
-            <div className="text-[9px] uppercase tracking-wide text-muted">Contados</div>
+            <div className="field-label">Contados</div>
             <div className="font-mono text-[16px] font-bold text-green">{Object.keys(counts).length}</div>
           </div>
           <div>
-            <div className="text-[9px] uppercase tracking-wide text-muted">Sin contar</div>
+            <div className="field-label">Sin contar</div>
             <div className="font-mono text-[16px] font-bold text-muted">{filtered.length - Object.keys(counts).length}</div>
           </div>
         </div>

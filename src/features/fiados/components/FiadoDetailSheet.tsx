@@ -104,15 +104,15 @@ export function FiadoDetailSheet({ group, customer, onClose }: FiadoDetailSheetP
 
         <div className="mb-4 grid grid-cols-3 gap-2">
           <div className="rounded-[10px] bg-s2 p-2.5 text-center">
-            <div className="text-[9px] uppercase tracking-wide text-muted">Debe</div>
+            <div className="field-label">Debe</div>
             <div className="font-mono text-[16px] font-bold text-red">{formatMoney(totalDebt)}</div>
           </div>
           <div className="rounded-[10px] bg-s2 p-2.5 text-center">
-            <div className="text-[9px] uppercase tracking-wide text-muted">Abonado</div>
+            <div className="field-label">Abonado</div>
             <div className="font-mono text-[16px] font-bold text-green">{formatMoney(totalPaid)}</div>
           </div>
           <div className="rounded-[10px] bg-s2 p-2.5 text-center">
-            <div className="text-[9px] uppercase tracking-wide text-muted">Original</div>
+            <div className="field-label">Original</div>
             <div className="font-mono text-[15px] font-semibold text-txt2">{formatMoney(totalOwed)}</div>
           </div>
         </div>
@@ -130,7 +130,7 @@ export function FiadoDetailSheet({ group, customer, onClose }: FiadoDetailSheetP
           <div className="mb-4 rounded-xl border border-green/25 bg-green/10 py-3 text-center font-bold text-green">🎉 ¡Todo pagado!</div>
         )}
 
-        <p className="mb-2.5 text-[11px] font-bold uppercase tracking-wide text-muted">Detalle por fiado</p>
+        <p className="mb-2.5 field-label">Detalle por fiado</p>
         {group.sales.map((s) => {
           const debt = getFiadoDebt(s)
           const isPaid = debt <= 0

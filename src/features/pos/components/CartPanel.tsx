@@ -134,7 +134,7 @@ export function CartPanel({ products, onEditMeasured, onOpenDiscount, onCheckout
           </div>
 
           <div className="border-t border-br px-3 py-2.5">
-            <p className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-muted">Método de pago</p>
+            <p className="mb-2 field-label">Método de pago</p>
             <div className="grid grid-cols-3 gap-2">
               {PAY_METHODS.map((m) => (
                 <button
@@ -151,7 +151,7 @@ export function CartPanel({ products, onEditMeasured, onOpenDiscount, onCheckout
             </div>
             {payMethod === 'fiado' && !customerId && (
               <div className="mt-2">
-                <label className="mb-1 block text-[10px] font-semibold uppercase tracking-wider text-muted">Nombre (fiado)</label>
+                <label className="mb-1 block field-label">Nombre (fiado)</label>
                 <input className="input" value={fiadoName} onChange={(e) => setFiadoName(e.target.value)} placeholder="¿A quién le fías?" />
               </div>
             )}

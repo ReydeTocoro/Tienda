@@ -69,7 +69,7 @@ export function CierreZModal({ open, dayKey, onClose, onClosed }: CierreZModalPr
       <div className="mb-4 text-[12px] text-muted">Fecha: {dayKey}</div>
 
       <div className="mb-3.5 rounded-xl bg-s2 p-3.5">
-        <div className="mb-2 text-[10px] font-bold uppercase tracking-wider text-muted">📊 Según el sistema</div>
+        <div className="mb-2 field-label">📊 Según el sistema</div>
         <div className="grid grid-cols-2 gap-2">
           <Stat label="Ventas" value={formatMoney(agg.totalVentas)} color="text-green" />
           <Stat label="Ganancia" value={formatMoney(agg.totalGanancia)} color="text-lime" />
@@ -77,13 +77,13 @@ export function CierreZModal({ open, dayKey, onClose, onClosed }: CierreZModalPr
           <Stat label="💵 Efect. sistema" value={formatMoney(agg.payBreak.efectivo)} color="text-txt" />
           {agg.fiadoTotalDay > 0 && <Stat label="📋 Fiado (no en caja)" value={formatMoney(agg.fiadoTotalDay)} color="text-red" span2 />}
           <div className="col-span-2 border-t border-br pt-1.5">
-            <div className="text-[9px] uppercase tracking-wider text-muted">Flujo neto</div>
+            <div className="field-label">Flujo neto</div>
             <div className={`font-mono text-[18px] font-extrabold ${agg.netDay >= 0 ? 'text-lime' : 'text-red'}`}>{formatMoney(agg.netDay)}</div>
           </div>
         </div>
       </div>
 
-      <div className="mb-2 text-[11px] font-bold uppercase tracking-wider text-muted">💵 Arqueo físico — Efectivo contado</div>
+      <div className="mb-2 field-label">💵 Arqueo físico — Efectivo contado</div>
       <div className="mb-2.5 rounded-xl bg-s2 p-3.5">
         <div className="flex items-center gap-2.5">
           <span className="whitespace-nowrap text-[13px] text-txt2">Billetes + monedas:</span>
@@ -112,9 +112,9 @@ export function CierreZModal({ open, dayKey, onClose, onClosed }: CierreZModalPr
         )}
       </div>
 
-      <label className="mb-1 block text-[10px] font-semibold uppercase tracking-wider text-muted">👤 Cajero responsable *</label>
+      <label className="mb-1 block field-label">👤 Cajero responsable *</label>
       <input className="input mb-2.5 border-lime" value={cajero} onChange={(e) => setCajero(e.target.value)} placeholder="Nombre del cajero" />
-      <label className="mb-1 block text-[10px] font-semibold uppercase tracking-wider text-muted">📝 Observaciones del cierre</label>
+      <label className="mb-1 block field-label">📝 Observaciones del cierre</label>
       <textarea
         rows={2}
         value={notas}
@@ -142,7 +142,7 @@ export function CierreZModal({ open, dayKey, onClose, onClosed }: CierreZModalPr
 function Stat({ label, value, color, span2 }: { label: string; value: string; color: string; span2?: boolean }) {
   return (
     <div className={span2 ? 'col-span-2' : ''}>
-      <div className="text-[9px] uppercase tracking-wider text-muted">{label}</div>
+      <div className="field-label">{label}</div>
       <div className={`font-mono text-[15px] font-bold ${color}`}>{value}</div>
     </div>
   )

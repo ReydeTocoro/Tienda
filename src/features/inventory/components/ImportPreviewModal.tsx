@@ -56,7 +56,7 @@ export function ImportPreviewModal({ open, fileName, parsed, errors, onClose, on
           <thead className="sticky top-0 bg-s2">
             <tr>
               {['Estado', 'Código', 'Nombre', 'Precio', 'Costo', 'Stock', 'Categoría'].map((h) => (
-                <th key={h} className="whitespace-nowrap border-b border-br px-2.5 py-1.5 text-left text-[10px] uppercase tracking-wide text-muted">
+                <th key={h} className="whitespace-nowrap border-b border-br px-2.5 py-1.5 text-left field-label">
                   {h}
                 </th>
               ))}

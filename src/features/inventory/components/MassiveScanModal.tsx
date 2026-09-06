@@ -175,17 +175,17 @@ export function MassiveScanModal({ open, onClose, products }: MassiveScanModalPr
         <div className="flex flex-shrink-0 items-center gap-4">
           <div className="text-center">
             <div className="font-mono text-[26px] font-bold leading-none text-lime">{totalUnidades}</div>
-            <div className="text-[9px] uppercase tracking-wide text-muted">unidades</div>
+            <div className="field-label">unidades</div>
           </div>
           <div className="text-center">
             <div className="font-mono text-[18px] font-bold leading-none text-blue">{log.length}</div>
-            <div className="text-[9px] uppercase tracking-wide text-muted">productos</div>
+            <div className="field-label">productos</div>
           </div>
         </div>
       </div>
 
       <div className="flex flex-shrink-0 items-center gap-2.5 border-b border-br bg-s2 px-4 py-2.5">
-        <span className="text-[11px] font-semibold uppercase tracking-wider text-muted">Modo:</span>
+        <span className="field-label">Modo:</span>
         <button
           onClick={() => switchMode('cam')}
           className={`rounded-[10px] border px-3.5 py-1.5 text-[12px] font-bold ${mode === 'cam' ? 'border-green/40 bg-green/15 text-green' : 'border-br2 text-txt2'}`}
@@ -254,7 +254,7 @@ export function MassiveScanModal({ open, onClose, products }: MassiveScanModalPr
       )}
 
       <div className="flex-1 overflow-y-auto px-4 py-3.5">
-        <div className="mb-2.5 text-[10px] font-semibold uppercase tracking-wider text-muted">Productos escaneados</div>
+        <div className="mb-2.5 field-label">Productos escaneados</div>
         {!log.length ? (
           <div className="py-10 text-center text-muted">
             <div className="mb-2.5 text-4xl">📦</div>

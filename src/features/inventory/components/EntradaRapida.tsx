@@ -104,7 +104,7 @@ export const EntradaRapida = forwardRef<EntradaRapidaHandle, EntradaRapidaProps>
             <span className="text-[18px]">›</span>
           </button>
 
-          <div className="mb-2.5 flex items-center gap-2 text-[10px] uppercase tracking-wider text-muted">
+          <div className="mb-2.5 flex items-center gap-2 field-label">
             <div className="h-px flex-1 bg-br" /> o buscar uno a uno <div className="h-px flex-1 bg-br" />
           </div>
 
@@ -159,12 +159,12 @@ export const EntradaRapida = forwardRef<EntradaRapidaHandle, EntradaRapidaProps>
                     <div className="mt-0.5 text-[11px] text-muted">{selected.code}</div>
                   </div>
                   <div className="text-right">
-                    <div className="text-[10px] uppercase tracking-wider text-muted">Stock actual</div>
+                    <div className="field-label">Stock actual</div>
                     <div className="font-mono text-[20px] font-bold text-lime">{selected.stock}</div>
                   </div>
                 </div>
                 <div className="flex items-center gap-2.5">
-                  <div className="whitespace-nowrap text-[12px] font-semibold uppercase tracking-wider text-muted">Sumar:</div>
+                  <div className="whitespace-nowrap field-label">Sumar:</div>
                   <button onClick={() => setQty((q) => Math.max(1, q - 1))} className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-[9px] border border-br2 bg-s3 text-[20px] font-bold">
                     −
                   </button>
@@ -196,7 +196,7 @@ export const EntradaRapida = forwardRef<EntradaRapidaHandle, EntradaRapidaProps>
 
           {recent.length > 0 && (
             <div className="mt-2.5">
-              <div className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-muted">Entradas recientes</div>
+              <div className="mb-2 field-label">Entradas recientes</div>
               {recent.map((e, i) => (
                 <div key={i} className="mb-1.5 flex items-center gap-2.5 rounded-[10px] bg-s2 px-2.5 py-2">
                   <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-[8px] border border-green/25 bg-green/10 font-mono text-[13px] font-extrabold text-green">

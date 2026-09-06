@@ -254,7 +254,7 @@ export function ProductForm({ product, onSaved, onCancel, scanSeed, onOpenCamera
         </Field>
 
         <div className="col-span-2 rounded-xl border border-br2 bg-s2 p-3">
-          <label className="mb-2 block text-[10px] uppercase tracking-wider text-muted">💰 Precio y Margen</label>
+          <label className="mb-2 block field-label">💰 Precio y Margen</label>
           <div className="grid grid-cols-3 gap-2">
             <NumField label="Precio Compra" value={f.cost} onChange={(v) => calcFromCost(v, f.margin)} />
             <NumField label="% Ganancia" value={f.margin} onChange={(v) => calcFromCost(f.cost, v)} accent />
@@ -427,7 +427,7 @@ export function ProductForm({ product, onSaved, onCancel, scanSeed, onOpenCamera
 function Field({ label, children, span2 }: { label: string; children: React.ReactNode; span2?: boolean }) {
   return (
     <div className={`flex flex-col gap-1 ${span2 ? 'col-span-2' : ''}`}>
-      <label className="text-[10px] font-semibold uppercase tracking-wider text-muted">{label}</label>
+      <label className="field-label">{label}</label>
       {children}
     </div>
   )
@@ -436,7 +436,7 @@ function Field({ label, children, span2 }: { label: string; children: React.Reac
 function NumField({ label, value, onChange, accent }: { label: string; value: string; onChange: (v: string) => void; accent?: boolean }) {
   return (
     <div>
-      <div className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-muted">{label}</div>
+      <div className="mb-1 field-label">{label}</div>
       <input
         className={`input ${accent ? 'border-lime font-bold text-lime' : ''}`}
         type="number"

@@ -21,7 +21,7 @@ export function SearchDropdown({ matches, query, focusIndex, onHover, onSelect }
         </div>
       ) : (
         <>
-          <div className="border-b border-br bg-s2 px-3.5 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted">
+          <div className="border-b border-br bg-s2 px-3.5 py-1.5 field-label">
             {matches.length} resultado{matches.length !== 1 ? 's' : ''} — ↑↓ navegar · Enter seleccionar
           </div>
           {matches.map((p, i) => {

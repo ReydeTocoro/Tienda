@@ -1,50 +1,53 @@
 @import 'tailwindcss';
-@import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Playfair+Display:wght@700;900&family=DM+Sans:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Fraunces:opsz,wght@9..144,600..900&family=DM+Sans:wght@300;400;500;600;700&display=swap');
 
-/* Colores portados tal cual del index.html original (legacy/index.html L166-192). */
+/* Identidad "mostrador de tienda": papel de recibo + libreta de fiados, no dashboard oscuro
+ * generico. El papel claro es la base (@theme); ".dark" es el modo mostrador nocturno, no al
+ * reves como antes. Los 6 acentos semanticos mantienen su rol (lime->bottle, orange->ochre,
+ * blue->ledger, purple->plum, red->brick, green->leaf) en tonos terrosos, no neon. */
 @theme {
   --font-sans: 'DM Sans', sans-serif;
-  --font-display: 'Playfair Display', serif;
+  --font-display: 'Fraunces', serif;
   --font-mono: 'DM Mono', ui-monospace, monospace;
 
-  --color-bg: #0a0a0a;
-  --color-s1: #141414;
-  --color-s2: #1c1c1c;
-  --color-s3: #242424;
-  --color-br: #2a2a2a;
-  --color-br2: #363636;
-  --color-lime: #c8f060;
-  --color-orange: #f0a060;
-  --color-blue: #60b8f0;
-  --color-purple: #b060f0;
-  --color-red: #ff6b6b;
-  --color-green: #6bffb8;
-  --color-txt: #f0ede8;
-  --color-txt2: #a0a0a0;
-  --color-muted: #555555;
+  --color-bg: #edede8;
+  --color-s1: #f7f7f2;
+  --color-s2: #f0f0e9;
+  --color-s3: #e6e6dd;
+  --color-br: #d6d8cc;
+  --color-br2: #c3c6b6;
+  --color-lime: #3e6b4c;
+  --color-orange: #b9822c;
+  --color-blue: #48628a;
+  --color-purple: #7a5570;
+  --color-red: #a8503f;
+  --color-green: #5c8a57;
+  --color-txt: #26271f;
+  --color-txt2: #6b6d5f;
+  --color-muted: #91937f;
 
   --radius-sm: 8px;
   --radius-md: 12px;
   --radius-lg: 16px;
 }
 
-/* Variante clara (activada con la clase `.light` en <body>, igual que hoy `body.light`). */
-.light {
-  --color-bg: #f5f3ef;
-  --color-s1: #ffffff;
-  --color-s2: #f0ede8;
-  --color-s3: #e8e4de;
-  --color-br: #ddd9d3;
-  --color-br2: #ccc8c2;
-  --color-txt: #1a1a1a;
-  --color-txt2: #666666;
-  --color-muted: #999999;
-  --color-lime: #5a9a00;
-  --color-orange: #c06000;
-  --color-blue: #0070b8;
-  --color-purple: #7020c8;
-  --color-red: #cc2200;
-  --color-green: #007840;
+/* Modo mostrador nocturno (activado con la clase `.dark` en <body>). */
+.dark {
+  --color-bg: #1c1d17;
+  --color-s1: #242519;
+  --color-s2: #2c2d20;
+  --color-s3: #343528;
+  --color-br: #3a3b2d;
+  --color-br2: #474836;
+  --color-txt: #edebe0;
+  --color-txt2: #a6a493;
+  --color-muted: #6e6c5e;
+  --color-lime: #7fb37e;
+  --color-orange: #d9a54a;
+  --color-blue: #7195c4;
+  --color-purple: #a67f9c;
+  --color-red: #d97e6e;
+  --color-green: #82b87a;
 }
 
 * {
@@ -76,17 +79,6 @@ body {
   }
 }
 
-@keyframes dialogIn {
-  from {
-    transform: scale(0.96);
-    opacity: 0;
-  }
-  to {
-    transform: scale(1);
-    opacity: 1;
-  }
-}
-
 @keyframes fadeInPage {
   from {
     opacity: 0;
@@ -98,28 +90,14 @@ body {
   }
 }
 
-@keyframes pinShake {
-  0%,
-  100% {
-    transform: translateX(0);
+@keyframes dialogIn {
+  from {
+    transform: scale(0.96);
+    opacity: 0;
   }
-  15% {
-    transform: translateX(-9px);
-  }
-  30% {
-    transform: translateX(9px);
-  }
-  45% {
-    transform: translateX(-7px);
-  }
-  60% {
-    transform: translateX(7px);
-  }
-  75% {
-    transform: translateX(-4px);
-  }
-  90% {
-    transform: translateX(4px);
+  to {
+    transform: scale(1);
+    opacity: 1;
   }
 }
 
@@ -168,5 +146,14 @@ body {
   }
   .search-input:focus {
     border-color: var(--color-lime);
+  }
+
+  /* Field/section label — replaces the uppercase+tracking-wide(r) treatment used ~85 times
+   * across the app (a named generic tell in the design brief: "using all caps for labels").
+   * Normal case, distinguished by size/weight/color alone. */
+  .field-label {
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--color-txt2);
   }
 }

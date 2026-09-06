@@ -77,11 +77,11 @@ export function WeightModal({ product: p, editIndex, onClose }: WeightModalProps
 
         <div className="mb-3 flex items-center justify-between gap-2.5 rounded-[14px] border border-lime bg-s2 px-4 py-3.5">
           <div>
-            <div className="mb-1 text-[10px] uppercase tracking-wider text-muted">Cantidad</div>
+            <div className="mb-1 field-label">Cantidad</div>
             <div className="font-mono text-[32px] font-bold leading-none">{val}</div>
           </div>
           <div className="text-right">
-            <div className="mb-1 text-[10px] uppercase tracking-wider text-muted">Unidad</div>
+            <div className="mb-1 field-label">Unidad</div>
             <select
               value={unit}
               onChange={(e) => setUnit(e.target.value)}

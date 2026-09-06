@@ -93,7 +93,7 @@ export function ClientProfileSheet({ customer, onClose, onEdit, onSell }: Client
 
         {stats.recent.length > 0 && (
           <>
-            <div className="mb-1.5 mt-1 text-[12px] font-bold uppercase tracking-wide text-muted">Últimas compras</div>
+            <div className="mb-1.5 mt-1 field-label">Últimas compras</div>
             {stats.recent.map((s) => (
               <button
                 key={s.id}
@@ -135,7 +135,7 @@ function ProfileStat({ label, value, color }: { label: string; value: string; co
   return (
     <div className="rounded-[10px] bg-s2 p-2.5 text-center">
       <div className={`font-mono text-[15px] font-bold ${color}`}>{value}</div>
-      <div className="mt-0.5 text-[9px] uppercase tracking-wide text-muted">{label}</div>
+      <div className="mt-0.5 field-label">{label}</div>
     </div>
   )
 }
