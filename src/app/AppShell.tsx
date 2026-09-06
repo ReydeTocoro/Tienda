@@ -1,4 +1,6 @@
+import { useEffect, useRef } from 'react'
 import { Outlet } from 'react-router-dom'
+import { useLiveQuery } from 'dexie-react-hooks'
 import { Header } from './Header'
 import { BottomNav } from './BottomNav'
 import { Sidebar } from './Sidebar'
@@ -6,8 +8,8 @@ import { ToastHost } from '../shared/components/ToastHost'
 import { ConfirmDialog } from '../shared/components/ConfirmDialog'
 import { PinModal } from '../features/pin/PinModal'
 import { useKeyboardShortcuts } from '../shared/hooks/useKeyboardShortcuts'
-import { useThemeSync } from '../shared/hooks/useThemeSync'
-import { useScannerSettingSync } from '../shared/hooks/useScannerSettingSync'
+import { getSettings } from '../db/repositories/settings'
+import { useScannerStore } from '../store/useScannerStore'
 
 /** Mobile: header on top, single content column, thumb bar (`BottomNav`) at the bottom.
  * Desktop (`lg:` and up): `Sidebar` takes over as the nav chrome instead, sitting beside the
@@ -15,8 +17,23 @@ import { useScannerSettingSync } from '../shared/hooks/useScannerSettingSync'
  * free, so individual pages only need to worry about their own internal layout. */
 export function AppShell() {
   useKeyboardShortcuts()
-  useThemeSync()
-  useScannerSettingSync()
+
+  const settings = useLiveQuery(() => getSettings())
+  const setScannerEnabled = useScannerStore((s) => s.setEnabled)
+  const scannerHydrated = useRef(false)
+
+  // Applies settings.theme to <body class="light"> — legacy toggleTheme() (index.html L5176-5181).
+  useEffect(() => {
+    document.body.classList.toggle('light', settings?.theme === 'light')
+  }, [settings?.theme])
+
+  // Hydrates useScannerStore.enabled from settings once on load; after that F8/Reporte owns it.
+  useEffect(() => {
+    if (!scannerHydrated.current && settings) {
+      setScannerEnabled(settings.hidScannerEnabled)
+      scannerHydrated.current = true
+    }
+  }, [settings, setScannerEnabled])
 
   return (
     <div className="flex h-full flex-col bg-bg text-txt">
