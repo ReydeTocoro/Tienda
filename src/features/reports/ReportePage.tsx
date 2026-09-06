@@ -57,10 +57,10 @@ export function ReportePage() {
   const fiadosToday = agg.ventasDay.filter((s) => s.payMethod === 'fiado')
 
   return (
-    <div className="p-3.5 lg:mx-auto lg:max-w-[1200px] lg:p-6">
-      <p className="mb-3.5 font-display text-[21px] font-bold lg:text-[26px]">Reporte de Caja</p>
+    <div className="p-3.5 md:mx-auto md:max-w-[1200px] md:p-6">
+      <p className="mb-3.5 font-display text-[21px] font-bold md:text-[26px]">Reporte de Caja</p>
 
-      <div className="mb-3.5 lg:max-w-xs">
+      <div className="mb-3.5 md:max-w-xs">
         <label className="mb-1 block field-label">Filtrar por fecha</label>
         <div className="flex gap-2">
           <input type="date" value={dayKey} onChange={(e) => setDayKey(e.target.value)} className="input flex-1" />
@@ -70,12 +70,12 @@ export function ReportePage() {
         </div>
       </div>
 
-      <div className="mb-3.5 grid grid-cols-2 gap-2.5 lg:grid-cols-4">
+      <div className="mb-3.5 grid grid-cols-2 gap-2.5 md:grid-cols-4">
         <Kpi label="Ventas del día" value={formatMoney(agg.totalVentas)} color="text-green" sub={`${agg.numTx} transacción${agg.numTx !== 1 ? 'es' : ''}`} />
         <Kpi label="Ganancia bruta" value={formatMoney(agg.totalGanancia)} color="text-lime" sub={`Margen: ${agg.totalVentas ? ((agg.totalGanancia / agg.totalVentas) * 100).toFixed(1) : 0}%`} />
         <Kpi label="Ticket promedio" value={formatMoney(agg.avgTicket)} color="text-blue" sub={`Desc. dados: ${formatMoney(agg.totalDescuentos)}`} />
         <Kpi label="Compras / Gastos" value={formatMoney(agg.totalCompras + agg.totalExOut)} color="text-red" sub={`Extras ingreso: +${formatMoney(agg.totalExIn)}`} />
-        <div className="col-span-2 rounded-[14px] border border-br bg-s1 p-4 text-center lg:col-span-4">
+        <div className="col-span-2 rounded-[14px] border border-br bg-s1 p-4 text-center md:col-span-4">
           <div className="field-label">Flujo neto del día</div>
           <div className={`my-1.5 font-mono text-[26px] font-bold ${agg.netDay >= 0 ? 'text-lime' : 'text-red'}`}>{formatMoney(agg.netDay)}</div>
           <div className="text-[11px] text-txt2">
@@ -85,7 +85,7 @@ export function ReportePage() {
         </div>
       </div>
 
-      <div className="lg:grid lg:grid-cols-2 lg:items-start lg:gap-5">
+      <div className="md:grid md:grid-cols-2 md:items-start md:gap-5">
         <div>
           <p className="mb-2 field-label">Desglose por pago</p>
           <div className="mb-3.5 rounded-[14px] border border-br bg-s1 p-3.5">
@@ -111,7 +111,7 @@ export function ReportePage() {
         </div>
 
         <div>
-          <p className="mb-2 mt-3.5 text-[13px] font-bold uppercase tracking-wide text-red lg:mt-0">📋 Fiados</p>
+          <p className="mb-2 mt-3.5 text-[13px] font-bold uppercase tracking-wide text-red md:mt-0">📋 Fiados</p>
           <div className="mb-2.5 rounded-xl border border-red/20 bg-red/10 p-3.5">
             <div className="mb-2 text-[11px] font-bold uppercase tracking-wider text-red">Fiados generados hoy ({dayKey})</div>
             {!fiadosToday.length ? (
@@ -163,12 +163,12 @@ export function ReportePage() {
           <p className="text-[13px]">Sin ventas en esta fecha</p>
         </div>
       ) : (
-        <div className="lg:grid lg:grid-cols-2 lg:gap-2.5 xl:grid-cols-3">
+        <div className="md:grid md:grid-cols-2 md:gap-2.5 xl:grid-cols-3">
           {[...agg.ventasDay].reverse().map((s) => (
             <button
               key={s.id}
               onClick={() => setReceiptSale(s)}
-              className="mb-2 block w-full rounded-xl border border-br bg-s1 p-3 text-left transition-colors hover:border-br2 hover:bg-s2 lg:mb-0"
+              className="mb-2 block w-full rounded-xl border border-br bg-s1 p-3 text-left transition-colors hover:border-br2 hover:bg-s2 md:mb-0"
             >
               <div className="flex items-start justify-between">
                 <div>
@@ -185,11 +185,11 @@ export function ReportePage() {
         </div>
       )}
 
-      <div className="mt-2 mb-3.5 lg:grid lg:grid-cols-3 lg:gap-3">
-        <button onClick={() => setReporteXOpen(true)} className="mb-2.5 w-full rounded-xl border-2 border-blue/30 bg-blue/10 py-3 text-[13px] font-bold text-blue transition-colors hover:bg-blue/15 lg:mb-0">
+      <div className="mt-2 mb-3.5 md:grid md:grid-cols-3 md:gap-3">
+        <button onClick={() => setReporteXOpen(true)} className="mb-2.5 w-full rounded-xl border-2 border-blue/30 bg-blue/10 py-3 text-[13px] font-bold text-blue transition-colors hover:bg-blue/15 md:mb-0">
           📊 Reporte X — Lectura parcial (sin cerrar caja)
         </button>
-        <button onClick={openCierreZ} className="mb-2.5 w-full rounded-xl border border-red/30 bg-red/10 py-3.5 text-[15px] font-bold text-red transition-colors hover:bg-red/15 lg:mb-0">
+        <button onClick={openCierreZ} className="mb-2.5 w-full rounded-xl border border-red/30 bg-red/10 py-3.5 text-[15px] font-bold text-red transition-colors hover:bg-red/15 md:mb-0">
           🔒 Reporte Z — Cierre definitivo de caja
         </button>
         <button onClick={() => setExtraOpen(true)} className="w-full rounded-[10px] border border-br2 py-2.5 text-[13px] text-txt2 transition-colors hover:bg-s2">
@@ -197,14 +197,14 @@ export function ReportePage() {
         </button>
       </div>
 
-      <div className="lg:grid lg:grid-cols-2 lg:gap-6">
+      <div className="md:grid md:grid-cols-2 md:gap-6">
         <div>
-          <p className="mb-2 mt-5 lg:mt-0 field-label">📁 Historial de cierres</p>
+          <p className="mb-2 mt-5 md:mt-0 field-label">📁 Historial de cierres</p>
           <CierresHistoryList />
         </div>
 
         <div>
-          <p className="mb-2 mt-5 text-[13px] font-bold uppercase tracking-wide text-orange lg:mt-0">✏️ Correcciones de facturas</p>
+          <p className="mb-2 mt-5 text-[13px] font-bold uppercase tracking-wide text-orange md:mt-0">✏️ Correcciones de facturas</p>
           <CorrectionsHistoryList />
         </div>
       </div>

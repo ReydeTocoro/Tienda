@@ -32,16 +32,16 @@ export function FiadosPage() {
   const selectedCustomer = selectedGroup?.customerId ? customerById.get(selectedGroup.customerId) ?? null : null
 
   return (
-    <div className="p-3.5 lg:mx-auto lg:max-w-[1400px] lg:p-6">
-      <p className="mb-3.5 font-display text-[21px] font-bold lg:text-[26px]">📋 Fiados</p>
+    <div className="p-3.5 md:mx-auto md:max-w-[1400px] md:p-6">
+      <p className="mb-3.5 font-display text-[21px] font-bold md:text-[26px]">📋 Fiados</p>
 
-      <div className="mb-3.5 grid grid-cols-3 gap-2 lg:max-w-lg lg:gap-3">
+      <div className="mb-3.5 grid grid-cols-3 gap-2 md:max-w-lg md:gap-3">
         <StatBox label="Deudas" value={String(pendingGroups.length)} color="text-red" />
         <StatBox label="Total debido" value={formatMoney(totalDebt)} color="text-orange" small />
         <StatBox label="Personas" value={String(pendingGroups.length)} color="text-blue" />
       </div>
 
-      <input className="search-input lg:max-w-md" placeholder="🔍 Buscar por nombre o cédula..." value={search} onChange={(e) => setSearch(e.target.value)} />
+      <input className="search-input md:max-w-md" placeholder="🔍 Buscar por nombre o cédula..." value={search} onChange={(e) => setSearch(e.target.value)} />
 
       {!filtered.length ? (
         <div className="p-10 text-center text-muted">
@@ -49,7 +49,7 @@ export function FiadosPage() {
           <p className="text-[13px]">Sin fiados pendientes</p>
         </div>
       ) : (
-        <div className="lg:grid lg:grid-cols-2 lg:gap-3 xl:grid-cols-3">
+        <div className="md:grid md:grid-cols-2 md:gap-3 xl:grid-cols-3">
           {filtered.map((g) => {
             const { totalOwed, totalDebt: debt, totalPaid, isPaid } = groupTotals(g)
             const pct = totalOwed > 0 ? (totalPaid / totalOwed) * 100 : 0
@@ -58,7 +58,7 @@ export function FiadosPage() {
               <button
                 key={g.key}
                 onClick={() => setSelectedKey(g.key)}
-                className={`mb-2.5 block w-full rounded-[14px] border p-3.5 text-left transition-colors lg:mb-0 ${isPaid ? 'border-green/30 opacity-60 hover:opacity-80' : 'border-br hover:border-br2 hover:bg-s2'} bg-s1`}
+                className={`mb-2.5 block w-full rounded-[14px] border p-3.5 text-left transition-colors md:mb-0 ${isPaid ? 'border-green/30 opacity-60 hover:opacity-80' : 'border-br hover:border-br2 hover:bg-s2'} bg-s1`}
               >
                 <div className="flex items-start justify-between gap-2.5">
                   <div className="min-w-0 flex-1">

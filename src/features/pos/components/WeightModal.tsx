@@ -53,7 +53,7 @@ export function WeightModal({ product: p, editIndex, onClose }: WeightModalProps
 
   return (
     <BottomSheet open onClose={onClose} maxWidthClass="max-w-[420px]">
-      <div className="pb-8 lg:pb-0">
+      <div className="pb-8 md:pb-0">
         <div className="mb-3.5 flex items-start justify-between">
           <div>
             <div className="font-display text-[17px] font-bold leading-tight">{p.name}</div>

@@ -58,7 +58,7 @@ export function PackageCard({ product: p, onEdit, onDelete }: PackageCardProps) 
   }
 
   return (
-    <div className="mb-2.5 rounded-[14px] border-2 border-purple/20 bg-s1 p-3.5 transition-colors lg:mb-0 lg:h-full lg:hover:border-purple/35">
+    <div className="mb-2.5 rounded-[14px] border-2 border-purple/20 bg-s1 p-3.5 transition-colors md:mb-0 md:h-full md:hover:border-purple/35">
       <div className="mb-2.5 flex items-center justify-between">
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-1.5 text-[15px] font-bold">

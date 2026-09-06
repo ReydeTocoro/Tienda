@@ -25,7 +25,7 @@ export function ToastHost() {
 
   return (
     <div
-      className={`pointer-events-none fixed bottom-[76px] left-1/2 z-[9999] max-w-[90vw] -translate-x-1/2 overflow-hidden text-ellipsis whitespace-nowrap rounded-[30px] border bg-s2 px-5 py-2.5 text-[13px] font-semibold shadow-[var(--shadow-md)] lg:bottom-6 ${COLOR_CLASSES[color]}`}
+      className={`pointer-events-none fixed bottom-[76px] left-1/2 z-[9999] max-w-[90vw] -translate-x-1/2 overflow-hidden text-ellipsis whitespace-nowrap rounded-[30px] border bg-s2 px-5 py-2.5 text-[13px] font-semibold shadow-[var(--shadow-md)] md:bottom-6 ${COLOR_CLASSES[color]}`}
     >
       {message}
     </div>

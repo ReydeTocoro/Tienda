@@ -143,13 +143,13 @@ export function InventarioPage() {
   }
 
   return (
-    <div className="p-3.5 lg:mx-auto lg:max-w-[1600px] lg:p-6">
-      <p className="mb-3.5 font-display text-[21px] font-bold lg:text-[26px]">Inventario</p>
+    <div className="p-3.5 md:mx-auto md:max-w-[1600px] md:p-6">
+      <p className="mb-3.5 font-display text-[21px] font-bold md:text-[26px]">Inventario</p>
 
-      <div className="lg:flex lg:items-start lg:gap-6">
+      <div className="md:flex md:items-start md:gap-6">
         {/* Tools column — restock + product form. Sticky on desktop so it stays in view while
             the product list on the right scrolls. */}
-        <div className="lg:sticky lg:top-6 lg:w-[380px] lg:flex-shrink-0">
+        <div className="md:sticky md:top-6 md:w-[380px] md:flex-shrink-0">
           <EntradaRapida
             ref={entradaRef}
             products={products}
@@ -181,7 +181,7 @@ export function InventarioPage() {
             </div>
           </div>
 
-          <div className="mb-3.5 lg:mb-0">
+          <div className="mb-3.5 md:mb-0">
             <ProductForm
               product={editing}
               onSaved={() => setEditing(null)}
@@ -196,10 +196,10 @@ export function InventarioPage() {
         </div>
 
         {/* Browse column — search, bulk tools, and the product list as a card grid on desktop. */}
-        <div className="lg:min-w-0 lg:flex-1">
+        <div className="md:min-w-0 md:flex-1">
           <input className="search-input" placeholder="🔍 Buscar producto..." value={search} onChange={(e) => setSearch(e.target.value)} />
 
-          <div className="mb-2 grid grid-cols-2 gap-2 lg:grid-cols-4">
+          <div className="mb-2 grid grid-cols-2 gap-2 md:grid-cols-4">
             <button onClick={() => exportExcel(products, settings?.storeName ?? 'Mi Tienda')} className="rounded-[10px] border border-green/25 bg-green/10 py-2.5 text-[12px] font-semibold text-green transition-colors hover:bg-green/15">
               📊 Exportar Excel
             </button>
@@ -213,7 +213,7 @@ export function InventarioPage() {
               📥 Importar CSV/Excel
             </button>
           </div>
-          <div className="mb-3.5 grid grid-cols-2 gap-2 lg:max-w-md">
+          <div className="mb-3.5 grid grid-cols-2 gap-2 md:max-w-md">
             <button onClick={() => setCyclicOpen(true)} className="rounded-[10px] border border-orange/25 bg-orange/10 py-2.5 text-[12px] font-semibold text-orange transition-colors hover:bg-orange/15">
               🔢 Conteo Cíclico
             </button>
@@ -229,7 +229,7 @@ export function InventarioPage() {
               <p className="text-[13px]">Sin productos aún</p>
             </div>
           ) : (
-            <div className="lg:grid lg:grid-cols-2 lg:items-start lg:gap-3 xl:grid-cols-3">
+            <div className="md:grid md:grid-cols-2 md:items-start md:gap-3 xl:grid-cols-3">
               {filtered.map((p) =>
                 p.esPaquete ? (
                   <PackageCard key={p.code} product={p} onEdit={() => setEditing(p)} onDelete={() => handleDelete(p)} />

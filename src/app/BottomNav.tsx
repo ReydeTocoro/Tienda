@@ -3,7 +3,7 @@ import type { MouseEvent } from 'react'
 import { NAV_ITEMS, useNavBadges, type NavItem } from './navConfig'
 import { usePermission } from '../features/pin/usePermission'
 
-/** Mobile chrome — thumb-friendly bottom tab bar. Hidden at `lg:` and up, where `Sidebar`
+/** Mobile chrome — thumb-friendly bottom tab bar. Hidden at `md:` and up, where `Sidebar`
  * takes over as the desktop nav (see `AppShell`). */
 export function BottomNav() {
   const badges = useNavBadges()
@@ -19,7 +19,7 @@ export function BottomNav() {
   }
 
   return (
-    <nav className="z-50 flex flex-shrink-0 border-t border-br bg-s1 pb-[env(safe-area-inset-bottom,0px)] lg:hidden">
+    <nav className="z-50 flex flex-shrink-0 border-t border-br bg-s1 pb-[env(safe-area-inset-bottom,0px)] md:hidden">
       {NAV_ITEMS.map((item) => {
         const { to, label, icon: Icon, end, badgeKey } = item
         const count = badgeKey ? badges[badgeKey] : 0

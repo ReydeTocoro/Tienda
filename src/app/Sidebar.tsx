@@ -4,7 +4,7 @@ import { NAV_ITEMS, useNavBadges, type NavItem } from './navConfig'
 import { usePermission } from '../features/pin/usePermission'
 
 /** Desktop chrome — a proper left sidebar nav, replacing the thumb-sized bottom bar once
- * there's room for it. Hidden below `lg:`, where `BottomNav` takes over instead. */
+ * there's room for it. Hidden below `md:`, where `BottomNav` takes over instead. */
 export function Sidebar() {
   const badges = useNavBadges()
   const { requireAdmin } = usePermission()
@@ -19,7 +19,7 @@ export function Sidebar() {
   }
 
   return (
-    <nav className="hidden w-60 flex-shrink-0 flex-col overflow-y-auto border-r border-br bg-s1 py-4 lg:flex">
+    <nav className="hidden w-60 flex-shrink-0 flex-col overflow-y-auto border-r border-br bg-s1 py-4 md:flex">
       <div className="flex flex-col gap-1 px-3">
         {NAV_ITEMS.map((item) => {
           const { to, label, icon: Icon, end, badgeKey } = item

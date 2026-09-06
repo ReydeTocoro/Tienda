@@ -12,7 +12,7 @@ import { getSettings } from '../db/repositories/settings'
 import { useScannerStore } from '../store/useScannerStore'
 
 /** Mobile: header on top, single content column, thumb bar (`BottomNav`) at the bottom.
- * Desktop (`lg:` and up): `Sidebar` takes over as the nav chrome instead, sitting beside the
+ * Desktop (`md:` and up): `Sidebar` takes over as the nav chrome instead, sitting beside the
  * content column under the same header — the one breakpoint switch every page inherits for
  * free, so individual pages only need to worry about their own internal layout. */
 export function AppShell() {

@@ -34,7 +34,7 @@ export function ProductListItem({ product: p, onEdit, onDelete }: ProductListIte
   const lineMargin = p.cost > 0 ? ((p.price - p.cost) / p.cost) * 100 : 0
 
   return (
-    <div className="mb-2.5 rounded-[14px] border border-br bg-s1 p-3.5 transition-colors lg:mb-0 lg:h-full lg:hover:border-br2 lg:hover:bg-s2">
+    <div className="mb-2.5 rounded-[14px] border border-br bg-s1 p-3.5 transition-colors md:mb-0 md:h-full md:hover:border-br2 md:hover:bg-s2">
       <div className="flex items-center justify-between gap-2.5">
         <div className="min-w-0 flex-1">
           <div className="text-[14px] font-bold">

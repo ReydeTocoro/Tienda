@@ -151,7 +151,7 @@ export function VentaPage() {
       <ClientBar onOpen={() => setPickerOpen(true)} />
       <VentaKpiBar onClickLowStock={() => setLowStockOnly(true)} />
 
-      <div className="flex flex-shrink-0 gap-2 px-3 py-2 lg:px-4">
+      <div className="flex flex-shrink-0 gap-2 px-3 py-2 md:px-4">
         <div className="relative flex-1">
           <input
             id="venta-search-input"
@@ -164,7 +164,7 @@ export function VentaPage() {
             onKeyDown={handleSearchKeyDown}
             placeholder="🔍  Buscar producto por nombre o código..."
             autoComplete="off"
-            className="input lg:h-[42px] lg:text-[15px]"
+            className="input md:h-[42px] md:text-[15px]"
           />
           <SearchDropdown matches={searchMatches(products, search)} query={search} focusIndex={ddFocus} onHover={setDdFocus} onSelect={pickAndClear} />
         </div>
@@ -187,14 +187,14 @@ export function VentaPage() {
       {lowStockOnly && (
         <button
           onClick={() => setLowStockOnly(false)}
-          className="mx-3 mb-2 flex-shrink-0 rounded-lg border border-orange/30 bg-orange/10 px-3 py-1.5 text-left text-[12px] text-orange transition-colors hover:bg-orange/15 lg:mx-4"
+          className="mx-3 mb-2 flex-shrink-0 rounded-lg border border-orange/30 bg-orange/10 px-3 py-1.5 text-left text-[12px] text-orange transition-colors hover:bg-orange/15 md:mx-4"
         >
           ⚠ Mostrando solo stock bajo — toca para quitar el filtro
         </button>
       )}
 
       <div className="flex min-h-0 flex-1 overflow-hidden border-t border-br">
-        <div className="w-[52%] flex-shrink-0 md:w-[55%] lg:w-[56%] xl:w-[58%]">
+        <div className="w-[52%] flex-shrink-0 md:w-[56%] xl:w-[58%]">
           <ProductGrid
             products={products}
             cart={items}

@@ -39,9 +39,9 @@ export function HistorialPage() {
   }, [sales, purchases])
 
   return (
-    <div className="p-3.5 lg:mx-auto lg:max-w-[1400px] lg:p-6">
+    <div className="p-3.5 md:mx-auto md:max-w-[1400px] md:p-6">
       <div className="mb-3.5 flex items-center justify-between">
-        <p className="font-display text-[21px] font-bold lg:text-[26px]">Historial</p>
+        <p className="font-display text-[21px] font-bold md:text-[26px]">Historial</p>
         <button onClick={() => setPurchaseOpen(true)} className="rounded-[10px] border border-br2 px-3 py-2 text-[12px] text-txt2 transition-colors hover:bg-s2">
           + Compra
         </button>
@@ -53,13 +53,13 @@ export function HistorialPage() {
           <p className="text-[13px]">Sin registros aún</p>
         </div>
       ) : (
-        <div className="lg:grid lg:grid-cols-2 lg:gap-3 xl:grid-cols-3">
+        <div className="md:grid md:grid-cols-2 md:gap-3 xl:grid-cols-3">
           {rows.map((r, i) =>
             r.kind === 'venta' ? (
               <button
                 key={'v' + i}
                 onClick={() => setReceiptSale(r.sale)}
-                className="mb-2 block w-full rounded-xl border border-br bg-s1 p-3 text-left transition-colors hover:border-br2 hover:bg-s2 lg:mb-0"
+                className="mb-2 block w-full rounded-xl border border-br bg-s1 p-3 text-left transition-colors hover:border-br2 hover:bg-s2 md:mb-0"
               >
                 <div className="flex items-start justify-between">
                   <div>
@@ -89,7 +89,7 @@ export function HistorialPage() {
                 </div>
               </button>
             ) : (
-              <div key={'c' + i} className="mb-2 rounded-xl border border-br bg-s1 p-3 lg:mb-0">
+              <div key={'c' + i} className="mb-2 rounded-xl border border-br bg-s1 p-3 md:mb-0">
                 <div className="flex items-start justify-between">
                   <div>
                     <div className="font-mono text-[12px] text-orange">
