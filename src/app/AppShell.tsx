@@ -10,6 +10,7 @@ import { PinModal } from '../features/pin/PinModal'
 import { useKeyboardShortcuts } from '../shared/hooks/useKeyboardShortcuts'
 import { getSettings } from '../db/repositories/settings'
 import { useScannerStore } from '../store/useScannerStore'
+import { startSync } from '../sync'
 
 /** Mobile: header on top, single content column, thumb bar (`BottomNav`) at the bottom.
  * Desktop (`md:` and up): `Sidebar` takes over as the nav chrome instead, sitting beside the
@@ -17,6 +18,10 @@ import { useScannerStore } from '../store/useScannerStore'
  * free, so individual pages only need to worry about their own internal layout. */
 export function AppShell() {
   useKeyboardShortcuts()
+
+  useEffect(() => {
+    startSync()
+  }, [])
 
   const settings = useLiveQuery(() => getSettings())
   const setScannerEnabled = useScannerStore((s) => s.setEnabled)

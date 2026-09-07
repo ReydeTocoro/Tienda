@@ -4,6 +4,15 @@ import { VitePWA } from 'vite-plugin-pwa'
 
 // https://vite.dev/config/
 export default defineConfig({
+  server: {
+    // Dev-time equivalent of production's same-origin server (server/index.ts) — keeps
+    // `npm run dev` working against the new server without the app needing to know the
+    // difference. Run the server separately: `npm run server`.
+    proxy: {
+      '/api': 'http://localhost:3001',
+      '/ws': { target: 'ws://localhost:3001', ws: true },
+    },
+  },
   plugins: [
     react(),
     VitePWA({

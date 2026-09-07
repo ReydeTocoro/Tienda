@@ -1,5 +1,6 @@
 import { db } from '../index'
 import type { Product } from '../../types/product'
+import { apiPost, apiPut, apiDelete } from '../../api/client'
 
 export async function getProduct(code: string): Promise<Product | undefined> {
   return db.products.get(code)
@@ -9,33 +10,26 @@ export async function listProducts(): Promise<Product[]> {
   return db.products.toArray()
 }
 
-/** Insert a brand-new product. Throws if the code already exists (legacy L3690). */
+/** Insert a brand-new product. Throws if the code already exists (server returns 409). */
 export async function addProduct(product: Product): Promise<void> {
-  const existing = await db.products.get(product.code)
-  if (existing) throw new Error('Ese código ya existe')
-  await db.products.add(product)
+  await apiPost('/api/products', product)
 }
 
 /** Update an existing product in place (code is the primary key and cannot change). */
 export async function updateProduct(product: Product): Promise<void> {
-  await db.products.put(product)
+  await apiPut(`/api/products/${encodeURIComponent(product.code)}`, product)
 }
 
 export async function upsertProduct(product: Product): Promise<void> {
-  await db.products.put(product)
+  await apiPut(`/api/products/${encodeURIComponent(product.code)}`, product)
 }
 
 export async function deleteProduct(code: string): Promise<void> {
-  await db.products.delete(code)
+  await apiDelete(`/api/products/${encodeURIComponent(code)}`)
 }
 
-/** Adjust stock by a signed delta, clamped at 0 (legacy `quickStock`, L4116-4124). */
+/** Adjust stock by a signed delta, clamped at 0 (legacy `quickStock`). */
 export async function adjustStock(code: string, delta: number): Promise<number> {
-  return db.transaction('rw', db.products, async () => {
-    const p = await db.products.get(code)
-    if (!p) throw new Error('Producto no encontrado')
-    const next = Math.max(0, (p.stock || 0) + delta)
-    await db.products.update(code, { stock: next })
-    return next
-  })
+  const updated = await apiPost<Product>(`/api/products/${encodeURIComponent(code)}/adjust-stock`, { delta })
+  return updated.stock
 }
