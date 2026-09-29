@@ -50,3 +50,10 @@ export function insertAutoRow<T extends object>(db: Database.Database, table: st
 export function errorMessage(err: unknown): string {
   return err instanceof Error ? err.message : String(err)
 }
+
+/** Repeated float add/subtract on `stock` (kg deliveries, weighed sales) drifts — e.g.
+ * 0.1 + 0.2 !== 0.3 — so every stock write rounds to the same 4 decimals WeightModal already
+ * rounds a weighed qty to, instead of letting garbage digits accumulate sale after sale. */
+export function roundQty(n: number): number {
+  return Math.round(n * 10000) / 10000
+}

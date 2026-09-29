@@ -2,7 +2,8 @@ import { forwardRef, useImperativeHandle, useMemo, useState, type RefObject } fr
 import { useLiveQuery } from 'dexie-react-hooks'
 import type { Product } from '../../../types/product'
 import { confirmEntrada, listEntradas } from '../../../db/repositories/entradas'
-import { formatDateTime } from '../../../shared/lib/currency'
+import { formatDateTime, formatQty } from '../../../shared/lib/currency'
+import { unitShortLabel, isMeasuredUnit } from '../../../shared/lib/units'
 import { toast } from '../../../store/useToastStore'
 
 export interface EntradaRapidaHandle {
@@ -29,6 +30,10 @@ export const EntradaRapida = forwardRef<EntradaRapidaHandle, EntradaRapidaProps>
   const [selected, setSelected] = useState<Product | null>(null)
   const [qty, setQty] = useState(1)
   const recent = useLiveQuery(() => listEntradas(5), [], [])
+  const productByCode = useMemo(() => new Map(products.map((p) => [p.code, p])), [products])
+
+  const entradaUnitMeasured = isMeasuredUnit(selected?.unit ?? 'unidad')
+  const entradaUnitLabel = unitShortLabel(selected?.unit || 'unidad')
 
   const matches = useMemo(() => {
     const q = search.trim().toLowerCase()
@@ -73,7 +78,7 @@ export const EntradaRapida = forwardRef<EntradaRapidaHandle, EntradaRapidaProps>
       return
     }
     const r = await confirmEntrada(selected.code, qty)
-    toast(`✓ +${qty} a "${selected.name}" → Stock: ${r.stockDespues}`, 'green')
+    toast(`✓ +${formatQty(qty)} a "${selected.name}" → Stock: ${formatQty(r.stockDespues)}`, 'green')
     cancel()
   }
 
@@ -160,28 +165,32 @@ export const EntradaRapida = forwardRef<EntradaRapidaHandle, EntradaRapidaProps>
                   </div>
                   <div className="text-right">
                     <div className="field-label">Stock actual</div>
-                    <div className="font-mono text-[20px] font-bold text-lime">{selected.stock}</div>
+                    <div className="font-mono text-[20px] font-bold text-lime">
+                      {formatQty(selected.stock)} {entradaUnitLabel}
+                    </div>
                   </div>
                 </div>
                 <div className="flex items-center gap-2.5">
                   <div className="whitespace-nowrap field-label">Sumar:</div>
-                  <button onClick={() => setQty((q) => Math.max(1, q - 1))} className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-[9px] border border-br2 bg-s3 text-[20px] font-bold">
+                  <button onClick={() => setQty((q) => Math.max(0, q - 1))} className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-[9px] border border-br2 bg-s3 text-[20px] font-bold">
                     −
                   </button>
                   <input
                     type="number"
-                    min={1}
+                    min={0}
+                    step={entradaUnitMeasured ? 'any' : 1}
                     value={qty}
-                    onChange={(e) => setQty(Math.max(1, parseInt(e.target.value) || 1))}
+                    onChange={(e) => setQty(Math.max(0, parseFloat(e.target.value) || 0))}
                     className="w-full flex-1 rounded-[9px] border border-br2 bg-s3 p-2 text-center font-mono text-[20px] font-bold text-lime outline-none"
                   />
+                  <span className="flex-shrink-0 text-[13px] text-muted">{entradaUnitLabel}</span>
                   <button onClick={() => setQty((q) => q + 1)} className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-[9px] border border-br2 bg-s3 text-[20px] font-bold">
                     +
                   </button>
                 </div>
                 {qty > 0 && (
                   <div className="mt-2.5 rounded-lg bg-green/10 px-3 py-2 text-center font-mono text-[13px] text-green">
-                    {selected.stock || 0} + {qty} = {(selected.stock || 0) + qty} unidades en stock
+                    {formatQty(selected.stock)} + {formatQty(qty)} = {formatQty((selected.stock || 0) + qty)} {entradaUnitLabel}
                   </div>
                 )}
               </div>
@@ -197,20 +206,23 @@ export const EntradaRapida = forwardRef<EntradaRapidaHandle, EntradaRapidaProps>
           {recent.length > 0 && (
             <div className="mt-2.5">
               <div className="mb-2 field-label">Entradas recientes</div>
-              {recent.map((e, i) => (
-                <div key={i} className="mb-1.5 flex items-center gap-2.5 rounded-[10px] bg-s2 px-2.5 py-2">
-                  <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-[8px] border border-green/25 bg-green/10 font-mono text-[13px] font-extrabold text-green">
-                    +{e.qty}
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="overflow-hidden text-ellipsis whitespace-nowrap text-[13px] font-semibold">{e.name}</div>
-                    <div className="text-[11px] text-muted">
-                      {e.stockAntes} → {e.stockDespues} uds
+              {recent.map((e, i) => {
+                const ul = unitShortLabel(productByCode.get(e.code)?.unit || 'unidad')
+                return (
+                  <div key={i} className="mb-1.5 flex items-center gap-2.5 rounded-[10px] bg-s2 px-2.5 py-2">
+                    <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-[8px] border border-green/25 bg-green/10 font-mono text-[13px] font-extrabold text-green">
+                      +{formatQty(e.qty)}
                     </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="overflow-hidden text-ellipsis whitespace-nowrap text-[13px] font-semibold">{e.name}</div>
+                      <div className="text-[11px] text-muted">
+                        {formatQty(e.stockAntes)} → {formatQty(e.stockDespues)} {ul}
+                      </div>
+                    </div>
+                    <div className="flex-shrink-0 text-right text-[10px] text-muted">{formatDateTime(e.date)}</div>
                   </div>
-                  <div className="flex-shrink-0 text-right text-[10px] text-muted">{formatDateTime(e.date)}</div>
-                </div>
-              ))}
+                )
+              })}
             </div>
           )}
         </div>

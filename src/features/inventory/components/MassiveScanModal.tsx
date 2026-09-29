@@ -3,6 +3,7 @@ import type { Product } from '../../../types/product'
 import { useBarcodeScanner } from '../../../shared/hooks/useBarcodeScanner'
 import { confirmEntradasBulk } from '../../../db/repositories/entradas'
 import { addProduct } from '../../../db/repositories/products'
+import { formatQty } from '../../../shared/lib/currency'
 import { toast } from '../../../store/useToastStore'
 
 interface LogEntry {
@@ -137,7 +138,6 @@ export function MassiveScanModal({ open, onClose, products }: MassiveScanModalPr
             stock: 0,
             min: 0,
             unit: 'unidad',
-            pricePer: 0,
             esPaquete: false,
             createdAt: new Date().toISOString(),
           })
@@ -148,7 +148,7 @@ export function MassiveScanModal({ open, onClose, products }: MassiveScanModalPr
         log.map((e) => ({ code: e.code, qty: e.qty })),
         'masivo',
       )
-      toast(`✓ ${totalUnidades} ud${totalUnidades !== 1 ? 's' : ''} agregadas a ${log.length} producto${log.length !== 1 ? 's' : ''}`, 'green')
+      toast(`✓ ${formatQty(totalUnidades)} ud${totalUnidades !== 1 ? 's' : ''} agregadas a ${log.length} producto${log.length !== 1 ? 's' : ''}`, 'green')
       setLog([])
       onClose()
     } catch (err) {
@@ -174,7 +174,7 @@ export function MassiveScanModal({ open, onClose, products }: MassiveScanModalPr
         </div>
         <div className="flex flex-shrink-0 items-center gap-4">
           <div className="text-center">
-            <div className="font-mono text-[26px] font-bold leading-none text-lime">{totalUnidades}</div>
+            <div className="font-mono text-[26px] font-bold leading-none text-lime">{formatQty(totalUnidades)}</div>
             <div className="field-label">unidades</div>
           </div>
           <div className="text-center">
@@ -268,7 +268,7 @@ export function MassiveScanModal({ open, onClose, products }: MassiveScanModalPr
             return (
               <div key={e.code} className={`mb-1.5 flex items-center gap-2.5 rounded-xl border bg-s1 p-2.5 ${e.isNew ? 'border-orange' : 'border-br'}`}>
                 <div className={`flex h-[42px] w-[42px] flex-shrink-0 items-center justify-center rounded-[10px] font-mono text-[15px] font-extrabold ${e.isNew ? 'bg-orange/10 text-orange' : 'bg-green/10 text-green'}`}>
-                  +{e.qty}
+                  +{formatQty(e.qty)}
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="overflow-hidden text-ellipsis whitespace-nowrap text-[13px] font-bold">

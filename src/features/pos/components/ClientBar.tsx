@@ -1,5 +1,6 @@
 import { useCartStore } from '../../../store/useCartStore'
 import { useSelectedCustomerLoyalty } from '../hooks/useSelectedCustomerLoyalty'
+import { formatQty } from '../../../shared/lib/currency'
 
 interface ClientBarProps {
   onOpen: () => void
@@ -22,7 +23,7 @@ export function ClientBar({ onOpen }: ClientBarProps) {
           <div className="overflow-hidden text-ellipsis whitespace-nowrap text-[14px] font-semibold">
             {customerName ? `${customerName} · ${tier.label}` : 'Sin cliente'}
           </div>
-          {customerName && <div className="mt-0.5 font-mono text-[11px] text-lime">⭐ {pts} puntos</div>}
+          {customerName && <div className="mt-0.5 font-mono text-[11px] text-lime">⭐ {formatQty(pts)} puntos</div>}
         </div>
         <span className="flex-shrink-0 text-[18px] text-muted">›</span>
       </button>

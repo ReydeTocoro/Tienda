@@ -28,7 +28,6 @@ const EMPTY = {
   price: '',
   brand: '',
   unit: 'unidad',
-  pricePer: '',
   stock: '',
   min: '',
   cat: '',
@@ -66,7 +65,6 @@ export function ProductForm({ product, onSaved, onCancel, scanSeed, onOpenCamera
         price: product.price ? String(product.price) : '',
         brand: product.brand || '',
         unit: product.unit || 'unidad',
-        pricePer: product.pricePer ? String(product.pricePer) : '',
         stock: product.stock ? String(product.stock) : '',
         min: product.min ? String(product.min) : '',
         cat: product.cat || '',
@@ -197,7 +195,6 @@ export function ProductForm({ product, onSaved, onCancel, scanSeed, onOpenCamera
       cat: f.cat.trim(),
       brand: f.brand.trim(),
       unit: f.unit,
-      pricePer: isMeasured ? parseFloat(f.pricePer) || 0 : 0,
       esPaquete: f.esPaquete,
       unidadesPor: f.esPaquete ? unidadesPorNum : undefined,
       codigoSuelta: f.esPaquete ? codigoSuelta : undefined,
@@ -253,16 +250,33 @@ export function ProductForm({ product, onSaved, onCancel, scanSeed, onOpenCamera
           <input className="input" value={f.name} onChange={(e) => set('name', e.target.value)} placeholder="Nombre del producto" />
         </Field>
 
+        <Field label="Marca">
+          <input className="input" value={f.brand} onChange={(e) => set('brand', e.target.value)} placeholder="Ej: Nestlé, Colgate..." />
+        </Field>
+        <Field label="Unidad de venta">
+          <select className="input" value={f.unit} onChange={(e) => set('unit', e.target.value)}>
+            {UNIT_GROUPS.map((g) => (
+              <optgroup key={g.label} label={g.label}>
+                {g.values.map((v) => (
+                  <option key={v} value={v}>
+                    {UNITS.find((u) => u.value === v)?.label ?? v}
+                  </option>
+                ))}
+              </optgroup>
+            ))}
+          </select>
+        </Field>
+
         <div className="col-span-2 rounded-xl border border-br2 bg-s2 p-3">
-          <label className="mb-2 block field-label">💰 Precio y Margen</label>
+          <label className="mb-2 block field-label">💰 {isMeasured ? `Costo y Precio por ${unitLbl}` : 'Precio y Margen'}</label>
           <div className="grid grid-cols-3 gap-2">
-            <NumField label="Precio Compra" value={f.cost} onChange={(v) => calcFromCost(v, f.margin)} />
+            <NumField label={isMeasured ? `Costo /${unitLbl}` : 'Precio Compra'} value={f.cost} onChange={(v) => calcFromCost(v, f.margin)} />
             <NumField label="% Ganancia" value={f.margin} onChange={(v) => calcFromCost(f.cost, v)} accent />
-            <NumField label="Precio Venta" value={f.price} onChange={calcFromPrice} />
+            <NumField label={isMeasured ? `Venta /${unitLbl}` : 'Precio Venta'} value={f.price} onChange={calcFromPrice} />
           </div>
           {cost > 0 && price > 0 && (
             <div className="mt-2.5 flex items-center justify-between gap-2 rounded-lg bg-s1 px-3 py-2 text-[12px] text-muted">
-              <span>Ganancia por unidad:</span>
+              <span>Ganancia por {isMeasured ? unitLbl : 'unidad'}:</span>
               <div className="flex gap-3">
                 <span className={gain >= 0 ? 'font-mono font-bold text-green' : 'font-mono font-bold text-red'}>
                   {gain >= 0 ? '+' : ''}${gain.toFixed(2)}
@@ -286,37 +300,6 @@ export function ProductForm({ product, onSaved, onCancel, scanSeed, onOpenCamera
             ))}
           </div>
         </div>
-
-        <Field label="Marca">
-          <input className="input" value={f.brand} onChange={(e) => set('brand', e.target.value)} placeholder="Ej: Nestlé, Colgate..." />
-        </Field>
-        <Field label="Unidad de venta">
-          <select className="input" value={f.unit} onChange={(e) => set('unit', e.target.value)}>
-            {UNIT_GROUPS.map((g) => (
-              <optgroup key={g.label} label={g.label}>
-                {g.values.map((v) => (
-                  <option key={v} value={v}>
-                    {UNITS.find((u) => u.value === v)?.label ?? v}
-                  </option>
-                ))}
-              </optgroup>
-            ))}
-          </select>
-        </Field>
-
-        {isMeasured && (
-          <Field label={`Precio por ${unitLbl}`} span2>
-            <input
-              className="input"
-              type="number"
-              min={0}
-              step="0.01"
-              value={f.pricePer}
-              onChange={(e) => set('pricePer', e.target.value)}
-              placeholder="0.00"
-            />
-          </Field>
-        )}
 
         <Field label="Stock actual">
           <div className="flex items-center gap-1.5">

@@ -1,5 +1,5 @@
 import type { Product } from '../../../types/product'
-import { formatMoney } from '../../../shared/lib/currency'
+import { formatMoney, formatQty } from '../../../shared/lib/currency'
 import { unitShortLabel, unitFullName, isMeasuredUnit } from '../../../shared/lib/units'
 
 interface SearchDropdownProps {
@@ -54,10 +54,11 @@ export function SearchDropdown({ matches, query, focusIndex, onHover, onSelect }
                 </div>
                 <div className="ml-auto flex-shrink-0 pl-2 text-right">
                   <div className="font-mono text-[13px] font-semibold text-lime">
-                    {measured && p.pricePer ? `${formatMoney(p.pricePer)}/${ul}` : formatMoney(p.price)}
+                    {formatMoney(p.price)}
+                    {measured ? `/${ul}` : ''}
                   </div>
                   <div className={`mt-0.5 text-[10px] ${out ? 'text-red' : low ? 'text-orange' : 'text-muted'}`}>
-                    {out ? '✗ Sin stock' : `${p.stock} ${ul}`}
+                    {out ? '✗ Sin stock' : `${formatQty(p.stock)} ${ul}`}
                   </div>
                   {measured && <div className="mt-0.5 text-[10px] text-purple">⚖️ {unitFullName(p.unit)}</div>}
                 </div>

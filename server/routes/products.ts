@@ -1,7 +1,7 @@
 import { Router } from 'express'
 import type Database from 'better-sqlite3'
 import type { Product } from '../../src/types/product'
-import { listAll, getRow, putRow, deleteRow, errorMessage } from './generic'
+import { listAll, getRow, putRow, deleteRow, errorMessage, roundQty } from './generic'
 import { broadcast } from '../broadcast'
 
 const TABLE = 'products'
@@ -44,7 +44,7 @@ export function productsRouter(db: Database.Database) {
       const updated = db.transaction(() => {
         const p = getRow<Product>(db, TABLE, 'code', req.params.code)
         if (!p) throw new Error('Producto no encontrado')
-        const next = Math.max(0, (p.stock || 0) + delta)
+        const next = roundQty(Math.max(0, (p.stock || 0) + delta))
         const u: Product = { ...p, stock: next }
         putRow(db, TABLE, 'code', req.params.code, {}, u)
         return u

@@ -18,12 +18,12 @@ function downloadBlob(blob: Blob, filename: string) {
  * (index.html L4174-4247). Cell styling/fills are dropped for simplicity; column layout and
  * the "buy list" logic (reorder to 2x min) are preserved. */
 export function exportExcel(products: Product[], storeName: string): void {
-  const headers = ['Código', 'Nombre', 'Marca', 'Categoría', 'Unidad', 'Precio Venta', 'Precio Compra', '% Margen', 'Precio x Unidad Medida', 'Stock', 'Stock Mínimo']
-  const rows = products.map((p) => [p.code, p.name, p.brand || '', p.cat || '', p.unit || 'unidad', p.price || 0, p.cost || 0, marginOf(p), p.pricePer || '', p.stock || 0, p.min || 0])
+  const headers = ['Código', 'Nombre', 'Marca', 'Categoría', 'Unidad', 'Precio Venta', 'Precio Compra', '% Margen', 'Stock', 'Stock Mínimo']
+  const rows = products.map((p) => [p.code, p.name, p.brand || '', p.cat || '', p.unit || 'unidad', p.price || 0, p.cost || 0, marginOf(p), p.stock || 0, p.min || 0])
 
   const wb = XLSX.utils.book_new()
   const ws = XLSX.utils.aoa_to_sheet([headers, ...rows])
-  ws['!cols'] = [{ wch: 12 }, { wch: 28 }, { wch: 16 }, { wch: 14 }, { wch: 10 }, { wch: 13 }, { wch: 13 }, { wch: 10 }, { wch: 16 }, { wch: 8 }, { wch: 10 }]
+  ws['!cols'] = [{ wch: 12 }, { wch: 28 }, { wch: 16 }, { wch: 14 }, { wch: 10 }, { wch: 13 }, { wch: 13 }, { wch: 10 }, { wch: 8 }, { wch: 10 }]
   XLSX.utils.book_append_sheet(wb, ws, 'Stock Completo')
 
   const needed = products.filter((p) => p.stock <= p.min)
@@ -43,10 +43,10 @@ export function exportExcel(products: Product[], storeName: string): void {
 
 /** legacy `exportCSV()` (index.html L4250-4274). */
 export function exportCSV(products: Product[], storeName: string): void {
-  const headers = ['Código', 'Nombre', 'Marca', 'Categoría', 'Unidad', 'Precio Venta', 'Precio Compra', '% Margen', 'Precio x UM', 'Stock', 'Stock Mínimo']
+  const headers = ['Código', 'Nombre', 'Marca', 'Categoría', 'Unidad', 'Precio Venta', 'Precio Compra', '% Margen', 'Stock', 'Stock Mínimo']
   const esc = (v: unknown) => `"${String(v ?? '').replace(/"/g, '""')}"`
   const rows = products.map((p) =>
-    [esc(p.code), esc(p.name), esc(p.brand || ''), esc(p.cat || ''), esc(p.unit || 'unidad'), p.price || 0, p.cost || 0, marginOf(p) || '0', p.pricePer || 0, p.stock || 0, p.min || 0].join(','),
+    [esc(p.code), esc(p.name), esc(p.brand || ''), esc(p.cat || ''), esc(p.unit || 'unidad'), p.price || 0, p.cost || 0, marginOf(p) || '0', p.stock || 0, p.min || 0].join(','),
   )
   const csv = [headers.join(','), ...rows].join('\n')
   downloadBlob(new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' }), `Stock_${storeName.replace(/\s+/g, '_')}_${new Date().toISOString().slice(0, 10)}.csv`)

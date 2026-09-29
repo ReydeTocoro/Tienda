@@ -9,7 +9,6 @@ export interface ParsedImportRow {
   unit: string
   price: number
   cost: number
-  pricePer: number
   stock: number
   min: number
   warnings: string[]
@@ -92,6 +91,9 @@ export function buildParsedRows(rawRows: Record<string, string>[], existingProdu
     const cost = parseFloat(get(row, 'precio compra', 'precio_compra', 'cost', 'costo', 'compra').replace(',', '.')) || 0
     const marginStr = get(row, '% margen', 'margen', 'margin', '% ganancia', 'ganancia')
     if (!price && cost && marginStr) price = cost * (1 + parseFloat(marginStr) / 100)
+    // "Precio x UM" is the old column name from before price/pricePer were unified — still
+    // accepted as a price source so templates exported before this change keep importing fine.
+    if (!price) price = parseFloat(get(row, 'precio x um', 'precio_x_um', 'priceper', 'price_per').replace(',', '.')) || 0
 
     const stock = parseFloat(get(row, 'stock', 'existencia', 'qty', 'quantity', 'cantidad', 'inventario')) || 0
     const min = parseFloat(get(row, 'stock mínimo', 'stock_minimo', 'min', 'minimo', 'minimum', 'stock min')) || 0
@@ -110,7 +112,6 @@ export function buildParsedRows(rawRows: Record<string, string>[], existingProdu
       unit: get(row, 'unidad', 'unit') || 'unidad',
       price,
       cost,
-      pricePer: parseFloat(get(row, 'precio x um', 'precio_x_um', 'priceper', 'price_per')) || 0,
       stock,
       min,
       warnings,

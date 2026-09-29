@@ -3,7 +3,7 @@ import { db } from '../../db/index'
 import type { Sale } from '../../types/sale'
 import { getSettings } from '../../db/repositories/settings'
 import { BottomSheet } from './BottomSheet'
-import { formatMoney, formatDateTime } from '../lib/currency'
+import { formatMoney, formatDateTime, formatQty } from '../lib/currency'
 import { formatSaleId } from '../lib/id'
 import { unitShortLabel, isMeasuredUnit } from '../lib/units'
 import { getPts } from '../lib/loyalty'
@@ -21,7 +21,7 @@ function buildReceiptText(sale: Sale, storeName: string): string {
   const itemLines = sale.items
     .map((i) => {
       const ul = isMeasuredUnit(i.unit) ? unitShortLabel(i.unit) : null
-      const qtyStr = ul ? `${i.qty}${ul}` : `x${i.qty}`
+      const qtyStr = ul ? `${formatQty(i.qty)}${ul}` : `x${formatQty(i.qty)}`
       return `  ${i.name}${i.isFree ? ' [Libre]' : ''} ${qtyStr}  $${formatMoney(i.price * i.qty).slice(1)}`
     })
     .join('\n')
@@ -40,6 +40,33 @@ Pago:      ${sale.payMethod.charAt(0).toUpperCase() + sale.payMethod.slice(1)}${
 ¡Gracias por su compra!`
 }
 
+/** jsPDF's standard fonts (incl. "courier", used below to keep buildReceiptText's manual
+ * column-spacing intact) have no emoji glyphs — WinAnsi/StandardEncoding only — so they're
+ * stripped rather than left to render as boxes/blanks in the PDF. */
+function stripEmojiForPdf(text: string): string[] {
+  return text
+    .replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/gu, '')
+    .replace(/\u{FE0F}/gu, '')
+    .replace(/━/g, '-')
+    .split('\n')
+    .map((l) => l.trimStart())
+}
+
+async function buildReceiptPdfBlob(sale: Sale, storeName: string): Promise<Blob> {
+  const { jsPDF } = await import('jspdf')
+  const lines = stripEmojiForPdf(buildReceiptText(sale, storeName))
+  const fontSize = 9
+  const lineHeight = 4.2 // mm — comfortably clears 9pt courier's line advance
+  const marginX = 4
+  const marginY = 6
+  const width = 80 // mm — standard thermal-receipt width
+  const doc = new jsPDF({ unit: 'mm', format: [width, marginY * 2 + lines.length * lineHeight] })
+  doc.setFont('courier')
+  doc.setFontSize(fontSize)
+  lines.forEach((line, i) => doc.text(line, marginX, marginY + i * lineHeight))
+  return doc.output('blob')
+}
+
 export function ReceiptSheet({ sale, onClose, onCorrect }: ReceiptSheetProps) {
   const settings = useLiveQuery(() => getSettings())
   const storeName = settings?.storeName ?? 'Mi Tienda Pro'
@@ -55,7 +82,23 @@ export function ReceiptSheet({ sale, onClose, onCorrect }: ReceiptSheetProps) {
   const ptsTotal = sale.customerId ? getPts(customerSales, sale.customerId) : 0
   const text = buildReceiptText(sale, storeName)
 
+  /** Shares the receipt as an actual PDF file (so WhatsApp/etc. show it as a document, not a
+   * wall of plain text) via the Web Share API's file-sharing (canShare({files})); falls back to
+   * text-only sharing, then to a plain download, on browsers that support less than that. */
   async function share() {
+    if (!sale) return
+    const blob = await buildReceiptPdfBlob(sale, storeName)
+    const filename = `Recibo-${String(sale.id ?? 0).padStart(4, '0')}.pdf`
+    const file = new File([blob], filename, { type: 'application/pdf' })
+
+    if (navigator.canShare?.({ files: [file] })) {
+      try {
+        await navigator.share({ files: [file], title: 'Recibo — ' + storeName })
+        return
+      } catch (e) {
+        if (e instanceof Error && e.name === 'AbortError') return
+      }
+    }
     if (navigator.share) {
       try {
         await navigator.share({ title: 'Recibo — ' + storeName, text })
@@ -64,7 +107,13 @@ export function ReceiptSheet({ sale, onClose, onCorrect }: ReceiptSheetProps) {
         if (e instanceof Error && e.name === 'AbortError') return
       }
     }
-    await copy()
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = filename
+    a.click()
+    URL.revokeObjectURL(url)
+    toast('✓ Recibo PDF descargado', 'purple')
   }
 
   async function copy() {
@@ -91,7 +140,7 @@ export function ReceiptSheet({ sale, onClose, onCorrect }: ReceiptSheetProps) {
             <div key={idx} className="flex justify-between">
               <span>
                 {i.name}
-                {i.isFree ? ' 🏷️' : ''} {ul ? `${i.qty}${ul}` : `×${i.qty}`}
+                {i.isFree ? ' 🏷️' : ''} {ul ? `${formatQty(i.qty)}${ul}` : `×${formatQty(i.qty)}`}
               </span>
               <span>{formatMoney(i.price * i.qty)}</span>
             </div>
@@ -142,7 +191,7 @@ export function ReceiptSheet({ sale, onClose, onCorrect }: ReceiptSheetProps) {
         )}
         {ptsEarned > 0 && (
           <div className="mt-0.5 text-center text-[11px] text-lime">
-            +{ptsEarned} puntos ganados · Total: {ptsTotal} pts
+            +{formatQty(ptsEarned)} puntos ganados · Total: {formatQty(ptsTotal)} pts
           </div>
         )}
         {sale.notes && <div className="mt-2 rounded-md bg-s2 px-2 py-1.5 text-[11px] text-txt2">📝 {sale.notes}</div>}
@@ -156,7 +205,7 @@ export function ReceiptSheet({ sale, onClose, onCorrect }: ReceiptSheetProps) {
 
       <div className="mt-4 grid grid-cols-2 gap-2">
         <button onClick={share} className="rounded-[10px] border border-blue/30 bg-blue/10 py-2.5 text-[13px] text-blue">
-          📤 Compartir
+          📤 Compartir PDF
         </button>
         <button onClick={copy} className="rounded-[10px] border border-purple/30 bg-purple/10 py-2.5 text-[13px] text-purple">
           📋 Copiar texto

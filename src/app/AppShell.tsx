@@ -3,7 +3,7 @@ import { Outlet } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { Header } from './Header'
 import { BottomNav } from './BottomNav'
-import { Sidebar } from './Sidebar'
+import { DesktopTabs } from './DesktopTabs'
 import { ToastHost } from '../shared/components/ToastHost'
 import { ConfirmDialog } from '../shared/components/ConfirmDialog'
 import { PinModal } from '../features/pin/PinModal'
@@ -42,13 +42,11 @@ export function AppShell() {
 
   return (
     <div className="flex h-full flex-col bg-bg text-txt">
+      <DesktopTabs />
       <Header />
-      <div className="flex min-h-0 flex-1">
-        <Sidebar />
-        <main className="min-w-0 flex-1 overflow-y-auto overflow-x-hidden">
-          <Outlet />
-        </main>
-      </div>
+      <main className="min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden">
+        <Outlet />
+      </main>
       <BottomNav />
       <ToastHost />
       <ConfirmDialog />

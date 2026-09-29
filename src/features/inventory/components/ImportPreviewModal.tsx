@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { BottomSheet } from '../../../shared/components/BottomSheet'
 import type { DupAction, ParsedImportRow } from '../lib/importProducts'
-import { formatMoney } from '../../../shared/lib/currency'
+import { formatMoney, formatQty } from '../../../shared/lib/currency'
 
 interface ImportPreviewModalProps {
   open: boolean
@@ -74,7 +74,7 @@ export function ImportPreviewModal({ open, fileName, parsed, errors, onClose, on
                 </td>
                 <td className="border-b border-br px-2.5 py-1.5 font-mono text-lime">{formatMoney(r.price)}</td>
                 <td className="border-b border-br px-2.5 py-1.5 font-mono text-muted">{formatMoney(r.cost)}</td>
-                <td className="border-b border-br px-2.5 py-1.5 font-mono">{r.stock}</td>
+                <td className="border-b border-br px-2.5 py-1.5 font-mono">{formatQty(r.stock)}</td>
                 <td className="border-b border-br px-2.5 py-1.5 text-txt2">{r.cat || '—'}</td>
               </tr>
             ))}

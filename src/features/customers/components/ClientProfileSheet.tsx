@@ -7,7 +7,7 @@ import { BottomSheet } from '../../../shared/components/BottomSheet'
 import { ReceiptSheet } from '../../../shared/components/ReceiptSheet'
 import { CustomerAvatar } from './CustomerAvatar'
 import { getSpent, getPts, tier } from '../../../shared/lib/loyalty'
-import { formatDate, formatDateTime, formatMoney } from '../../../shared/lib/currency'
+import { formatDate, formatDateTime, formatMoney, formatQty } from '../../../shared/lib/currency'
 import { formatSaleId } from '../../../shared/lib/id'
 
 interface ClientProfileSheetProps {
@@ -71,14 +71,14 @@ export function ClientProfileSheet({ customer, onClose, onEdit, onSell }: Client
 
         <div className="mb-3.5">
           <div className="mb-1.5 flex justify-between text-[11px] text-muted">
-            <span>⭐ {stats.pts} puntos</span>
+            <span>⭐ {formatQty(stats.pts)} puntos</span>
             <span>{stats.next ? `Próx: ${stats.next.label} (−${formatMoney(stats.next.threshold - stats.spent)})` : '¡Nivel máximo! 🏆'}</span>
           </div>
           <div className="h-1.5 overflow-hidden rounded-full bg-s3">
             <div className="h-full rounded-full bg-gradient-to-r from-lime to-orange" style={{ width: `${stats.barPct}%` }} />
           </div>
           <div className={`mt-1.5 text-[12px] ${stats.pts >= 50 ? 'text-purple' : 'text-muted'}`}>
-            {stats.pts >= 50 ? '🎁 Tiene descuento disponible al cobrar' : `Faltan ${50 - stats.pts} pts para obtener descuento`}
+            {stats.pts >= 50 ? '🎁 Tiene descuento disponible al cobrar' : `Faltan ${formatQty(50 - stats.pts)} pts para obtener descuento`}
           </div>
         </div>
 

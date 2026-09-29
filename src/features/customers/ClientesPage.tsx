@@ -5,7 +5,7 @@ import { useCustomersWithSpent } from './hooks/useCustomersWithSpent'
 import { CustomerAvatar } from './components/CustomerAvatar'
 import { ClientFormSheet } from './components/ClientFormSheet'
 import { ClientProfileSheet } from './components/ClientProfileSheet'
-import { formatMoney } from '../../shared/lib/currency'
+import { formatMoney, formatQty } from '../../shared/lib/currency'
 import { useCartStore } from '../../store/useCartStore'
 
 export function ClientesPage() {
@@ -48,8 +48,8 @@ export function ClientesPage() {
   }
 
   return (
-    <div className="p-3.5 md:mx-auto md:max-w-[1400px] md:p-6">
-      <p className="mb-3.5 font-display text-[21px] font-bold md:text-[26px]">Clientes</p>
+    <div className="p-3.5 md:mx-auto md:max-w-[1400px] md:p-5">
+      <p className="mb-3.5 font-display text-[21px] font-bold md:mb-2.5 md:text-[22px]">Clientes</p>
 
       <div className="mb-3.5 grid grid-cols-3 gap-2 md:max-w-lg md:gap-3">
         <StatBox label="Total" value={String(list.length)} color="text-blue" />
@@ -96,7 +96,7 @@ export function ClientesPage() {
               </div>
               <div className="flex-shrink-0 text-right">
                 <div className="font-mono text-[14px] text-lime">{formatMoney(spent)}</div>
-                <div className="text-[11px] text-muted">⭐ {pts} pts</div>
+                <div className="text-[11px] text-muted">⭐ {formatQty(pts)} pts</div>
               </div>
             </button>
           ))}

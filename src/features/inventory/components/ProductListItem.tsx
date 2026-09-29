@@ -1,6 +1,6 @@
 import type { Product } from '../../../types/product'
-import { unitShortLabel, unitFullName } from '../../../shared/lib/units'
-import { formatMoney } from '../../../shared/lib/currency'
+import { unitShortLabel, unitFullName, isMeasuredUnit } from '../../../shared/lib/units'
+import { formatMoney, formatQty } from '../../../shared/lib/currency'
 import { adjustStock } from '../../../db/repositories/products'
 import { usePermission } from '../../pin/usePermission'
 import { toast } from '../../../store/useToastStore'
@@ -22,13 +22,13 @@ export function ProductListItem({ product: p, onEdit, onDelete }: ProductListIte
       return
     }
     const next = await adjustStock(p.code, delta)
-    toast(`${delta > 0 ? '+' : ''}${delta} → Stock: ${next}`, delta > 0 ? 'green' : 'orange')
+    toast(`${delta > 0 ? '+' : ''}${formatQty(delta)} → Stock: ${formatQty(next)}`, delta > 0 ? 'green' : 'orange')
   }
 
   const low = p.stock <= p.min
   const ul = unitShortLabel(p.unit || 'unidad')
-  const isMeasured = p.unit && p.unit !== 'unidad' && p.pricePer > 0
-  const priceDisplay = isMeasured ? `${formatMoney(p.pricePer)} / ${ul}` : formatMoney(p.price)
+  const isMeasured = isMeasuredUnit(p.unit)
+  const priceDisplay = isMeasured ? `${formatMoney(p.price)} / ${ul}` : formatMoney(p.price)
   const lineValue = (p.cost || 0) * (p.stock || 0)
   const lineSale = (p.price || 0) * (p.stock || 0)
   const lineMargin = p.cost > 0 ? ((p.price - p.cost) / p.cost) * 100 : 0
@@ -56,7 +56,7 @@ export function ProductListItem({ product: p, onEdit, onDelete }: ProductListIte
           <div className="mt-1 flex flex-wrap items-center gap-2">
             <span className="rounded-full border border-purple/30 bg-purple/10 px-2 py-0.5 text-[10px] text-purple">{unitFullName(p.unit)}</span>
             <span className="text-[12px] text-txt2">
-              Stock: <b>{p.stock} {ul}</b> · Mín: {p.min} {ul}
+              Stock: <b>{formatQty(p.stock)} {ul}</b> · Mín: {formatQty(p.min)} {ul}
             </span>
           </div>
           <div className="mt-1.5 flex flex-wrap gap-2.5">

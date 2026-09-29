@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import type { Product } from '../../../types/product'
 import { getUnitConversions, convert } from '../../../types/unit'
 import { unitShortLabel } from '../../../shared/lib/units'
-import { formatMoney } from '../../../shared/lib/currency'
+import { formatMoney, formatQty } from '../../../shared/lib/currency'
 import { NumericKeypad } from '../../../shared/components/NumericKeypad'
 import { BottomSheet } from '../../../shared/components/BottomSheet'
 import { useCartStore } from '../../../store/useCartStore'
@@ -23,7 +23,7 @@ export function WeightModal({ product: p, editIndex, onClose }: WeightModalProps
   const addWeightedItem = useCartStore((s) => s.addWeightedItem)
 
   const conversions = useMemo(() => getUnitConversions(baseUnit), [baseUnit])
-  const pricePer = p.pricePer || p.price || 0
+  const pricePer = p.price || 0
 
   const raw = parseFloat(val) || 0
   const qtyInBase = unit === baseUnit ? raw : convert(raw, unit, baseUnit) ?? raw
@@ -47,7 +47,7 @@ export function WeightModal({ product: p, editIndex, onClose }: WeightModalProps
       { code: p.code, name: p.name, price: pricePer, cost: p.cost, qty: qtyRounded, brand: p.brand, unit: baseUnit, isFree: false },
       editIndex,
     )
-    toast(`✓ ${raw} ${unitShortLabel(unit)} de ${p.name} agregado`, 'lime')
+    toast(`✓ ${formatQty(raw)} ${unitShortLabel(unit)} de ${p.name} agregado`, 'lime')
     onClose()
   }
 
@@ -70,7 +70,7 @@ export function WeightModal({ product: p, editIndex, onClose }: WeightModalProps
               <span className="text-[11px] font-normal text-muted">/{unitShortLabel(baseUnit)}</span>
             </div>
             <div className="mt-0.5 text-[11px] text-muted">
-              Stock: {p.stock} {unitShortLabel(baseUnit)}
+              Stock: {formatQty(p.stock)} {unitShortLabel(baseUnit)}
             </div>
           </div>
         </div>

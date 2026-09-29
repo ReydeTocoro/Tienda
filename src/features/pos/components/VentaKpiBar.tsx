@@ -1,6 +1,6 @@
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../../../db/index'
-import { formatMoney, todayKey } from '../../../shared/lib/currency'
+import { formatMoney, formatQty, todayKey } from '../../../shared/lib/currency'
 
 interface VentaKpiBarProps {
   onClickLowStock: () => void
@@ -26,10 +26,10 @@ export function VentaKpiBar({ onClickLowStock }: VentaKpiBarProps) {
     // receipt summary line — instead of five identical bordered/rounded tiles.
     <div className="flex flex-shrink-0 divide-x divide-br overflow-x-auto border-b border-br bg-s1 [scrollbar-width:none]">
       <Kpi label="Ventas hoy" value={formatMoney(totalVentas)} />
-      <Kpi label="Transacc." value={String(numTx)} />
+      <Kpi label="Transacc." value={formatQty(numTx)} />
       <Kpi label="Margen" value={margen.toFixed(0) + '%'} />
       <Kpi label="Ticket prom." value={formatMoney(avgTicket)} />
-      <Kpi label="Stock bajo" value={String(lowStockCount)} warn={lowStockCount > 0} onClick={onClickLowStock} />
+      <Kpi label="Stock bajo" value={formatQty(lowStockCount)} warn={lowStockCount > 0} onClick={onClickLowStock} />
     </div>
   )
 }

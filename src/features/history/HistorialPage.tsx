@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../../db/index'
 import type { Sale } from '../../types/sale'
-import { formatDateTime, formatMoney } from '../../shared/lib/currency'
+import { formatDateTime, formatMoney, formatQty } from '../../shared/lib/currency'
 import { formatPurchaseId, formatSaleId } from '../../shared/lib/id'
 import { ReceiptSheet } from '../../shared/components/ReceiptSheet'
 import { PurchaseFormSheet } from './components/PurchaseFormSheet'
@@ -39,9 +39,9 @@ export function HistorialPage() {
   }, [sales, purchases])
 
   return (
-    <div className="p-3.5 md:mx-auto md:max-w-[1400px] md:p-6">
+    <div className="p-3.5 md:mx-auto md:max-w-[1400px] md:p-5">
       <div className="mb-3.5 flex items-center justify-between">
-        <p className="font-display text-[21px] font-bold md:text-[26px]">Historial</p>
+        <p className="font-display text-[21px] font-bold md:text-[22px]">Historial</p>
         <button onClick={() => setPurchaseOpen(true)} className="rounded-[10px] border border-br2 px-3 py-2 text-[12px] text-txt2 transition-colors hover:bg-s2">
           + Compra
         </button>
@@ -83,7 +83,7 @@ export function HistorialPage() {
                 </div>
                 <div className="mt-1.5 text-[12px] text-txt2">
                   {r.sale.items
-                    .map((it) => `${it.name} ×${it.qty}`)
+                    .map((it) => `${it.name} ×${formatQty(it.qty)}`)
                     .join(', ')
                     .slice(0, 85)}
                 </div>

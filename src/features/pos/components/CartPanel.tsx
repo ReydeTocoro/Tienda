@@ -3,9 +3,10 @@ import type { Product } from '../../../types/product'
 import { useCartStore } from '../../../store/useCartStore'
 import { useCartTotals } from '../hooks/useFinalizeSale'
 import { useSelectedCustomerLoyalty } from '../hooks/useSelectedCustomerLoyalty'
-import { formatMoney } from '../../../shared/lib/currency'
+import { formatMoney, formatQty } from '../../../shared/lib/currency'
 import { unitShortLabel, isMeasuredUnit } from '../../../shared/lib/units'
 import { BottomSheet } from '../../../shared/components/BottomSheet'
+import { MoneyInput } from '../../../shared/components/MoneyInput'
 
 interface CartPanelProps {
   products: Product[]
@@ -48,7 +49,7 @@ export function CartPanel({ products, onEditMeasured, onOpenDiscount, onCheckout
   const stockByCode = useMemo(() => new Map(products.map((p) => [p.code, p.stock])), [products])
   const totalItems = items.reduce((a, i) => a + i.qty, 0)
 
-  const discLabel = discountLabel === 'manual' ? `Desc. manual (${manualDiscountPct}%)` : discountLabel === 'loyalty' ? `Desc. cliente (${loyaltyPts} pts)` : ''
+  const discLabel = discountLabel === 'manual' ? `Desc. manual (${manualDiscountPct}%)` : discountLabel === 'loyalty' ? `Desc. cliente (${formatQty(loyaltyPts)} pts)` : ''
 
   const change = amountReceived - chargeAmount
   const insufficientCash = payMethod === 'efectivo' && amountReceived > 0 && change < 0
@@ -103,7 +104,7 @@ export function CartPanel({ products, onEditMeasured, onOpenDiscount, onCheckout
                   {measured ? (
                     <div className="flex items-center gap-2">
                       <span className="whitespace-nowrap font-mono text-[12px] text-lime">
-                        {item.qty} {ul}
+                        {formatQty(item.qty)} {ul}
                       </span>
                       <button onClick={() => onEditMeasured(i)} className="rounded border border-br2 bg-s3 px-1.5 py-0.5 text-[10px] text-txt2">
                         ✏ editar
@@ -117,7 +118,7 @@ export function CartPanel({ products, onEditMeasured, onOpenDiscount, onCheckout
                       >
                         −
                       </button>
-                      <span className="w-[22px] text-center font-mono text-[13px]">{item.qty}</span>
+                      <span className="w-[22px] text-center font-mono text-[13px]">{formatQty(item.qty)}</span>
                       <button
                         disabled={item.isFree}
                         onClick={() => changeQty(i, 1, stockByCode.get(item.code))}
@@ -179,15 +180,11 @@ export function CartPanel({ products, onEditMeasured, onOpenDiscount, onCheckout
               </label>
               {roundingAdjustment !== 0 && <span className="text-[11px] text-orange">ajustado de {formatMoney(total)}</span>}
             </div>
-            <input
+            <MoneyInput
               id="charge-input"
-              type="number"
-              inputMode="decimal"
-              step="any"
-              className="input w-full text-right font-mono text-[22px] font-bold text-lime"
+              className="input text-right font-mono text-[22px] font-bold text-lime"
               value={chargeOverride ?? total}
-              onFocus={(e) => e.target.select()}
-              onChange={(e) => setChargeOverride(e.target.value === '' ? total : Number(e.target.value))}
+              onChange={setChargeOverride}
             />
           </div>
         </div>
@@ -195,15 +192,11 @@ export function CartPanel({ products, onEditMeasured, onOpenDiscount, onCheckout
         {payMethod === 'efectivo' && (
           <div className="mb-3.5">
             <p className="mb-2 field-label">Efectivo recibido</p>
-            <input
-              type="number"
-              inputMode="decimal"
-              step="any"
+            <MoneyInput
               placeholder="0"
-              className="input mb-2 w-full text-right font-mono text-[22px] font-bold"
-              value={amountReceived || ''}
-              onFocus={(e) => e.target.select()}
-              onChange={(e) => setAmountReceived(e.target.value === '' ? 0 : Number(e.target.value))}
+              className="input mb-2 text-right font-mono text-[22px] font-bold"
+              value={amountReceived}
+              onChange={(v) => setAmountReceived(v ?? 0)}
             />
             <div className="mb-2 grid grid-cols-3 gap-1.5">
               {QUICK_BILLS.map((bill) => (

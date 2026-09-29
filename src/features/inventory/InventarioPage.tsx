@@ -143,8 +143,8 @@ export function InventarioPage() {
   }
 
   return (
-    <div className="p-3.5 md:mx-auto md:max-w-[1600px] md:p-6">
-      <p className="mb-3.5 font-display text-[21px] font-bold md:text-[26px]">Inventario</p>
+    <div className="p-3.5 md:mx-auto md:max-w-[1600px] md:p-5">
+      <p className="mb-3.5 font-display text-[21px] font-bold md:mb-2.5 md:text-[22px]">Inventario</p>
 
       <div className="md:flex md:items-start md:gap-6">
         {/* Tools column — restock + product form. Sticky on desktop so it stays in view while

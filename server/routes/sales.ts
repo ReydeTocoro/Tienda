@@ -4,7 +4,7 @@ import type { Sale, PayMethod, FiadoPago } from '../../src/types/sale'
 import type { CartItem } from '../../src/types/cartItem'
 import type { Product } from '../../src/types/product'
 import type { CorrectionAuditEntry, SaleSnapshot } from '../../src/types/auditLog'
-import { listAll, getRow, putRow, insertAutoRow, errorMessage } from './generic'
+import { listAll, getRow, putRow, insertAutoRow, errorMessage, roundQty } from './generic'
 import { broadcast, type BroadcastMsg } from '../broadcast'
 
 const TABLE = 'sales'
@@ -80,7 +80,7 @@ export function salesRouter(db: Database.Database) {
           if (item.isFree) continue
           const p = getRow<Product>(db, 'products', 'code', item.code)
           if (p) {
-            const u: Product = { ...p, stock: Math.max(0, (p.stock || 0) - item.qty) }
+            const u: Product = { ...p, stock: roundQty(Math.max(0, (p.stock || 0) - item.qty)) }
             putRow(db, 'products', 'code', item.code, {}, u)
             broadcasts.push({ table: 'products', op: 'put', data: u })
           }
@@ -179,7 +179,7 @@ export function salesRouter(db: Database.Database) {
           if (!isTracked(ci)) continue
           const p = getRow<Product>(db, 'products', 'code', ci.code)
           if (p) {
-            const u: Product = { ...p, stock: p.stock + ci.qty }
+            const u: Product = { ...p, stock: roundQty(p.stock + ci.qty) }
             putRow(db, 'products', 'code', ci.code, {}, u)
             broadcasts.push({ table: 'products', op: 'put', data: u })
           }
@@ -188,7 +188,7 @@ export function salesRouter(db: Database.Database) {
           if (!isTracked(ci)) continue
           const p = getRow<Product>(db, 'products', 'code', ci.code)
           if (p) {
-            const u: Product = { ...p, stock: Math.max(0, p.stock - ci.qty) }
+            const u: Product = { ...p, stock: roundQty(Math.max(0, p.stock - ci.qty)) }
             putRow(db, 'products', 'code', ci.code, {}, u)
             broadcasts.push({ table: 'products', op: 'put', data: u })
           }

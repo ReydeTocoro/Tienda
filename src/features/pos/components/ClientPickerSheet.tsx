@@ -3,6 +3,7 @@ import { BottomSheet } from '../../../shared/components/BottomSheet'
 import { CustomerAvatar } from '../../customers/components/CustomerAvatar'
 import { useCustomersWithSpent } from '../../customers/hooks/useCustomersWithSpent'
 import { useCartStore } from '../../../store/useCartStore'
+import { formatQty } from '../../../shared/lib/currency'
 
 interface ClientPickerSheetProps {
   open: boolean
@@ -56,7 +57,7 @@ export function ClientPickerSheet({ open, onClose }: ClientPickerSheetProps) {
                   {c.phone || ''}
                 </div>
                 <div className="font-mono text-[11px] text-lime">
-                  ⭐ {pts} pts · {t.label}
+                  ⭐ {formatQty(pts)} pts · {t.label}
                 </div>
               </div>
             </div>

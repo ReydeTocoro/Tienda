@@ -1,7 +1,7 @@
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../../../db/index'
 import type { Product } from '../../../types/product'
-import { formatMoney } from '../../../shared/lib/currency'
+import { formatMoney, formatQty } from '../../../shared/lib/currency'
 import { openPackage, sellLooseUnit, sellWholePackage } from '../../../db/repositories/inventoryOps'
 import { toast } from '../../../store/useToastStore'
 import { usePermission } from '../../pin/usePermission'
@@ -84,7 +84,7 @@ export function PackageCard({ product: p, onEdit, onDelete }: PackageCardProps) 
       <div className="mb-3 grid grid-cols-2 gap-2.5">
         <div className={`rounded-[14px] border-2 bg-purple/10 p-3 text-center ${lowPaq ? 'border-red' : 'border-purple/25'}`}>
           <div className="mb-1 text-[10px] font-bold uppercase tracking-wider text-purple">📦 Paquetes</div>
-          <div className={`font-mono text-[32px] font-extrabold ${lowPaq ? 'text-red' : 'text-purple'}`}>{p.stock}</div>
+          <div className={`font-mono text-[32px] font-extrabold ${lowPaq ? 'text-red' : 'text-purple'}`}>{formatQty(p.stock)}</div>
           <div className="mt-0.5 text-[10px] text-muted">
             × {p.unidadesPor} u/paq · {formatMoney(p.price)} c/u
           </div>

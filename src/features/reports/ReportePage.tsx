@@ -57,8 +57,8 @@ export function ReportePage() {
   const fiadosToday = agg.ventasDay.filter((s) => s.payMethod === 'fiado')
 
   return (
-    <div className="p-3.5 md:mx-auto md:max-w-[1200px] md:p-6">
-      <p className="mb-3.5 font-display text-[21px] font-bold md:text-[26px]">Reporte de Caja</p>
+    <div className="p-3.5 md:mx-auto md:max-w-[1200px] md:p-5">
+      <p className="mb-3.5 font-display text-[21px] font-bold md:mb-2.5 md:text-[22px]">Reporte de Caja</p>
 
       <div className="mb-3.5 md:max-w-xs">
         <label className="mb-1 block field-label">Filtrar por fecha</label>

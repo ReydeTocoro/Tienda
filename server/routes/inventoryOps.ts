@@ -45,7 +45,6 @@ export function inventoryOpsRouter(db: Database.Database) {
             cat: p.cat || '',
             brand: p.brand || '',
             unit: 'unidad',
-            pricePer: 0,
             esPaquete: false,
             esUnidadSuelta: true,
             codigoPaquete: p.code,
@@ -95,7 +94,6 @@ export function inventoryOpsRouter(db: Database.Database) {
               cat: p.cat || '',
               brand: p.brand || '',
               unit: 'unidad',
-              pricePer: 0,
               esPaquete: false,
               esUnidadSuelta: true,
               codigoPaquete: p.code,
@@ -223,7 +221,6 @@ export function inventoryOpsRouter(db: Database.Database) {
           if (row.unit && row.unit !== 'unidad') merged.unit = row.unit
           if (row.price > 0) merged.price = row.price
           if (row.cost > 0) merged.cost = row.cost
-          if (row.pricePer > 0) merged.pricePer = row.pricePer
           if (row.stock > 0) merged.stock = row.stock
           if (row.min > 0) merged.min = row.min
           putRow(db, 'products', 'code', row.code, {}, merged)
@@ -238,7 +235,6 @@ export function inventoryOpsRouter(db: Database.Database) {
             unit: row.unit || 'unidad',
             price: row.price,
             cost: row.cost,
-            pricePer: row.pricePer,
             stock: row.stock,
             min: row.min,
             esPaquete: false,

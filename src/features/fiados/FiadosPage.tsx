@@ -32,8 +32,8 @@ export function FiadosPage() {
   const selectedCustomer = selectedGroup?.customerId ? customerById.get(selectedGroup.customerId) ?? null : null
 
   return (
-    <div className="p-3.5 md:mx-auto md:max-w-[1400px] md:p-6">
-      <p className="mb-3.5 font-display text-[21px] font-bold md:text-[26px]">📋 Fiados</p>
+    <div className="p-3.5 md:mx-auto md:max-w-[1400px] md:p-5">
+      <p className="mb-3.5 font-display text-[21px] font-bold md:mb-2.5 md:text-[22px]">📋 Fiados</p>
 
       <div className="mb-3.5 grid grid-cols-3 gap-2 md:max-w-lg md:gap-3">
         <StatBox label="Deudas" value={String(pendingGroups.length)} color="text-red" />

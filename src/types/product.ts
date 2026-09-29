@@ -1,6 +1,8 @@
 export interface Product {
   code: string
   name: string
+  /** Price per selling unit — "per kg"/"per lb" when `unit` is measured, "per unidad" otherwise.
+   * One field for both: a measured product has no separate "total" price to duplicate it with. */
   price: number
   cost: number
   stock: number
@@ -8,8 +10,6 @@ export interface Product {
   cat: string
   brand: string
   unit: string
-  /** Only meaningful when `unit` is a measured (non-count) unit. */
-  pricePer: number
 
   /** True when this product is sold as a sealed package that can be "opened" into loose units. */
   esPaquete: boolean

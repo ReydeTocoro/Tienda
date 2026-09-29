@@ -2,7 +2,7 @@ import { Router } from 'express'
 import type Database from 'better-sqlite3'
 import type { Product } from '../../src/types/product'
 import type { EntradaRecord } from '../../src/types/entrada'
-import { getRow, putRow, insertAutoRow, errorMessage } from './generic'
+import { getRow, putRow, insertAutoRow, errorMessage, roundQty } from './generic'
 import { broadcast, type BroadcastMsg } from '../broadcast'
 
 const TABLE = 'entradas'
@@ -25,7 +25,7 @@ export function entradasRouter(db: Database.Database) {
         const p = getRow<Product>(db, 'products', 'code', code)
         if (!p) throw new Error('Producto no encontrado')
         const stockAntes = p.stock || 0
-        const stockDespues = stockAntes + qty
+        const stockDespues = roundQty(stockAntes + qty)
         const updatedP: Product = { ...p, stock: stockDespues }
         putRow(db, 'products', 'code', code, {}, updatedP)
         const record: EntradaRecord = { code, name: p.name, qty, stockAntes, stockDespues, date: new Date().toISOString(), source }
@@ -54,7 +54,7 @@ export function entradasRouter(db: Database.Database) {
         const p = getRow<Product>(db, 'products', 'code', e.code)
         if (!p) continue
         const stockAntes = p.stock || 0
-        const stockDespues = stockAntes + e.qty
+        const stockDespues = roundQty(stockAntes + e.qty)
         const updatedP: Product = { ...p, stock: stockDespues }
         putRow(db, 'products', 'code', e.code, {}, updatedP)
         broadcasts.push({ table: 'products', op: 'put', data: updatedP })

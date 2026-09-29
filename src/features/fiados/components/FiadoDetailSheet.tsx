@@ -6,7 +6,7 @@ import { BottomSheet } from '../../../shared/components/BottomSheet'
 import { AbonoModal } from './AbonoModal'
 import { useConfirm } from '../../../store/useConfirmStore'
 import { toast } from '../../../store/useToastStore'
-import { formatDateTime, formatMoney } from '../../../shared/lib/currency'
+import { formatDateTime, formatMoney, formatQty } from '../../../shared/lib/currency'
 import { formatSaleId } from '../../../shared/lib/id'
 import { initials } from '../../../shared/lib/text'
 import type { Customer } from '../../../types/customer'
@@ -142,7 +142,7 @@ export function FiadoDetailSheet({ group, customer, onClose }: FiadoDetailSheetP
                     {formatSaleId(s.id)} · {formatDateTime(s.date)}
                   </div>
                   <div className="mt-0.5 max-w-[220px] overflow-hidden text-ellipsis whitespace-nowrap text-[12px] text-txt2">
-                    {s.items.map((i) => `${i.name} ×${i.qty}`).join(', ')}
+                    {s.items.map((i) => `${i.name} ×${formatQty(i.qty)}`).join(', ')}
                   </div>
                 </div>
                 <div className="flex-shrink-0 text-right">
