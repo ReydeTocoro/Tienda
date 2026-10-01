@@ -17,11 +17,11 @@ export function QuickDiscountModal({ open, onClose }: QuickDiscountModalProps) {
 
   function apply(pct: number) {
     if (pct < 0 || pct > 100) {
-      toast('⚠ Porcentaje inválido', 'orange')
+      toast('Porcentaje inválido', 'orange')
       return
     }
     setManualDiscountPct(pct)
-    toast(pct > 0 ? `✓ Descuento ${pct}% aplicado` : '✓ Descuento eliminado', pct > 0 ? 'purple' : 'default')
+    toast(pct > 0 ? `Descuento ${pct}% aplicado` : 'Descuento eliminado', pct > 0 ? 'purple' : 'default')
     onClose()
   }
 
@@ -46,11 +46,11 @@ export function QuickDiscountModal({ open, onClose }: QuickDiscountModalProps) {
           className="input flex-1 border-lime font-mono text-lime"
         />
         <button onClick={() => apply(parseFloat(custom) || 0)} className="rounded-[10px] bg-lime px-4.5 py-2.5 text-[15px] font-extrabold text-black">
-          ✓
+ 
         </button>
       </div>
       <button onClick={() => apply(0)} className="w-full py-1.5 text-[13px] text-muted">
-        ✕ Quitar descuento
+        Quitar descuento
       </button>
     </BottomSheet>
   )

@@ -15,8 +15,6 @@ interface ReceiptSheetProps {
   onCorrect?: () => void
 }
 
-const PAY_ICON: Record<string, string> = { efectivo: '💵', transferencia: '📲', fiado: '📋' }
-
 function buildReceiptText(sale: Sale, storeName: string): string {
   const itemLines = sale.items
     .map((i) => {
@@ -26,16 +24,16 @@ function buildReceiptText(sale: Sale, storeName: string): string {
     })
     .join('\n')
 
-  return `🏪 ${storeName.toUpperCase()}
+  return `${storeName.toUpperCase()}
 ━━━━━━━━━━━━━━━━━━━━
 RECIBO DE VENTA ${formatSaleId(sale.id)}
-${formatDateTime(sale.date)}${sale.customerName ? '\n👤 ' + sale.customerName : ''}${sale.fiadoName && !sale.customerId ? '\n📋 Fiado: ' + sale.fiadoName : ''}
+${formatDateTime(sale.date)}${sale.customerName ? '\n' + sale.customerName : ''}${sale.fiadoName && !sale.customerId ? '\nFiado: ' + sale.fiadoName : ''}
 ━━━━━━━━━━━━━━━━━━━━
 ${itemLines}
 ━━━━━━━━━━━━━━━━━━━━
-Subtotal:  ${formatMoney(sale.subtotal ?? sale.total)}${sale.discount ? '\nDescuento: -' + formatMoney(sale.discount) : ''}${sale.roundingAdjustment ? '\nAjuste:    ' + (sale.roundingAdjustment > 0 ? '+' : '') + formatMoney(sale.roundingAdjustment) : ''}
-TOTAL:     ${formatMoney(sale.total)}
-Pago:      ${sale.payMethod.charAt(0).toUpperCase() + sale.payMethod.slice(1)}${sale.amountReceived !== undefined ? '\nRecibido:  ' + formatMoney(sale.amountReceived) : ''}${sale.changeGiven !== undefined ? '\nCambio:    ' + formatMoney(sale.changeGiven) : ''}
+Subtotal: ${formatMoney(sale.subtotal ?? sale.total)}${sale.discount ? '\nDescuento: -' + formatMoney(sale.discount) : ''}${sale.roundingAdjustment ? '\nAjuste: ' + (sale.roundingAdjustment > 0 ? '+' : '') + formatMoney(sale.roundingAdjustment) : ''}
+TOTAL: ${formatMoney(sale.total)}
+Pago: ${sale.payMethod.charAt(0).toUpperCase() + sale.payMethod.slice(1)}${sale.amountReceived !== undefined ? '\nRecibido: ' + formatMoney(sale.amountReceived) : ''}${sale.changeGiven !== undefined ? '\nCambio: ' + formatMoney(sale.changeGiven) : ''}
 ━━━━━━━━━━━━━━━━━━━━
 ¡Gracias por su compra!`
 }
@@ -113,26 +111,26 @@ export function ReceiptSheet({ sale, onClose, onCorrect }: ReceiptSheetProps) {
     a.download = filename
     a.click()
     URL.revokeObjectURL(url)
-    toast('✓ Recibo PDF descargado', 'purple')
+    toast('Recibo PDF descargado', 'purple')
   }
 
   async function copy() {
     try {
       await navigator.clipboard.writeText(text)
-      toast('✓ Recibo copiado al portapapeles', 'purple')
+      toast('Recibo copiado al portapapeles', 'purple')
     } catch {
-      toast('⚠ No se pudo copiar', 'orange')
+      toast('No se pudo copiar', 'orange')
     }
   }
 
   return (
     <BottomSheet open={!!sale} onClose={onClose}>
       <div className="font-mono text-[12px] leading-[1.9]">
-        <div className="text-center font-display text-[19px] text-lime">🏪 {storeName}</div>
+        <div className="text-center font-display text-[19px] text-lime">{storeName}</div>
         <div className="text-center text-[11px] text-muted">RECIBO DE VENTA {formatSaleId(sale.id)}</div>
         <div className="text-center text-[11px] text-muted">{formatDateTime(sale.date)}</div>
-        {sale.customerName && <div className="mt-0.5 text-center text-[11px] text-lime">👤 {sale.customerName}</div>}
-        {sale.fiadoName && !sale.customerId && <div className="text-center text-[11px] text-red">📋 Fiado: {sale.fiadoName}</div>}
+        {sale.customerName && <div className="mt-0.5 text-center text-[11px] text-lime">{sale.customerName}</div>}
+        {sale.fiadoName && !sale.customerId && <div className="text-center text-[11px] text-red">Fiado: {sale.fiadoName}</div>}
         <div className="my-1.5 border-t border-dashed border-br2" />
         {sale.items.map((i, idx) => {
           const ul = isMeasuredUnit(i.unit) ? unitShortLabel(i.unit) : null
@@ -140,7 +138,7 @@ export function ReceiptSheet({ sale, onClose, onCorrect }: ReceiptSheetProps) {
             <div key={idx} className="flex justify-between">
               <span>
                 {i.name}
-                {i.isFree ? ' 🏷️' : ''} {ul ? `${formatQty(i.qty)}${ul}` : `×${formatQty(i.qty)}`}
+                {i.isFree ? ' [Libre]' : ''} {ul ? `${formatQty(i.qty)}${ul}` : `×${formatQty(i.qty)}`}
               </span>
               <span>{formatMoney(i.price * i.qty)}</span>
             </div>
@@ -173,9 +171,7 @@ export function ReceiptSheet({ sale, onClose, onCorrect }: ReceiptSheetProps) {
         <div className="my-1.5 border-t border-dashed border-br2" />
         <div className="flex justify-between">
           <span>Método de pago</span>
-          <span>
-            {PAY_ICON[sale.payMethod]} {sale.payMethod.charAt(0).toUpperCase() + sale.payMethod.slice(1)}
-          </span>
+          <span>{sale.payMethod.charAt(0).toUpperCase() + sale.payMethod.slice(1)}</span>
         </div>
         {sale.amountReceived !== undefined && (
           <div className="flex justify-between">
@@ -194,10 +190,10 @@ export function ReceiptSheet({ sale, onClose, onCorrect }: ReceiptSheetProps) {
             +{formatQty(ptsEarned)} puntos ganados · Total: {formatQty(ptsTotal)} pts
           </div>
         )}
-        {sale.notes && <div className="mt-2 rounded-md bg-s2 px-2 py-1.5 text-[11px] text-txt2">📝 {sale.notes}</div>}
+        {sale.notes && <div className="mt-2 rounded-md bg-s2 px-2 py-1.5 text-[11px] text-txt2">{sale.notes}</div>}
         {sale.corrected && (
           <div className="mt-2 rounded-md border border-orange/30 bg-orange/10 px-2 py-1.5 text-[11px] text-orange">
-            ✏️ Factura corregida — {sale.correctionReason}
+            Factura corregida — {sale.correctionReason}
           </div>
         )}
         <div className="mt-2 text-center text-[11px] text-muted">¡Gracias por su compra!</div>
@@ -205,18 +201,18 @@ export function ReceiptSheet({ sale, onClose, onCorrect }: ReceiptSheetProps) {
 
       <div className="mt-4 grid grid-cols-2 gap-2">
         <button onClick={share} className="rounded-[10px] border border-blue/30 bg-blue/10 py-2.5 text-[13px] text-blue">
-          📤 Compartir PDF
+          Compartir PDF
         </button>
         <button onClick={copy} className="rounded-[10px] border border-purple/30 bg-purple/10 py-2.5 text-[13px] text-purple">
-          📋 Copiar texto
+          Copiar texto
         </button>
       </div>
       <div className="mt-2 grid grid-cols-2 gap-2">
         <button onClick={onClose} className="rounded-[10px] border border-br2 py-2.5 text-[13px] text-txt2">
-          ✕ Cerrar
+          Cerrar
         </button>
         <button onClick={() => window.print()} className="rounded-[10px] bg-lime py-2.5 text-[13px] font-semibold text-black">
-          🖨 Imprimir
+          Imprimir
         </button>
       </div>
       {onCorrect && sale.id !== undefined && (
@@ -224,7 +220,7 @@ export function ReceiptSheet({ sale, onClose, onCorrect }: ReceiptSheetProps) {
           onClick={onCorrect}
           className="mt-2.5 w-full rounded-[10px] border border-orange/30 bg-orange/10 py-2.5 text-[13px] font-semibold text-orange"
         >
-          ✏️ Corregir esta factura
+          Corregir esta factura
         </button>
       )}
     </BottomSheet>

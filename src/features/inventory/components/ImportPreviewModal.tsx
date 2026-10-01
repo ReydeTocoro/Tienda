@@ -25,16 +25,16 @@ export function ImportPreviewModal({ open, fileName, parsed, errors, onClose, on
 
   return (
     <BottomSheet open={open} onClose={onClose} maxWidthClass="max-w-[720px]">
-      <p className="mb-1 font-display text-[18px] font-bold">📥 Vista previa de importación</p>
+      <p className="mb-1 font-display text-[18px] font-bold">Vista previa de importación</p>
       <div className="mb-3.5 text-[12px] text-muted">
         <b>{fileName}</b> · {total} producto{total !== 1 ? 's' : ''} · <span className="text-green">{newCount} nuevo{newCount !== 1 ? 's' : ''}</span> ·{' '}
         <span className="text-blue">{updateCount} actualización{updateCount !== 1 ? 'es' : ''}</span>
-        {warnCount > 0 && <span className="text-orange"> · ⚠ {warnCount} advertencia{warnCount !== 1 ? 's' : ''}</span>}
+        {warnCount > 0 && <span className="text-orange"> · {warnCount} advertencia{warnCount !== 1 ? 's' : ''}</span>}
       </div>
 
       {errors.length > 0 && (
         <div className="mb-3 rounded-[10px] border border-red/30 bg-red/10 p-2.5 text-[12px] text-red">
-          <b>⚠ {errors.length} advertencia{errors.length !== 1 ? 's' : ''}:</b>
+          <b>{errors.length} advertencia{errors.length !== 1 ? 's' : ''}:</b>
           <br />
           {errors.slice(0, 20).map((e, i) => (
             <div key={i}>{e}</div>
@@ -65,12 +65,12 @@ export function ImportPreviewModal({ open, fileName, parsed, errors, onClose, on
           <tbody>
             {parsed.slice(0, 80).map((r) => (
               <tr key={r.code} className={r.isNew ? '' : 'opacity-80'}>
-                <td className={`border-b border-br px-2.5 py-1.5 text-[11px] font-bold ${r.isNew ? 'text-green' : 'text-blue'}`}>{r.isNew ? '🆕 Nuevo' : '🔄 Actualizar'}</td>
+                <td className={`border-b border-br px-2.5 py-1.5 text-[11px] font-bold ${r.isNew ? 'text-green' : 'text-blue'}`}>{r.isNew ? 'Nuevo' : 'Actualizar'}</td>
                 <td className="border-b border-br px-2.5 py-1.5 font-mono text-[11px]">{r.code}</td>
                 <td className="border-b border-br px-2.5 py-1.5 font-semibold">
                   {r.name}
                   {r.existingName && r.existingName !== r.name && <div className="text-[10px] text-muted">Era: {r.existingName}</div>}
-                  {r.warnings.length > 0 && <div className="text-[10px] text-orange">⚠ {r.warnings.join(', ')}</div>}
+                  {r.warnings.length > 0 && <div className="text-[10px] text-orange">{r.warnings.join(', ')}</div>}
                 </td>
                 <td className="border-b border-br px-2.5 py-1.5 font-mono text-lime">{formatMoney(r.price)}</td>
                 <td className="border-b border-br px-2.5 py-1.5 font-mono text-muted">{formatMoney(r.cost)}</td>
@@ -94,7 +94,7 @@ export function ImportPreviewModal({ open, fileName, parsed, errors, onClose, on
           Cancelar
         </button>
         <button onClick={() => onConfirm(dupAction)} className="flex-[2] rounded-[10px] bg-lime py-2.5 text-[14px] font-extrabold text-black">
-          ✓ Confirmar importación
+          Confirmar importación
         </button>
       </div>
     </BottomSheet>

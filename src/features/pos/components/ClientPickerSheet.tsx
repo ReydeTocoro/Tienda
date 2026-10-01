@@ -39,7 +39,7 @@ export function ClientPickerSheet({ open, onClose }: ClientPickerSheetProps) {
   return (
     <BottomSheet open={open} onClose={onClose}>
       <p className="mb-3 font-display text-[18px] font-bold">Seleccionar Cliente</p>
-      <input className="search-input" placeholder="🔍 Nombre, cédula o teléfono..." value={q} onChange={(e) => setQ(e.target.value)} autoFocus />
+      <input className="search-input" placeholder="Nombre, cédula o teléfono..." value={q} onChange={(e) => setQ(e.target.value)} autoFocus />
 
       {!filtered.length ? (
         <div className="p-6 text-center text-muted">
@@ -53,11 +53,11 @@ export function ClientPickerSheet({ open, onClose }: ClientPickerSheetProps) {
               <div className="min-w-0 flex-1">
                 <div className="text-[14px] font-semibold">{c.name}</div>
                 <div className="text-[11px] text-muted">
-                  {c.cedula ? '🪪 ' + c.cedula + (c.phone ? ' · ' : '') : ''}
+                  {c.cedula ? c.cedula + (c.phone ? ' · ' : '') : ''}
                   {c.phone || ''}
                 </div>
                 <div className="font-mono text-[11px] text-lime">
-                  ⭐ {formatQty(pts)} pts · {t.label}
+                  {formatQty(pts)} pts · {t.label}
                 </div>
               </div>
             </div>

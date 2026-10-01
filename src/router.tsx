@@ -6,6 +6,7 @@ import { ClientesPage } from './features/customers/ClientesPage'
 import { FiadosPage } from './features/fiados/FiadosPage'
 import { HistorialPage } from './features/history/HistorialPage'
 import { ReportePage } from './features/reports/ReportePage'
+import { ConfiguracionPage } from './features/settings/ConfiguracionPage'
 import { AdminGate } from './features/pin/AdminGate'
 
 export const router = createBrowserRouter([
@@ -16,7 +17,7 @@ export const router = createBrowserRouter([
       {
         path: '/inventario',
         element: (
-          <AdminGate title="🔒 Acceso restringido" subtitle="Esta sección requiere PIN de administrador">
+          <AdminGate title="Acceso restringido" subtitle="Esta sección requiere PIN de administrador">
             <InventarioPage />
           </AdminGate>
         ),
@@ -27,8 +28,16 @@ export const router = createBrowserRouter([
       {
         path: '/reporte',
         element: (
-          <AdminGate title="🔒 Acceso restringido" subtitle="Los reportes requieren PIN de administrador">
+          <AdminGate title="Acceso restringido" subtitle="Los reportes requieren PIN de administrador">
             <ReportePage />
+          </AdminGate>
+        ),
+      },
+      {
+        path: '/configuracion',
+        element: (
+          <AdminGate title="Acceso restringido" subtitle="La configuración requiere PIN de administrador">
+            <ConfiguracionPage />
           </AdminGate>
         ),
       },

@@ -18,7 +18,7 @@ export function PurchaseFormSheet({ open, onClose }: PurchaseFormSheetProps) {
     const d = desc.trim()
     const amt = parseFloat(amount) || 0
     if (!d || !amt) {
-      toast('⚠ Completa los campos', 'orange')
+      toast('Completa los campos', 'orange')
       return
     }
     await savePurchase({ desc: d, total: amt, provider: provider.trim() || undefined })
@@ -26,8 +26,8 @@ export function PurchaseFormSheet({ open, onClose }: PurchaseFormSheetProps) {
     setDesc('')
     setAmount('')
     onClose()
-    toast('✓ Compra registrada', 'orange')
-  }
+    toast('Compra registrada', 'orange')
+    }
 
   return (
     <BottomSheet open={open} onClose={onClose}>

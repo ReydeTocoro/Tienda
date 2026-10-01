@@ -26,7 +26,7 @@ export function HistorialPage() {
   const { requireAdmin } = usePermission()
 
   async function requestCorrection(sale: Sale) {
-    const ok = await requireAdmin('🔐 Corregir Factura', 'Se requiere PIN para modificar una venta')
+    const ok = await requireAdmin('Corregir Factura', 'Se requiere PIN para modificar una venta')
     if (!ok) return
     setCorrectingSale(sale)
     setReceiptSale(null)
@@ -49,7 +49,6 @@ export function HistorialPage() {
 
       {!rows.length ? (
         <div className="p-10 text-center text-muted">
-          <div className="mb-2.5 text-4xl">📋</div>
           <p className="text-[13px]">Sin registros aún</p>
         </div>
       ) : (
@@ -65,19 +64,19 @@ export function HistorialPage() {
                   <div>
                     <div className="font-mono text-[12px] text-lime">
                       {formatSaleId(r.sale.id)}{' '}
-                      <span className="rounded-full bg-lime/10 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-lime">↑ Venta</span>{' '}
+                      <span className="rounded-full bg-lime/10 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-lime">Venta</span>{' '}
                       <span className={`rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide ${PAY_PILL[r.sale.payMethod]}`}>
                         {r.sale.payMethod}
                       </span>
                       {r.sale.corrected && (
                         <span className="rounded-full bg-orange/10 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-orange">
-                          ✏️ corregida
+                          corregida
                         </span>
                       )}
                     </div>
                     <div className="mt-0.5 text-[10px] text-muted">{formatDateTime(r.sale.date)}</div>
-                    {r.sale.customerName && <div className="mt-0.5 text-[11px] text-blue">👤 {r.sale.customerName}</div>}
-                    {!r.sale.customerName && r.sale.fiadoName && <div className="mt-0.5 text-[11px] text-red">📋 Fiado: {r.sale.fiadoName}</div>}
+                    {r.sale.customerName && <div className="mt-0.5 text-[11px] text-blue">{r.sale.customerName}</div>}
+                    {!r.sale.customerName && r.sale.fiadoName && <div className="mt-0.5 text-[11px] text-red">Fiado: {r.sale.fiadoName}</div>}
                   </div>
                   <div className="font-mono text-[17px] font-semibold text-green">{formatMoney(r.sale.total)}</div>
                 </div>
@@ -94,7 +93,7 @@ export function HistorialPage() {
                   <div>
                     <div className="font-mono text-[12px] text-orange">
                       {formatPurchaseId(r.id)}{' '}
-                      <span className="rounded-full bg-orange/10 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-orange">↓ Compra</span>
+                      <span className="rounded-full bg-orange/10 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-orange">Compra</span>
                     </div>
                     <div className="mt-0.5 text-[10px] text-muted">{formatDateTime(r.date)}</div>
                   </div>

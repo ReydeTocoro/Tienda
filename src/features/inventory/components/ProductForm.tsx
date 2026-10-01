@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
+import { Camera } from 'lucide-react'
 import { db } from '../../../db/index'
 import type { Product } from '../../../types/product'
 import { UNITS, isMeasuredUnit } from '../../../types/unit'
@@ -13,11 +14,11 @@ import { usePermission } from '../../pin/usePermission'
 const MARGIN_PRESETS = [10, 15, 20, 25, 30, 50, 100]
 
 const UNIT_GROUPS: Array<{ label: string; values: string[] }> = [
-  { label: '📦 Conteo', values: ['unidad', 'docena', 'caja', 'paquete', 'par'] },
-  { label: '⚖️ Peso', values: ['kg', 'g', 'lb', 'oz', 't'] },
-  { label: '💧 Volumen', values: ['L', 'ml', 'gal', 'fl_oz'] },
-  { label: '📏 Longitud', values: ['m', 'cm', 'mm', 'ft', 'in', 'yd'] },
-  { label: '📐 Área', values: ['m2', 'ft2'] },
+  { label: 'Conteo', values: ['unidad', 'docena', 'caja', 'paquete', 'par'] },
+  { label: 'Peso', values: ['kg', 'g', 'lb', 'oz', 't'] },
+  { label: 'Volumen', values: ['L', 'ml', 'gal', 'fl_oz'] },
+  { label: 'Longitud', values: ['m', 'cm', 'mm', 'ft', 'in', 'yd'] },
+  { label: 'Área', values: ['m2', 'ft2'] },
 ]
 
 const EMPTY = {
@@ -132,21 +133,21 @@ export function ProductForm({ product, onSaved, onCancel, scanSeed, onOpenCamera
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    const ok = await requireAdmin('🔐 Agregar / Editar Stock', 'Se requiere PIN para modificar inventario')
+    const ok = await requireAdmin('Agregar / Editar Stock', 'Se requiere PIN para modificar inventario')
     if (!ok) return
     const code = f.code.trim()
     const name = f.name.trim()
     if (!name) {
-      toast('⚠ Escribe el nombre', 'orange')
+      toast('Escribe el nombre', 'orange')
       return
     }
     if (!code) {
-      toast('⚠ Escribe el código', 'orange')
+      toast('Escribe el código', 'orange')
       return
     }
     if (cost > 0 && price > 0 && cost > price) {
       const ok = await confirm(
-        `⚠ El precio de compra ($${cost.toFixed(2)}) es mayor al precio de venta ($${price.toFixed(2)}). ¿Continuar de todas formas?`,
+        `El precio de compra ($${cost.toFixed(2)}) es mayor al precio de venta ($${price.toFixed(2)}). ¿Continuar de todas formas?`,
       )
       if (!ok) return
     }
@@ -154,24 +155,24 @@ export function ProductForm({ product, onSaved, onCancel, scanSeed, onOpenCamera
     const codigoSuelta = f.codigoSuelta.trim()
     if (f.esPaquete) {
       if (unidadesPorNum < 2) {
-        toast('⚠ Indica cuántas unidades trae el paquete (mínimo 2)', 'orange')
+        toast('Indica cuántas unidades trae el paquete (mínimo 2)', 'orange')
         return
       }
       if (!codigoSuelta) {
-        toast('⚠ Escribe el código para la unidad suelta', 'orange')
+        toast('Escribe el código para la unidad suelta', 'orange')
         return
       }
       if (!f.nombreSuelta.trim()) {
-        toast('⚠ Escribe el nombre de la unidad suelta', 'orange')
+        toast('Escribe el nombre de la unidad suelta', 'orange')
         return
       }
       if (precioSueltaNum <= 0) {
-        toast('⚠ Escribe el precio de la unidad suelta', 'orange')
+        toast('Escribe el precio de la unidad suelta', 'orange')
         return
       }
       const collision = allProducts.find((p) => p.code === codigoSuelta && p.code !== product?.codigoSuelta)
       if (collision) {
-        toast('⚠ El código de la unidad suelta ya existe en inventario', 'orange')
+        toast('El código de la unidad suelta ya existe en inventario', 'orange')
         return
       }
     }
@@ -181,7 +182,7 @@ export function ProductForm({ product, onSaved, onCancel, scanSeed, onOpenCamera
     if (editing && f.esPaquete && product?.codigoSuelta) {
       const existingSuelta = allProducts.find((p) => p.code === product.codigoSuelta)
       if (existingSuelta && (existingSuelta.name !== f.nombreSuelta.trim() || existingSuelta.price !== precioSueltaNum)) {
-        toast('ℹ️ La unidad suelta ya generada no se actualiza automáticamente — edítala aparte si hace falta', 'blue')
+        toast('La unidad suelta ya generada no se actualiza automáticamente — edítala aparte si hace falta', 'blue')
       }
     }
 
@@ -209,21 +210,21 @@ export function ProductForm({ product, onSaved, onCancel, scanSeed, onOpenCamera
     try {
       if (editing) {
         await updateProduct(prod)
-        toast('✓ Producto actualizado', 'lime')
+        toast('Producto actualizado', 'lime')
       } else {
         await addProduct(prod)
-        toast('✓ Producto guardado', 'lime')
+        toast('Producto guardado', 'lime')
       }
       setF(EMPTY)
       onSaved()
     } catch (err) {
-      toast('⚠ ' + (err instanceof Error ? err.message : String(err)), 'orange')
+      toast(err instanceof Error ? err.message : String(err), 'orange')
     }
   }
 
   return (
     <form onSubmit={handleSubmit} className="rounded-[14px] border border-br bg-s1 p-3.5">
-      <p className="mb-3 text-[14px] font-bold">{editing ? `✏ Editando: ${product!.name}` : '➕ Agregar Producto'}</p>
+      <p className="mb-3 text-[14px] font-bold">{editing ? `Editando: ${product!.name}` : 'Agregar Producto'}</p>
 
       <div className="grid grid-cols-2 gap-2.5">
         <Field label="Código / Barcode">
@@ -241,7 +242,7 @@ export function ProductForm({ product, onSaved, onCancel, scanSeed, onOpenCamera
                 onClick={onOpenCamera}
                 className="flex h-[42px] w-11 flex-shrink-0 items-center justify-center rounded-[10px] border border-br2 bg-s2 text-lime"
               >
-                📷
+                <Camera size={18} />
               </button>
             )}
           </div>
@@ -268,7 +269,7 @@ export function ProductForm({ product, onSaved, onCancel, scanSeed, onOpenCamera
         </Field>
 
         <div className="col-span-2 rounded-xl border border-br2 bg-s2 p-3">
-          <label className="mb-2 block field-label">💰 {isMeasured ? `Costo y Precio por ${unitLbl}` : 'Precio y Margen'}</label>
+          <label className="mb-2 block field-label">{isMeasured ? `Costo y Precio por ${unitLbl}` : 'Precio y Margen'}</label>
           <div className="grid grid-cols-3 gap-2">
             <NumField label={isMeasured ? `Costo /${unitLbl}` : 'Precio Compra'} value={f.cost} onChange={(v) => calcFromCost(v, f.margin)} />
             <NumField label="% Ganancia" value={f.margin} onChange={(v) => calcFromCost(f.cost, v)} accent />
@@ -337,7 +338,7 @@ export function ProductForm({ product, onSaved, onCancel, scanSeed, onOpenCamera
         <div className="col-span-2 rounded-xl border border-purple/25 bg-purple/10 p-3">
           <label className="mb-2.5 flex cursor-pointer items-center gap-2 text-[12px] font-bold text-purple">
             <input type="checkbox" checked={f.esPaquete} onChange={(e) => toggleEsPaquete(e.target.checked)} className="h-4 w-4 accent-purple" />
-            📦 Este producto es un paquete que se puede vender por unidades sueltas
+            Este producto es un paquete que se puede vender por unidades sueltas
           </label>
           {f.esPaquete && (
             <div className="grid grid-cols-2 gap-2.5">
@@ -376,9 +377,9 @@ export function ProductForm({ product, onSaved, onCancel, scanSeed, onOpenCamera
               </Field>
               {paqPreviewOk && (
                 <div className="col-span-2 rounded-lg bg-purple/10 px-3.5 py-2.5 font-mono text-[13px] leading-relaxed text-purple">
-                  Al abrir 1 paquete → se crean <b>{unidadesPorNum} "{f.nombreSuelta}"</b>
+                  Al abrir 1 paquete se crean <b>{unidadesPorNum} "{f.nombreSuelta}"</b>
                   <br />
-                  Precio unitario: <b>{formatMoney(precioSueltaNum)}</b> c/u → Total por paquete: <b>{formatMoney(precioSueltaNum * unidadesPorNum)}</b>
+                  Precio unitario: <b>{formatMoney(precioSueltaNum)}</b> c/u · Total por paquete: <b>{formatMoney(precioSueltaNum * unidadesPorNum)}</b>
                 </div>
               )}
             </div>

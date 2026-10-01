@@ -15,7 +15,7 @@ export function DesktopTabs() {
   function handleClick(e: MouseEvent, item: NavItem) {
     if (!item.requiresAdmin) return
     e.preventDefault()
-    requireAdmin('🔒 Acceso restringido', item.to === '/inventario' ? 'Esta sección requiere PIN de administrador' : 'Los reportes requieren PIN de administrador').then((ok) => {
+    requireAdmin('Acceso restringido', item.gateSubtitle ?? 'Esta sección requiere PIN de administrador').then((ok) => {
       if (ok) navigate(item.to)
     })
   }

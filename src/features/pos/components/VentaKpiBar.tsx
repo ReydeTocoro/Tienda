@@ -23,7 +23,8 @@ export function VentaKpiBar({ onClickLowStock }: VentaKpiBarProps) {
 
   return (
     // A tally strip, not a grid of stat cards: one continuous row divided by rules — like a
-    // receipt summary line — instead of five identical bordered/rounded tiles.
+    // receipt summary line — instead of five identical bordered/rounded tiles. Each cell grows
+    // evenly (flex-1) so the row fills the available width instead of bunching to the left.
     <div className="flex flex-shrink-0 divide-x divide-br overflow-x-auto border-b border-br bg-s1 [scrollbar-width:none]">
       <Kpi label="Ventas hoy" value={formatMoney(totalVentas)} />
       <Kpi label="Transacc." value={formatQty(numTx)} />
@@ -39,7 +40,7 @@ function Kpi({ label, value, warn, onClick }: { label: string; value: string; wa
     <button
       onClick={onClick}
       type="button"
-      className={`min-w-[84px] flex-shrink-0 px-3 py-2 text-center ${onClick ? '' : 'cursor-default'}`}
+      className={`min-w-[84px] flex-1 px-3 py-2 text-center ${onClick ? '' : 'cursor-default'}`}
     >
       <div className={`font-mono text-[13px] font-bold ${warn ? 'text-orange' : 'text-lime'}`}>{value}</div>
       <div className="mt-0.5 field-label">{label}</div>

@@ -23,13 +23,13 @@ export function ClientBar({ onOpen }: ClientBarProps) {
           <div className="overflow-hidden text-ellipsis whitespace-nowrap text-[14px] font-semibold">
             {customerName ? `${customerName} · ${tier.label}` : 'Sin cliente'}
           </div>
-          {customerName && <div className="mt-0.5 font-mono text-[11px] text-lime">⭐ {formatQty(pts)} puntos</div>}
+          {customerName && <div className="mt-0.5 font-mono text-[11px] text-lime">{formatQty(pts)} puntos</div>}
         </div>
         <span className="flex-shrink-0 text-[18px] text-muted">›</span>
       </button>
       {customerName && pts >= 50 && (
         <div className="flex flex-shrink-0 items-center gap-1.5 rounded-[10px] border border-purple/25 bg-purple/10 px-2.5 py-2 text-[12px] text-purple">
-          🎁 Descuento disponible
+          Descuento disponible
         </div>
       )}
     </div>

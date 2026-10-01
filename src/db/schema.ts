@@ -8,6 +8,7 @@ import type { Cierre } from '../types/cierre'
 import type { AuditLogEntry } from '../types/auditLog'
 import type { EntradaRecord } from '../types/entrada'
 import type { Settings } from '../types/settings'
+import type { Usuario } from '../types/usuario'
 
 export class TiendaDB extends Dexie {
   products!: EntityTable<Product, 'code'>
@@ -19,6 +20,7 @@ export class TiendaDB extends Dexie {
   auditLog!: EntityTable<AuditLogEntry, 'id'>
   entradas!: EntityTable<EntradaRecord, 'id'>
   settings!: EntityTable<Settings, 'key'>
+  usuarios!: EntityTable<Usuario, 'id'>
 
   constructor() {
     super('tienda-pro')
@@ -32,6 +34,9 @@ export class TiendaDB extends Dexie {
       auditLog: '++id, date, type, saleId, code',
       entradas: '++id, date, code',
       settings: '&key',
+    })
+    this.version(2).stores({
+      usuarios: '&id, role, active',
     })
   }
 }

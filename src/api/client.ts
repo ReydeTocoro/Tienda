@@ -17,7 +17,7 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
     } catch {
       // Response wasn't JSON — fall back to the raw text.
     }
-    throw new Error(message || `${method} ${path} → HTTP ${res.status}`)
+    throw new Error(message || `${method} ${path} HTTP ${res.status}`)
   }
   if (res.status === 204) return undefined as T
   const text = await res.text()

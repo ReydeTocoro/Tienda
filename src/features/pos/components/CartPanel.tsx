@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { Banknote, Smartphone, Handshake, X, Trash2, FileText } from 'lucide-react'
 import type { Product } from '../../../types/product'
 import { useCartStore } from '../../../store/useCartStore'
 import { useCartTotals } from '../hooks/useFinalizeSale'
@@ -15,10 +16,10 @@ interface CartPanelProps {
   onCheckout: () => void
 }
 
-const PAY_METHODS: Array<{ key: 'efectivo' | 'transferencia' | 'fiado'; label: string; icon: string }> = [
-  { key: 'efectivo', label: 'Efectivo', icon: '💵' },
-  { key: 'transferencia', label: 'Transfer.', icon: '📲' },
-  { key: 'fiado', label: 'Fiado', icon: '📋' },
+const PAY_METHODS: Array<{ key: 'efectivo' | 'transferencia' | 'fiado'; label: string; icon: typeof Banknote }> = [
+  { key: 'efectivo', label: 'Efectivo', icon: Banknote },
+  { key: 'transferencia', label: 'Transfer.', icon: Smartphone },
+  { key: 'fiado', label: 'Fiado', icon: Handshake },
 ]
 
 const QUICK_BILLS = [5000, 10000, 20000, 50000, 100000]
@@ -73,7 +74,6 @@ export function CartPanel({ products, onEditMeasured, onOpenDiscount, onCheckout
       <div className="flex-1 overflow-y-auto">
         {!items.length ? (
           <div className="p-8 text-center text-muted">
-            <div className="mb-2 text-3xl">🛒</div>
             <p className="text-[13px]">Carrito vacío</p>
           </div>
         ) : (
@@ -91,12 +91,12 @@ export function CartPanel({ products, onEditMeasured, onOpenDiscount, onCheckout
                       )}
                     </div>
                     <div className="truncate font-mono text-[10px] text-muted">
-                      {item.isFree ? '🏷️ Sin código' : item.code}
+                      {item.isFree ? 'Sin código' : item.code}
                       {item.brand ? ' · ' + item.brand : ''}
                     </div>
                   </div>
-                  <button onClick={() => removeItem(i)} className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-md text-[13px] text-muted transition-colors hover:bg-red/10 hover:text-red">
-                    ✕
+                  <button onClick={() => removeItem(i)} className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-md text-muted transition-colors hover:bg-red/10 hover:text-red">
+                    <X size={14} />
                   </button>
                 </div>
 
@@ -107,7 +107,7 @@ export function CartPanel({ products, onEditMeasured, onOpenDiscount, onCheckout
                         {formatQty(item.qty)} {ul}
                       </span>
                       <button onClick={() => onEditMeasured(i)} className="rounded border border-br2 bg-s3 px-1.5 py-0.5 text-[10px] text-txt2">
-                        ✏ editar
+                        editar
                       </button>
                     </div>
                   ) : (
@@ -148,7 +148,7 @@ export function CartPanel({ products, onEditMeasured, onOpenDiscount, onCheckout
             onClick={() => setCheckoutOpen(true)}
             className="flex w-full items-center justify-between rounded-[10px] bg-green px-4 py-3 text-black transition-transform hover:brightness-110 active:scale-[0.98]"
           >
-            <span className="text-[14px] font-bold">✓ Cobrar</span>
+            <span className="text-[14px] font-bold">Cobrar</span>
             <span className="font-mono text-[17px] font-bold">{formatMoney(chargeAmount)}</span>
           </button>
         </div>
@@ -240,7 +240,7 @@ export function CartPanel({ products, onEditMeasured, onOpenDiscount, onCheckout
                 payMethod === m.key ? 'border-lime bg-lime/15 text-lime' : 'border-br2 bg-s2 text-txt2 hover:border-br2 hover:bg-s3 hover:text-txt'
               }`}
             >
-              <div className="mb-1 text-[20px]">{m.icon}</div>
+              <m.icon size={20} className="mx-auto mb-1" />
               <div className="text-[11px] font-semibold">{m.label}</div>
             </button>
           ))}
@@ -257,7 +257,7 @@ export function CartPanel({ products, onEditMeasured, onOpenDiscount, onCheckout
             <textarea
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
-              placeholder="📝 Nota para esta venta (opcional)..."
+              placeholder="Nota para esta venta (opcional)..."
               rows={2}
               className="input resize-none text-[12px]"
             />
@@ -266,10 +266,10 @@ export function CartPanel({ products, onEditMeasured, onOpenDiscount, onCheckout
 
         <div className="flex gap-2">
           <button onClick={clear} title="Vaciar carrito" className="rounded-[10px] border border-br2 px-3 py-2.5 text-txt2 transition-colors hover:border-red/40 hover:text-red">
-            🗑
+            <Trash2 size={16} />
           </button>
           <button onClick={() => setNotesOpen((o) => !o)} title="Agregar nota" className="rounded-[10px] border border-br2 px-3 py-2.5 text-txt2 transition-colors hover:border-br2 hover:bg-s2">
-            📝
+            <FileText size={16} />
           </button>
           <button onClick={onOpenDiscount} title="Descuento manual" className="rounded-[10px] border border-br2 px-3 py-2.5 text-txt2 transition-colors hover:border-br2 hover:bg-s2">
             %
@@ -281,7 +281,7 @@ export function CartPanel({ products, onEditMeasured, onOpenDiscount, onCheckout
               insufficientCash ? 'cursor-not-allowed bg-br2 text-muted' : 'bg-green text-black hover:brightness-110'
             }`}
           >
-            {insufficientCash ? `Falta ${formatMoney(-change)}` : '✓ Confirmar cobro'}
+            {insufficientCash ? `Falta ${formatMoney(-change)}` : 'Confirmar cobro'}
           </button>
         </div>
       </BottomSheet>

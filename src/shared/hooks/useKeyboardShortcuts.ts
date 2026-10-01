@@ -36,7 +36,7 @@ export function useKeyboardShortcuts() {
         e.preventDefault()
         useScannerStore.getState().toggle()
         const enabled = useScannerStore.getState().enabled
-        toast(enabled ? '📡 Lector activado' : '🔇 Lector desactivado', enabled ? 'lime' : 'muted')
+        toast(enabled ? 'Lector activado' : 'Lector desactivado', enabled ? 'lime' : 'muted')
       }
     }
 

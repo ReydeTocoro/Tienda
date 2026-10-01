@@ -11,7 +11,7 @@ export function PinModal() {
   const setBuffer = usePinStore((s) => s.setBuffer)
   const settle = usePinStore((s) => s.settle)
   const attempts = usePinStore((s) => s.attempts)
-  const { pinLength, isLocked, remainingSecs, checkPin, registerFailure, registerSuccess } = usePinGate()
+  const { pinLength, isLocked, remainingSecs, registerFailure, registerSuccess } = usePinGate()
   const [error, setError] = useState('')
   const [shake, setShake] = useState(false)
 
@@ -30,7 +30,7 @@ export function PinModal() {
         pressKey('⌫')
       } else if (e.key === 'Escape') {
         e.preventDefault()
-        settle(false)
+        settle({ ok: false })
       }
     }
     document.addEventListener('keydown', onKeyDown, true)
@@ -41,10 +41,11 @@ export function PinModal() {
   if (!request) return null
 
   async function submit(entered: string) {
-    const ok = await checkPin(entered)
-    if (ok) {
+    if (!request) return
+    const result = await request.verify(entered)
+    if (result.ok) {
       registerSuccess()
-      settle(true)
+      settle(result)
       return
     }
     setBuffer('')
@@ -53,10 +54,10 @@ export function PinModal() {
     if (navigator.vibrate) navigator.vibrate([90, 50, 90])
     const { attempts: attemptCount, lockedNow } = await registerFailure()
     if (lockedNow) {
-      setError('🔒 Demasiados intentos — bloqueado')
+      setError('Demasiados intentos — bloqueado')
     } else {
       const remaining = PIN_MAX_ATTEMPTS - attemptCount
-      setError(`❌ PIN incorrecto — ${remaining} intento${remaining !== 1 ? 's' : ''} restante${remaining !== 1 ? 's' : ''}`)
+      setError(`PIN incorrecto — ${remaining} intento${remaining !== 1 ? 's' : ''} restante${remaining !== 1 ? 's' : ''}`)
     }
   }
 
@@ -82,14 +83,14 @@ export function PinModal() {
     <div className="fixed inset-0 z-[9500] flex items-center justify-center bg-black/95 p-5 backdrop-blur-sm">
       <div className={`w-full max-w-[340px] rounded-[24px] border border-br2 bg-s1 px-[26px] pb-[26px] pt-[30px] text-center shadow-[var(--shadow-md)] ${shake ? 'animate-[pinShake_0.45s_ease]' : ''}`}>
         <div className="mb-3.5 inline-flex items-center gap-1.5 rounded-full border border-lime/30 bg-lime/10 px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-lime">
-          🔐 Acceso protegido
+          Acceso protegido
         </div>
         <div className="mb-1 font-display text-[19px] font-bold leading-tight">{request.title}</div>
         <div className="mb-4.5 text-[11px] leading-relaxed text-muted">{request.subtitle}</div>
 
         {isLocked && (
           <div className="mb-3 flex items-center gap-2 rounded-[10px] border border-red/30 bg-red/10 px-3 py-2.5 text-left text-[11px] font-semibold text-red">
-            <span>🔒 PIN bloqueado temporalmente</span>
+            <span>PIN bloqueado temporalmente</span>
             <span className="ml-auto min-w-[34px] text-right font-mono text-[14px] font-extrabold">{remainingSecs}s</span>
           </div>
         )}
@@ -131,7 +132,7 @@ export function PinModal() {
           )}
         </div>
 
-        <button onClick={() => settle(false)} className="w-full py-1.5 text-[12px] text-muted">
+        <button onClick={() => settle({ ok: false })} className="w-full py-1.5 text-[12px] text-muted">
           Cancelar
         </button>
       </div>

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { X } from 'lucide-react'
 import type { Sale } from '../../../types/sale'
 import type { CartItem } from '../../../types/cartItem'
 import { BottomSheet } from '../../../shared/components/BottomSheet'
@@ -48,7 +49,7 @@ export function CorrectionModal({ sale, onClose, onCorrected }: CorrectionModalP
     const qty = parseFloat(newQty) || 0
     const price = parseFloat(newPrice) || 0
     if (!name || !qty || !price) {
-      toast('⚠ Completa nombre, cantidad y precio', 'orange')
+      toast('Completa nombre, cantidad y precio', 'orange')
       return
     }
     setItems((s) => [...s, { code: 'CORR', name, price, cost: 0, qty, brand: '', unit: 'unidad', isFree: true }])
@@ -60,31 +61,28 @@ export function CorrectionModal({ sale, onClose, onCorrected }: CorrectionModalP
   async function confirm() {
     if (!sale) return
     if (!reason.trim()) {
-      toast('⚠ Escribe el motivo de la corrección', 'orange')
+      toast('Escribe el motivo de la corrección', 'orange')
       return
     }
     if (!items.length) {
-      toast('⚠ La factura no puede quedar sin ítems', 'orange')
+      toast('La factura no puede quedar sin ítems', 'orange')
       return
     }
     await correctSale(sale.id!, items, reason.trim())
-    toast(`✓ Factura ${formatSaleId(sale.id)} corregida`, 'orange')
+    toast(`Factura ${formatSaleId(sale.id)} corregida`, 'orange')
     onCorrected()
   }
 
   return (
     <BottomSheet open={!!sale} onClose={onClose}>
-      <div className="mb-1 flex items-center gap-2">
-        <span className="text-[22px]">✏️</span>
-        <div>
-          <div className="font-display text-[18px] font-bold">Corregir Factura</div>
-          <div className="text-[11px] text-muted">
-            {formatSaleId(sale.id)} · {formatDateTime(sale.date)}
-          </div>
+      <div className="mb-1">
+        <div className="font-display text-[18px] font-bold">Corregir Factura</div>
+        <div className="text-[11px] text-muted">
+          {formatSaleId(sale.id)} · {formatDateTime(sale.date)}
         </div>
       </div>
       <div className="my-3.5 rounded-[10px] border border-orange/25 bg-orange/10 px-3 py-2.5 text-[12px] text-orange">
-        ⚠️ Los cambios quedan en el historial de auditoría. El reporte se recalcula automáticamente.
+        Los cambios quedan en el historial de auditoría. El reporte se recalcula automáticamente.
       </div>
 
       <div className="mb-2 field-label">Productos en la factura</div>
@@ -96,8 +94,8 @@ export function CorrectionModal({ sale, onClose, onCorrected }: CorrectionModalP
           </div>
           <input type="number" min={0} value={it.qty} onChange={(e) => updateItem(i, 'qty', e.target.value)} className="input py-1.5 text-right font-mono text-[13px]" />
           <input type="number" min={0} step="0.01" value={it.price} onChange={(e) => updateItem(i, 'price', e.target.value)} className="input py-1.5 text-right font-mono text-[13px]" />
-          <button onClick={() => removeItem(i)} className="text-[15px] text-red">
-            ✕
+          <button onClick={() => removeItem(i)} className="flex justify-center text-red">
+            <X size={15} />
           </button>
         </div>
       ))}
@@ -126,7 +124,7 @@ export function CorrectionModal({ sale, onClose, onCorrected }: CorrectionModalP
           Cancelar
         </button>
         <button onClick={confirm} className="flex-[2] rounded-[10px] bg-orange py-2.5 text-[14px] font-extrabold text-black">
-          ✓ Guardar corrección
+          Guardar corrección
         </button>
       </div>
     </BottomSheet>

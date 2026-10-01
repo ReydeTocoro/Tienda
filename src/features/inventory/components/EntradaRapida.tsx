@@ -1,5 +1,6 @@
 import { forwardRef, useImperativeHandle, useMemo, useState, type RefObject } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
+import { Package, Camera } from 'lucide-react'
 import type { Product } from '../../../types/product'
 import { confirmEntrada, listEntradas } from '../../../db/repositories/entradas'
 import { formatDateTime, formatQty } from '../../../shared/lib/currency'
@@ -62,9 +63,9 @@ export const EntradaRapida = forwardRef<EntradaRapidaHandle, EntradaRapidaProps>
         } else {
           selectProduct(p)
         }
-        toast('📦 ' + p.name, 'lime')
+        toast(p.name, 'lime')
       } else {
-        toast('❓ Código no registrado: ' + code, 'orange')
+        toast('Código no registrado: ' + code, 'orange')
         setSelected(null)
         setSearch(code)
       }
@@ -74,19 +75,24 @@ export const EntradaRapida = forwardRef<EntradaRapidaHandle, EntradaRapidaProps>
   async function confirm() {
     if (!selected) return
     if (qty <= 0) {
-      toast('⚠ Ingresa una cantidad válida', 'orange')
+      toast('Ingresa una cantidad válida', 'orange')
       return
     }
+    const ul = unitShortLabel(selected.unit || 'unidad')
     const r = await confirmEntrada(selected.code, qty)
-    toast(`✓ +${formatQty(qty)} a "${selected.name}" → Stock: ${formatQty(r.stockDespues)}`, 'green')
+    toast(`+${formatQty(qty)} ${ul} a "${selected.name}" — Stock: ${formatQty(r.stockDespues)} ${ul}`, 'green')
     cancel()
   }
+
+  const entradaStep = selected && isMeasuredUnit(selected.unit) ? 0.1 : 1
 
   return (
     <div className={`mb-3.5 overflow-hidden rounded-2xl border-2 bg-s1 transition-colors ${open ? 'border-green' : 'border-green/20'}`}>
       <button onClick={onToggle} className="flex w-full items-center justify-between px-3.5 py-3 text-left">
         <div className="flex items-center gap-2.5">
-          <div className="flex h-9 w-9 items-center justify-center rounded-[10px] border border-green/25 bg-green/10 text-[18px]">📦</div>
+          <div className="flex h-9 w-9 items-center justify-center rounded-[10px] border border-green/25 bg-green/10 text-green">
+            <Package size={18} />
+          </div>
           <div>
             <div className="text-[14px] font-bold">Entrada de Mercancía</div>
             <div className="text-[11px] text-muted">Escanea o busca para sumar al stock</div>
@@ -101,7 +107,7 @@ export const EntradaRapida = forwardRef<EntradaRapidaHandle, EntradaRapidaProps>
             onClick={onOpenMassive}
             className="mb-2.5 flex w-full items-center gap-2.5 rounded-xl border-2 border-green/25 bg-green/10 px-3.5 py-3 text-left text-green"
           >
-            <span className="text-[20px]">📦</span>
+            <Package size={20} />
             <div className="flex-1">
               <div className="text-[14px] font-bold">Escaneo Masivo de Stock</div>
               <div className="text-[11px] opacity-80">Escanea muchas unidades seguidas · cámara continua</div>
@@ -151,7 +157,7 @@ export const EntradaRapida = forwardRef<EntradaRapidaHandle, EntradaRapidaProps>
               )}
             </div>
             <button onClick={onOpenCamera} title="Escanear con cámara" className="flex h-[42px] w-11 flex-shrink-0 items-center justify-center rounded-[10px] border border-br2 bg-s2 text-lime">
-              📷
+              <Camera size={18} />
             </button>
           </div>
 
@@ -171,8 +177,8 @@ export const EntradaRapida = forwardRef<EntradaRapidaHandle, EntradaRapidaProps>
                   </div>
                 </div>
                 <div className="flex items-center gap-2.5">
-                  <div className="whitespace-nowrap field-label">Sumar:</div>
-                  <button onClick={() => setQty((q) => Math.max(0, q - 1))} className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-[9px] border border-br2 bg-s3 text-[20px] font-bold">
+                  <div className="whitespace-nowrap field-label">Sumar ({entradaUnitLabel}):</div>
+                  <button onClick={() => setQty((q) => Math.max(entradaStep, +(q - entradaStep).toFixed(3)))} className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-[9px] border border-br2 bg-s3 text-[20px] font-bold">
                     −
                   </button>
                   <input
@@ -183,19 +189,18 @@ export const EntradaRapida = forwardRef<EntradaRapidaHandle, EntradaRapidaProps>
                     onChange={(e) => setQty(Math.max(0, parseFloat(e.target.value) || 0))}
                     className="w-full flex-1 rounded-[9px] border border-br2 bg-s3 p-2 text-center font-mono text-[20px] font-bold text-lime outline-none"
                   />
-                  <span className="flex-shrink-0 text-[13px] text-muted">{entradaUnitLabel}</span>
-                  <button onClick={() => setQty((q) => q + 1)} className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-[9px] border border-br2 bg-s3 text-[20px] font-bold">
+                  <button onClick={() => setQty((q) => +(q + entradaStep).toFixed(3))} className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-[9px] border border-br2 bg-s3 text-[20px] font-bold">
                     +
                   </button>
                 </div>
                 {qty > 0 && (
                   <div className="mt-2.5 rounded-lg bg-green/10 px-3 py-2 text-center font-mono text-[13px] text-green">
-                    {formatQty(selected.stock)} + {formatQty(qty)} = {formatQty((selected.stock || 0) + qty)} {entradaUnitLabel}
+                    {formatQty(selected.stock)} + {formatQty(qty)} = {formatQty((selected.stock || 0) + qty)} {entradaUnitLabel} en stock
                   </div>
                 )}
               </div>
               <button onClick={confirm} className="w-full rounded-xl bg-green py-3.5 text-[15px] font-extrabold text-black">
-                ✓ Confirmar entrada al stock
+                Confirmar entrada al stock
               </button>
               <button onClick={cancel} className="mt-2 w-full py-1.5 text-[13px] text-muted">
                 Cancelar

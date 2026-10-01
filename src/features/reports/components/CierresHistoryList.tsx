@@ -25,7 +25,7 @@ export function CierresHistoryList() {
                   {d.toLocaleDateString('es', { day: 'numeric', month: 'short', year: 'numeric' })} {d.toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit' })}
                 </span>
               </div>
-              <span className="text-[11px] text-muted">👤 {c.cajero}</span>
+              <span className="text-[11px] text-muted">{c.cajero}</span>
             </div>
             <div className="grid grid-cols-3 gap-1.5 text-[11px]">
               <div>
@@ -42,11 +42,11 @@ export function CierresHistoryList() {
               <div className="mt-1.5 text-[11px]">
                 Arqueo:{' '}
                 <span className={diff === 0 ? 'text-green' : diff > 0 ? 'text-lime' : 'text-red'}>
-                  {diff === 0 ? '✓ Cuadre perfecto' : diff > 0 ? `+${formatMoney(diff)} sobrante` : `-${formatMoney(Math.abs(diff))} faltante`}
+                  {diff === 0 ? 'Cuadre perfecto' : diff > 0 ? `+${formatMoney(diff)} sobrante` : `-${formatMoney(Math.abs(diff))} faltante`}
                 </span>
               </div>
             )}
-            {c.notas && <div className="mt-1 text-[11px] text-muted">📝 {c.notas}</div>}
+            {c.notas && <div className="mt-1 text-[11px] text-muted">{c.notas}</div>}
           </div>
         )
       })}

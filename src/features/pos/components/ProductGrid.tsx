@@ -1,4 +1,6 @@
-import { useMemo } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { useVirtualizer } from '@tanstack/react-virtual'
+import { Tag } from 'lucide-react'
 import type { Product } from '../../../types/product'
 import type { CartItem } from '../../../types/cartItem'
 import { ProductCard } from './ProductCard'
@@ -13,6 +15,29 @@ interface ProductGridProps {
   onOpenFree: () => void
   lowStockOnly?: boolean
 }
+
+/** Column count at each breakpoint, mirroring the `grid-cols-*` classes below — read here too
+ * since virtualizing rows means we have to slice products into rows ourselves. */
+function useColumnCount() {
+  const [cols, setCols] = useState(() => columnsForWidth(typeof window === 'undefined' ? 1024 : window.innerWidth))
+  useEffect(() => {
+    function update() {
+      setCols(columnsForWidth(window.innerWidth))
+    }
+    window.addEventListener('resize', update)
+    return () => window.removeEventListener('resize', update)
+  }, [])
+  return cols
+}
+
+function columnsForWidth(w: number) {
+  if (w >= 1536) return 5
+  if (w >= 1280) return 4
+  if (w >= 768) return 3
+  return 2
+}
+
+const ROW_HEIGHT = 132
 
 export function ProductGrid({ products, cart, search, activeCat, onSetCat, onPick, onOpenFree, lowStockOnly }: ProductGridProps) {
   const cats = useMemo(() => ['__all__', ...Array.from(new Set(products.map((p) => p.cat).filter(Boolean))).sort()], [products])
@@ -32,6 +57,23 @@ export function ProductGrid({ products, cart, search, activeCat, onSetCat, onPic
     })
     return list
   }, [products, search, activeCat, lowStockOnly])
+
+  const columns = useColumnCount()
+  const scrollRef = useRef<HTMLDivElement>(null)
+  const rowCount = Math.ceil(filtered.length / columns)
+
+  // Products in the grid rarely number more than a few thousand even at the largest real
+  // inventories, but rendering all of them as DOM nodes at once (no pagination in this app) is
+  // what made the grid janky/garbled with 1000+ products — only the rows near the viewport get
+  // mounted now.
+  const rowVirtualizer = useVirtualizer({
+    count: rowCount,
+    getScrollElement: () => scrollRef.current,
+    estimateSize: () => ROW_HEIGHT,
+    overscan: 6,
+  })
+
+  const gridColsClass = 'grid-cols-2 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5'
 
   return (
     <div className="flex h-full flex-col overflow-hidden border-r border-br bg-bg">
@@ -55,22 +97,35 @@ export function ProductGrid({ products, cart, search, activeCat, onSetCat, onPic
       {!filtered.length ? (
         <div className="flex flex-1 items-center justify-center p-7 text-center text-muted">
           <div>
-            <div className="mb-2 text-3xl">🔍</div>
             <p className="text-[13px]">Sin resultados</p>
           </div>
         </div>
       ) : (
-        <div className="grid flex-1 grid-cols-2 content-start gap-1.5 overflow-y-auto p-2 md:grid-cols-3 md:gap-2 md:p-3 xl:grid-cols-4 2xl:grid-cols-5">
-          {filtered.map((p) => (
-            <ProductCard key={p.code} product={p} qtyInCart={cart.find((c) => c.code === p.code)?.qty ?? 0} onClick={() => onPick(p)} />
-          ))}
+        <div ref={scrollRef} className="flex-1 overflow-y-auto p-2.5 md:p-3">
+          <div style={{ height: rowVirtualizer.getTotalSize(), position: 'relative' }}>
+            {rowVirtualizer.getVirtualItems().map((vRow) => {
+              const start = vRow.index * columns
+              const rowProducts = filtered.slice(start, start + columns)
+              return (
+                <div
+                  key={vRow.key}
+                  className={`grid ${gridColsClass} gap-2 md:gap-2.5`}
+                  style={{ position: 'absolute', top: 0, left: 0, right: 0, height: vRow.size, transform: `translateY(${vRow.start}px)` }}
+                >
+                  {rowProducts.map((p) => (
+                    <ProductCard key={p.code} product={p} qtyInCart={cart.find((c) => c.code === p.code)?.qty ?? 0} onClick={() => onPick(p)} />
+                  ))}
+                </div>
+              )
+            })}
+          </div>
         </div>
       )}
       <button
         onClick={onOpenFree}
         className="m-2 flex flex-shrink-0 items-center justify-center gap-1.5 rounded-[10px] border border-dashed border-br2 p-2 text-[12px] text-txt2 transition-colors hover:border-br2 hover:bg-s1 hover:text-txt md:m-3"
       >
-        <span>🏷️</span> Producto sin registrar
+        <Tag size={14} /> Producto sin registrar
       </button>
     </div>
   )

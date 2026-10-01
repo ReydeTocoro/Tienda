@@ -26,7 +26,7 @@ export function AbonoModal({ open, maxDebt, onClose, onConfirm }: AbonoModalProp
 
   return (
     <Modal open={open} onClose={onClose}>
-      <div className="mb-1 font-display text-[18px] font-bold">💰 Registrar Abono</div>
+      <div className="mb-1 font-display text-[18px] font-bold">Registrar Abono</div>
       <div className="mb-4 text-[12px] text-muted">
         Deuda total: <b className="text-red">{formatMoney(maxDebt)}</b>
       </div>
@@ -47,7 +47,7 @@ export function AbonoModal({ open, maxDebt, onClose, onConfirm }: AbonoModalProp
           Cancelar
         </button>
         <button onClick={confirm} className="flex-[2] rounded-[10px] bg-green py-2.5 text-[14px] font-bold text-black">
-          ✓ Registrar Abono
+          Registrar Abono
         </button>
       </div>
     </Modal>

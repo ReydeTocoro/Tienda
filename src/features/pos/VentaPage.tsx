@@ -1,5 +1,6 @@
-import { useEffect, useRef, useState, type KeyboardEvent } from 'react'
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
+import { Camera, Calculator } from 'lucide-react'
 import { db } from '../../db/index'
 import type { Product } from '../../types/product'
 import type { Sale } from '../../types/sale'
@@ -40,6 +41,7 @@ export function VentaPage() {
   const [pickerOpen, setPickerOpen] = useState(false)
 
   const searchRef = useRef<HTMLInputElement>(null)
+  const dropdownMatches = useMemo(() => searchMatches(products, search), [products, search])
   const items = useCartStore((s) => s.items)
   const addUnitItem = useCartStore((s) => s.addUnitItem)
   const finalize = useFinalizeSale()
@@ -51,7 +53,7 @@ export function VentaPage() {
 
   function pickProduct(p: Product) {
     if (p.stock <= 0) {
-      toast('⚠ Sin stock disponible', 'orange')
+      toast('Sin stock disponible', 'orange')
       return
     }
     if (isMeasuredUnit(p.unit)) {
@@ -73,7 +75,7 @@ export function VentaPage() {
     if (exact) {
       if (exact.stock <= 0) {
         flashOnce(false)
-        toast('⚠ Sin stock: ' + exact.name, 'orange')
+        toast('Sin stock: ' + exact.name, 'orange')
       } else {
         flashOnce(true)
         if (isMeasuredUnit(exact.unit)) setWeightModal({ product: exact, editIndex: null })
@@ -81,7 +83,7 @@ export function VentaPage() {
       }
     } else {
       flashOnce(false)
-      toast('❓ Código no registrado: ' + trimmed, 'orange')
+      toast('Código no registrado: ' + trimmed, 'orange')
       setSearch(trimmed)
     }
     if (cameraOpen) setCameraOpen(false)
@@ -103,9 +105,9 @@ export function VentaPage() {
       pickAndClear(exact)
       return
     }
-    const matches = searchMatches(products, search)
+    const matches = dropdownMatches
     if (!matches.length) {
-      toast('❌ Producto no encontrado', 'orange')
+      toast('Producto no encontrado', 'orange')
       return
     }
     if (matches.length === 1) {
@@ -116,7 +118,7 @@ export function VentaPage() {
   }
 
   function handleSearchKeyDown(e: KeyboardEvent<HTMLInputElement>) {
-    const matches = searchMatches(products, search)
+    const matches = dropdownMatches
     if (e.key === 'ArrowDown') {
       e.preventDefault()
       setDdFocus((f) => Math.min(f + 1, matches.length - 1))
@@ -148,63 +150,68 @@ export function VentaPage() {
 
   return (
     <div className="mx-auto flex h-full max-w-[1800px] flex-col">
-      <ClientBar onOpen={() => setPickerOpen(true)} />
-      <VentaKpiBar onClickLowStock={() => setLowStockOnly(true)} />
+      {/* Left column carries everything that builds the sale (client, KPIs, search, grid); the
+       * cart is a standalone right column spanning the full height, not boxed under a shared
+       * header row — it's the thing the cashier watches the whole time. */}
+      <div className="flex min-h-0 flex-1 overflow-hidden">
+        <div className="flex w-[52%] flex-shrink-0 flex-col overflow-hidden md:w-[56%] xl:w-[58%]">
+          <ClientBar onOpen={() => setPickerOpen(true)} />
+          <VentaKpiBar onClickLowStock={() => setLowStockOnly(true)} />
 
-      <div className="flex flex-shrink-0 gap-2 px-3 py-2 md:px-4">
-        <div className="relative flex-1">
-          <input
-            id="venta-search-input"
-            ref={searchRef}
-            value={search}
-            onChange={(e) => {
-              setSearch(e.target.value)
-              setDdFocus(-1)
-            }}
-            onKeyDown={handleSearchKeyDown}
-            placeholder="🔍  Buscar producto por nombre o código..."
-            autoComplete="off"
-            className="input md:h-[42px] md:text-[15px]"
-          />
-          <SearchDropdown matches={searchMatches(products, search)} query={search} focusIndex={ddFocus} onHover={setDdFocus} onSelect={pickAndClear} />
-        </div>
-        <button
-          onClick={() => setCameraOpen(true)}
-          title="Escanear código"
-          className="flex h-[42px] w-11 flex-shrink-0 items-center justify-center rounded-[10px] border border-br2 bg-s2 text-lime transition-colors hover:border-lime/40 hover:bg-s3"
-        >
-          📷
-        </button>
-        <button
-          onClick={() => setCalcOpen((o) => !o)}
-          title="Calculadora"
-          className="flex h-[42px] w-11 flex-shrink-0 items-center justify-center rounded-[10px] border border-br2 bg-s2 text-blue transition-colors hover:border-blue/40 hover:bg-s3"
-        >
-          🧮
-        </button>
-      </div>
+          <div className="flex flex-shrink-0 gap-2 px-3 py-2 md:px-4">
+            <div className="relative flex-1">
+              <input
+                id="venta-search-input"
+                ref={searchRef}
+                value={search}
+                onChange={(e) => {
+                  setSearch(e.target.value)
+                  setDdFocus(-1)
+                }}
+                onKeyDown={handleSearchKeyDown}
+                placeholder="Buscar producto por nombre o código..."
+                autoComplete="off"
+                className="input md:h-[42px] md:text-[15px]"
+              />
+              <SearchDropdown matches={dropdownMatches} query={search} focusIndex={ddFocus} onHover={setDdFocus} onSelect={pickAndClear} />
+            </div>
+            <button
+              onClick={() => setCameraOpen(true)}
+              title="Escanear código"
+              className="flex h-[42px] w-11 flex-shrink-0 items-center justify-center rounded-[10px] border border-br2 bg-s2 text-lime transition-colors hover:border-lime/40 hover:bg-s3"
+            >
+              <Camera size={19} />
+            </button>
+            <button
+              onClick={() => setCalcOpen((o) => !o)}
+              title="Calculadora"
+              className="flex h-[42px] w-11 flex-shrink-0 items-center justify-center rounded-[10px] border border-br2 bg-s2 text-blue transition-colors hover:border-blue/40 hover:bg-s3"
+            >
+              <Calculator size={19} />
+            </button>
+          </div>
 
-      {lowStockOnly && (
-        <button
-          onClick={() => setLowStockOnly(false)}
-          className="mx-3 mb-2 flex-shrink-0 rounded-lg border border-orange/30 bg-orange/10 px-3 py-1.5 text-left text-[12px] text-orange transition-colors hover:bg-orange/15 md:mx-4"
-        >
-          ⚠ Mostrando solo stock bajo — toca para quitar el filtro
-        </button>
-      )}
+          {lowStockOnly && (
+            <button
+              onClick={() => setLowStockOnly(false)}
+              className="mx-3 mb-2 flex-shrink-0 rounded-lg border border-orange/30 bg-orange/10 px-3 py-1.5 text-left text-[12px] text-orange transition-colors hover:bg-orange/15 md:mx-4"
+            >
+              Mostrando solo stock bajo — toca para quitar el filtro
+            </button>
+          )}
 
-      <div className="flex min-h-0 flex-1 overflow-hidden border-t border-br">
-        <div className="w-[52%] flex-shrink-0 md:w-[56%] xl:w-[58%]">
-          <ProductGrid
-            products={products}
-            cart={items}
-            search={search}
-            activeCat={activeCat}
-            onSetCat={setActiveCat}
-            onPick={pickProduct}
-            onOpenFree={() => setFreeModal({ open: true, prefill: null })}
-            lowStockOnly={lowStockOnly}
-          />
+          <div className="min-h-0 flex-1 border-t border-br">
+            <ProductGrid
+              products={products}
+              cart={items}
+              search={search}
+              activeCat={activeCat}
+              onSetCat={setActiveCat}
+              onPick={pickProduct}
+              onOpenFree={() => setFreeModal({ open: true, prefill: null })}
+              lowStockOnly={lowStockOnly}
+            />
+          </div>
         </div>
         <div className="flex-1 overflow-hidden">
           <CartPanel products={products} onEditMeasured={handleEditMeasured} onOpenDiscount={() => setDiscOpen(true)} onCheckout={handleCheckout} />

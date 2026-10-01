@@ -15,6 +15,7 @@ import { auditLogRouter } from './routes/auditLog'
 import { entradasRouter } from './routes/entradas'
 import { settingsRouter } from './routes/settings'
 import { inventoryOpsRouter } from './routes/inventoryOps'
+import { usuariosRouter } from './routes/usuarios'
 
 const app = express()
 app.use(express.json())
@@ -29,6 +30,7 @@ app.use('/api/auditLog', auditLogRouter(db))
 app.use('/api/entradas', entradasRouter(db))
 app.use('/api/settings', settingsRouter(db))
 app.use('/api/inventory', inventoryOpsRouter(db))
+app.use('/api/usuarios', usuariosRouter(db))
 
 // Serve the Vite production build (npm run build) so the PC and any phone on the same WiFi hit
 // this one server for both the app shell and the API — no separate dev server needed for the

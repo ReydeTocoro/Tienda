@@ -10,7 +10,7 @@ interface ReporteXModalProps {
   onClose: () => void
 }
 
-const PAY_LABEL: Record<string, string> = { efectivo: '💵 Efectivo', transferencia: '📲 Transferencia', fiado: '📋 Fiado' }
+const PAY_LABEL: Record<string, string> = { efectivo: 'Efectivo', transferencia: 'Transferencia', fiado: 'Fiado' }
 
 /** Read-only partial reading — legacy `reporteX()` (index.html L5867-5934). Reuses the exact
  * same `computeDayAggregate` numbers as Reporte and Cierre Z. */
@@ -24,7 +24,7 @@ export function ReporteXModal({ open, dayKey, onClose }: ReporteXModalProps) {
   return (
     <BottomSheet open={open} onClose={onClose}>
       <div className="mb-1 flex items-center justify-between">
-        <div className="font-display text-[18px] font-bold text-blue">📊 Reporte X</div>
+        <div className="font-display text-[18px] font-bold text-blue">Reporte X</div>
         <span className="rounded-full border border-blue/30 bg-blue/10 px-2.5 py-0.5 text-[11px] font-bold text-blue">LECTURA PARCIAL</span>
       </div>
       <div className="mb-3.5 text-[12px] text-muted">No cierra la caja · Solo para consulta · Acumuladores siguen activos</div>
@@ -42,12 +42,12 @@ export function ReporteXModal({ open, dayKey, onClose }: ReporteXModalProps) {
           (m) => agg.payBreak[m] > 0 && <Row key={m} label={PAY_LABEL[m]} value={formatMoney(agg.payBreak[m])} />,
         )}
         <div className="my-2 border-t border-dashed border-br2" />
-        <Row label="✓ Cobrado en caja" value={formatMoney(agg.cobradoReal)} color="text-green" bold />
-        {agg.fiadoTotalDay > 0 && <Row label="📋 Fiado (pendiente)" value={formatMoney(agg.fiadoTotalDay)} color="text-red" />}
+        <Row label="Cobrado en caja" value={formatMoney(agg.cobradoReal)} color="text-green" bold />
+        {agg.fiadoTotalDay > 0 && <Row label="Fiado (pendiente)" value={formatMoney(agg.fiadoTotalDay)} color="text-red" />}
         <div className="my-2 border-t border-dashed border-br2" />
-        {agg.totalCompras > 0 && <Row label="↓ Compras proveedor" value={'-' + formatMoney(agg.totalCompras)} color="text-orange" />}
-        {agg.totalExOut > 0 && <Row label="↓ Egresos extra" value={'-' + formatMoney(agg.totalExOut)} color="text-orange" />}
-        {agg.totalExIn > 0 && <Row label="↑ Ingresos extra" value={'+' + formatMoney(agg.totalExIn)} color="text-lime" />}
+        {agg.totalCompras > 0 && <Row label="Compras proveedor" value={'-' + formatMoney(agg.totalCompras)} color="text-orange" />}
+        {agg.totalExOut > 0 && <Row label="Egresos extra" value={'-' + formatMoney(agg.totalExOut)} color="text-orange" />}
+        {agg.totalExIn > 0 && <Row label="Ingresos extra" value={'+' + formatMoney(agg.totalExIn)} color="text-lime" />}
         <div className="mt-2 flex justify-between border-t border-br2 pt-2 text-[14px] font-bold">
           <span>FLUJO NETO</span>
           <span className={agg.netDay >= 0 ? 'text-lime' : 'text-red'}>{formatMoney(agg.netDay)}</span>
@@ -64,7 +64,7 @@ export function ReporteXModal({ open, dayKey, onClose }: ReporteXModalProps) {
           Cerrar
         </button>
         <button onClick={() => window.print()} className="rounded-[10px] border border-blue/30 bg-blue/10 py-2.5 text-[13px] font-bold text-blue">
-          🖨 Imprimir
+          Imprimir
         </button>
       </div>
     </BottomSheet>

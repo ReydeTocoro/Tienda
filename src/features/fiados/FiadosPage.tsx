@@ -33,7 +33,7 @@ export function FiadosPage() {
 
   return (
     <div className="p-3.5 md:mx-auto md:max-w-[1400px] md:p-5">
-      <p className="mb-3.5 font-display text-[21px] font-bold md:mb-2.5 md:text-[22px]">📋 Fiados</p>
+      <p className="mb-3.5 font-display text-[21px] font-bold md:mb-2.5 md:text-[22px]">Fiados</p>
 
       <div className="mb-3.5 grid grid-cols-3 gap-2 md:max-w-lg md:gap-3">
         <StatBox label="Deudas" value={String(pendingGroups.length)} color="text-red" />
@@ -41,11 +41,10 @@ export function FiadosPage() {
         <StatBox label="Personas" value={String(pendingGroups.length)} color="text-blue" />
       </div>
 
-      <input className="search-input md:max-w-md" placeholder="🔍 Buscar por nombre o cédula..." value={search} onChange={(e) => setSearch(e.target.value)} />
+      <input className="search-input md:max-w-md" placeholder="Buscar por nombre o cédula..." value={search} onChange={(e) => setSearch(e.target.value)} />
 
       {!filtered.length ? (
         <div className="p-10 text-center text-muted">
-          <div className="mb-2.5 text-4xl">🎉</div>
           <p className="text-[13px]">Sin fiados pendientes</p>
         </div>
       ) : (
@@ -66,12 +65,12 @@ export function FiadosPage() {
                       <span className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full border-2 border-red/25 bg-red/10 text-[12px] text-red">
                         {initials(g.name)}
                       </span>
-                      {isPaid ? '✓ ' : ''}
+                      {isPaid ? '' : ''}
                       {g.name}
                     </div>
                     {c && (
                       <div className="ml-10 mt-0.5 text-[11px] text-muted">
-                        {c.cedula ? '🪪 ' + c.cedula + ' · ' : ''}
+                        {c.cedula ? c.cedula + ' · ' : ''}
                         {c.phone || ''}
                       </div>
                     )}

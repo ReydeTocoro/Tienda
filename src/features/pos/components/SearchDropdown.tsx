@@ -17,12 +17,12 @@ export function SearchDropdown({ matches, query, focusIndex, onHover, onSelect }
     <div className="absolute left-0 right-0 top-[calc(100%+4px)] z-[300] max-h-[300px] overflow-y-auto rounded-xl border border-br2 bg-s1 shadow-[var(--shadow-md)]">
       {!matches.length ? (
         <div className="p-4 text-center text-[13px] text-muted">
-          ❌ Sin resultados para "<b>{query}</b>"
+          Sin resultados para "<b>{query}</b>"
         </div>
       ) : (
         <>
           <div className="border-b border-br bg-s2 px-3.5 py-1.5 field-label">
-            {matches.length} resultado{matches.length !== 1 ? 's' : ''} — ↑↓ navegar · Enter seleccionar
+            {matches.length} resultado{matches.length !== 1 ? 's' : ''} — navegar · Enter seleccionar
           </div>
           {matches.map((p, i) => {
             const out = p.stock <= 0
@@ -43,7 +43,7 @@ export function SearchDropdown({ matches, query, focusIndex, onHover, onSelect }
                     out ? 'bg-red/10 text-red' : low ? 'bg-orange/10 text-orange' : 'bg-lime/10 text-lime'
                   }`}
                 >
-                  {out ? '✗' : p.stock}
+                  {out ? '0' : formatQty(p.stock)}
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="overflow-hidden text-ellipsis whitespace-nowrap text-[13px] font-semibold">{p.name}</div>
@@ -58,9 +58,9 @@ export function SearchDropdown({ matches, query, focusIndex, onHover, onSelect }
                     {measured ? `/${ul}` : ''}
                   </div>
                   <div className={`mt-0.5 text-[10px] ${out ? 'text-red' : low ? 'text-orange' : 'text-muted'}`}>
-                    {out ? '✗ Sin stock' : `${formatQty(p.stock)} ${ul}`}
+                    {out ? 'Sin stock' : `${formatQty(p.stock)} ${ul}`}
                   </div>
-                  {measured && <div className="mt-0.5 text-[10px] text-purple">⚖️ {unitFullName(p.unit)}</div>}
+                  {measured && <div className="mt-0.5 text-[10px] text-purple">{unitFullName(p.unit)}</div>}
                 </div>
               </div>
             )

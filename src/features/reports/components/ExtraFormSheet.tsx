@@ -19,7 +19,7 @@ export function ExtraFormSheet({ open, onClose }: ExtraFormSheetProps) {
     const d = desc.trim()
     const amt = parseFloat(amount) || 0
     if (!d || !amt) {
-      toast('⚠ Completa los campos', 'orange')
+      toast('Completa los campos', 'orange')
       return
     }
     await addExtra(d, amt, type)
@@ -27,8 +27,8 @@ export function ExtraFormSheet({ open, onClose }: ExtraFormSheetProps) {
     setAmount('')
     setType('egreso')
     onClose()
-    toast('✓ Registrado', 'default')
-  }
+    toast('Registrado', 'default')
+    }
 
   return (
     <BottomSheet open={open} onClose={onClose}>
@@ -44,8 +44,8 @@ export function ExtraFormSheet({ open, onClose }: ExtraFormSheetProps) {
       <div className="mb-3.5">
         <label className="mb-1 block field-label">Tipo</label>
         <select className="input" value={type} onChange={(e) => setType(e.target.value as ExtraType)}>
-          <option value="egreso">↓ Egreso (Gasto)</option>
-          <option value="ingreso">↑ Ingreso</option>
+          <option value="egreso">Egreso (Gasto)</option>
+          <option value="ingreso">Ingreso</option>
         </select>
       </div>
       <div className="flex gap-2">

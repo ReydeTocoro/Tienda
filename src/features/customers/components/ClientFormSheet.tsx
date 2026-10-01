@@ -38,20 +38,20 @@ export function ClientFormSheet({ open, customer, onClose, onSaved }: ClientForm
 
   async function save() {
     if (!f.name.trim()) {
-      toast('⚠ Escribe el nombre', 'orange')
+      toast('Escribe el nombre', 'orange')
       return
     }
     try {
       if (customer) {
         await updateCustomer(customer.id, f)
-        toast('✓ Cliente actualizado', 'lime')
+        toast('Cliente actualizado', 'lime')
       } else {
         await addCustomer(f)
-        toast('✓ Cliente agregado', 'lime')
+        toast('Cliente agregado', 'lime')
       }
       onSaved()
     } catch (err) {
-      toast('⚠ ' + (err instanceof Error ? err.message : String(err)), 'orange')
+      toast(err instanceof Error ? err.message : String(err), 'orange')
     }
   }
 
@@ -64,7 +64,7 @@ export function ClientFormSheet({ open, customer, onClose, onSaved }: ClientForm
           <input className="input" value={f.name} onChange={(e) => set('name', e.target.value)} placeholder="Nombre del cliente" autoFocus />
         </div>
         <div className="flex flex-col gap-1">
-          <label className="field-label">🪪 Cédula / ID</label>
+          <label className="field-label">Cédula / ID</label>
           <input className="input" value={f.cedula} onChange={(e) => set('cedula', e.target.value)} placeholder="Número de cédula" />
         </div>
         <div className="flex flex-col gap-1">

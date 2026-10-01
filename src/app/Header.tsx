@@ -29,24 +29,24 @@ export function Header() {
     if (!name) return
     await updateSettings({ storeName: name })
     setEditOpen(false)
-    toast('✓ Nombre actualizado', 'lime')
+    toast('Nombre actualizado', 'lime')
   }
 
   async function toggleTheme() {
     const next = settings?.theme === 'light' ? 'dark' : 'light'
     await updateSettings({ theme: next })
-    toast(next === 'light' ? '☀️ Modo claro' : '🌙 Modo oscuro', 'default')
+    toast(next === 'light' ? 'Modo claro' : 'Modo oscuro', 'default')
   }
 
   return (
     <header className="z-50 flex flex-shrink-0 items-center justify-between border-b border-br bg-s1 px-4 py-2.5 md:px-6 md:py-3">
       <button onClick={openEdit} className="text-left transition-opacity hover:opacity-80" title="Clic para cambiar el nombre">
-        <h1 className="font-display text-[17px] font-black text-lime md:text-[19px]">🏪 {settings?.storeName ?? 'Mi Tienda Pro'}</h1>
+        <h1 className="font-display text-[17px] font-black text-lime md:text-[19px]">{settings?.storeName ?? 'Mi Tienda Pro'}</h1>
         <div className="mt-px tracking-widest field-label">Sistema de caja</div>
       </button>
       <div className="flex items-center gap-2.5 md:gap-4">
         <button onClick={toggleTheme} title="Cambiar tema" className="text-[17px] leading-none opacity-70 transition-opacity hover:opacity-100">
-          {settings?.theme === 'light' ? '☀️' : '🌙'}
+          {settings?.theme === 'light' ? '' : ''}
         </button>
         <div className="text-right font-mono text-[11px] text-txt2">
           <div>{now.toLocaleDateString('es', { weekday: 'short', day: 'numeric', month: 'short' })}</div>

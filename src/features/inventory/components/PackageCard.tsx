@@ -1,4 +1,5 @@
 import { useLiveQuery } from 'dexie-react-hooks'
+import { Pencil, Trash2 } from 'lucide-react'
 import { db } from '../../../db/index'
 import type { Product } from '../../../types/product'
 import { formatMoney, formatQty } from '../../../shared/lib/currency'
@@ -26,34 +27,34 @@ export function PackageCard({ product: p, onEdit, onDelete }: PackageCardProps) 
   const { requireAdmin } = usePermission()
 
   async function handleAbrir() {
-    const ok = await requireAdmin('🔐 Abrir Paquete', 'Se requiere PIN para convertir un paquete en unidades sueltas')
+    const ok = await requireAdmin('Abrir Paquete', 'Se requiere PIN para convertir un paquete en unidades sueltas')
     if (!ok) return
     try {
       const r = await openPackage(p.code, 1)
-      toast(`📦 Abierto → +${r.nuevasSueltas} "${r.sueltaName}"`, 'purple')
+      toast(`Abierto +${r.nuevasSueltas} "${r.sueltaName}"`, 'purple')
     } catch (err) {
-      toast('⚠ ' + (err instanceof Error ? err.message : String(err)), 'red')
+      toast(err instanceof Error ? err.message : String(err), 'red')
     }
   }
 
   async function handleVenderUnidad() {
-    const ok = await requireAdmin('🔐 Vender Unidad Suelta', 'Se requiere PIN para descontar stock')
+    const ok = await requireAdmin('Vender Unidad Suelta', 'Se requiere PIN para descontar stock')
     if (!ok) return
     try {
       await sellLooseUnit(p.code)
     } catch (err) {
-      toast('⚠ ' + (err instanceof Error ? err.message : String(err)), 'red')
+      toast(err instanceof Error ? err.message : String(err), 'red')
     }
   }
 
   async function handleVenderPaquete() {
-    const ok = await requireAdmin('🔐 Vender Paquete', 'Se requiere PIN para descontar stock')
+    const ok = await requireAdmin('Vender Paquete', 'Se requiere PIN para descontar stock')
     if (!ok) return
     try {
       await sellWholePackage(p.code)
-      toast(`📤 Vendido 1 paquete "${p.name}"`, 'blue')
+      toast(`Vendido 1 paquete "${p.name}"`, 'blue')
     } catch (err) {
-      toast('⚠ ' + (err instanceof Error ? err.message : String(err)), 'red')
+      toast(err instanceof Error ? err.message : String(err), 'red')
     }
   }
 
@@ -63,7 +64,7 @@ export function PackageCard({ product: p, onEdit, onDelete }: PackageCardProps) 
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-1.5 text-[15px] font-bold">
             {p.name}
-            <span className="rounded-md border border-purple/25 bg-purple/10 px-1.5 py-0.5 text-[10px] font-bold text-purple">📦 ×{p.unidadesPor}</span>
+            <span className="rounded-md border border-purple/25 bg-purple/10 px-1.5 py-0.5 text-[10px] font-bold text-purple">×{p.unidadesPor}</span>
           </div>
           <div className="mt-0.5 font-mono text-[11px] text-muted">
             {p.code}
@@ -72,31 +73,31 @@ export function PackageCard({ product: p, onEdit, onDelete }: PackageCardProps) 
           </div>
         </div>
         <div className="ml-2 flex flex-shrink-0 gap-1.5">
-          <button onClick={onEdit} className="rounded-[8px] border border-br2 px-2.5 py-1 text-[12px] text-txt2 transition-colors hover:border-lime/40 hover:text-lime">
-            ✏
+          <button onClick={onEdit} className="rounded-[8px] border border-br2 px-2.5 py-1 text-txt2 transition-colors hover:border-lime/40 hover:text-lime">
+            <Pencil size={14} />
           </button>
-          <button onClick={onDelete} className="rounded-[8px] bg-red px-2.5 py-1 text-[12px] text-white transition-opacity hover:opacity-85">
-            🗑
+          <button onClick={onDelete} className="rounded-[8px] bg-red px-2.5 py-1 text-white transition-opacity hover:opacity-85">
+            <Trash2 size={14} />
           </button>
         </div>
       </div>
 
       <div className="mb-3 grid grid-cols-2 gap-2.5">
         <div className={`rounded-[14px] border-2 bg-purple/10 p-3 text-center ${lowPaq ? 'border-red' : 'border-purple/25'}`}>
-          <div className="mb-1 text-[10px] font-bold uppercase tracking-wider text-purple">📦 Paquetes</div>
+          <div className="mb-1 text-[10px] font-bold uppercase tracking-wider text-purple">Paquetes</div>
           <div className={`font-mono text-[32px] font-extrabold ${lowPaq ? 'text-red' : 'text-purple'}`}>{formatQty(p.stock)}</div>
           <div className="mt-0.5 text-[10px] text-muted">
             × {p.unidadesPor} u/paq · {formatMoney(p.price)} c/u
           </div>
-          {lowPaq && <div className="mt-0.5 text-[10px] font-bold text-red">⚠ Stock bajo</div>}
+          {lowPaq && <div className="mt-0.5 text-[10px] font-bold text-red">Stock bajo</div>}
         </div>
         <div className={`rounded-[14px] border-2 bg-green/10 p-3 text-center ${lowSuel ? 'border-orange' : 'border-green/30'}`}>
-          <div className="mb-1 text-[10px] font-bold uppercase tracking-wider text-green">🔓 Sueltas</div>
-          <div className={`font-mono text-[32px] font-extrabold ${lowSuel ? 'text-orange' : 'text-green'}`}>{qSueltas}</div>
+          <div className="mb-1 text-[10px] font-bold uppercase tracking-wider text-green">Sueltas</div>
+          <div className={`font-mono text-[32px] font-extrabold ${lowSuel ? 'text-orange' : 'text-green'}`}>{formatQty(qSueltas)}</div>
           <div className="mt-0.5 text-[10px] text-muted">
             {p.nombreSuelta || 'unidad'} · {formatMoney(p.precioSuelta || 0)} c/u
           </div>
-          {lowSuel && <div className="mt-0.5 text-[10px] font-bold text-orange">⚠ Pocas sueltas</div>}
+          {lowSuel && <div className="mt-0.5 text-[10px] font-bold text-orange">Pocas sueltas</div>}
         </div>
       </div>
 
@@ -106,7 +107,7 @@ export function PackageCard({ product: p, onEdit, onDelete }: PackageCardProps) 
           disabled={p.stock <= 0}
           className="rounded-[11px] border-2 border-purple/30 bg-purple/10 px-1.5 py-2.5 text-[12px] font-bold text-purple transition-colors hover:bg-purple/20 disabled:pointer-events-none disabled:opacity-40"
         >
-          📦 Abrir
+          Abrir
           <br />
           <span className="text-[10px] font-normal opacity-80">paquete</span>
         </button>
@@ -115,7 +116,7 @@ export function PackageCard({ product: p, onEdit, onDelete }: PackageCardProps) 
           disabled={qSueltas <= 0 && p.stock <= 0}
           className="rounded-[11px] border-2 border-green/30 bg-green/10 px-1.5 py-2.5 text-[12px] font-bold text-green transition-colors hover:bg-green/20 disabled:pointer-events-none disabled:opacity-40"
         >
-          🔓 Vender
+          Vender
           <br />
           <span className="text-[10px] font-normal opacity-80">unidad</span>
         </button>
@@ -124,7 +125,7 @@ export function PackageCard({ product: p, onEdit, onDelete }: PackageCardProps) 
           disabled={p.stock <= 0}
           className="rounded-[11px] border-2 border-blue/30 bg-blue/10 px-1.5 py-2.5 text-[12px] font-bold text-blue transition-colors hover:bg-blue/20 disabled:pointer-events-none disabled:opacity-40"
         >
-          📤 Vender
+          Vender
           <br />
           <span className="text-[10px] font-normal opacity-80">paquete</span>
         </button>
@@ -132,10 +133,10 @@ export function PackageCard({ product: p, onEdit, onDelete }: PackageCardProps) 
 
       <div className="flex flex-wrap justify-between gap-2 rounded-[10px] bg-s2 px-2.5 py-2 text-[11px]">
         <span>
-          💰 Paquete: <b className="font-mono text-lime">{formatMoney(p.price)}</b>
+          Paquete: <b className="font-mono text-lime">{formatMoney(p.price)}</b>
         </span>
         <span>
-          🔓 Suelta: <b className="font-mono text-green">{formatMoney(p.precioSuelta || 0)}</b>
+          Suelta: <b className="font-mono text-green">{formatMoney(p.precioSuelta || 0)}</b>
         </span>
         {p.cost > 0 && (
           <span>

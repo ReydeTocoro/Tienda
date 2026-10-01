@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { getSettings, updateSettings } from '../../db/repositories/settings'
-import { sha256 } from '../../shared/lib/pin'
 import { usePinStore } from '../../store/usePinStore'
 
 export const PIN_MAX_ATTEMPTS = 5
@@ -23,12 +22,6 @@ export function usePinGate() {
     return () => clearInterval(t)
   }, [isLocked])
 
-  const checkPin = useCallback(async (entered: string): Promise<boolean> => {
-    const s = await getSettings()
-    const hash = await sha256(entered)
-    return hash === s.pinHash
-  }, [])
-
   const registerFailure = useCallback(async (): Promise<{ attempts: number; lockedNow: boolean }> => {
     const attempts = usePinStore.getState().incAttempts()
     if (attempts >= PIN_MAX_ATTEMPTS) {
@@ -47,7 +40,6 @@ export function usePinGate() {
     pinLength: settings?.pinLength ?? 4,
     isLocked,
     remainingSecs: Math.max(0, Math.ceil((lockedUntil - now) / 1000)),
-    checkPin,
     registerFailure,
     registerSuccess,
   }

@@ -27,11 +27,11 @@ export function useFinalizeSale() {
   return async function finalize(): Promise<Sale | null> {
     const cart = useCartStore.getState()
     if (!cart.items.length) {
-      toast('⚠ Carrito vacío', 'orange')
+      toast('Carrito vacío', 'orange')
       return null
     }
     if (cart.payMethod === 'fiado' && !cart.fiadoName.trim() && !cart.customerId) {
-      toast('⚠ Escribe el nombre del cliente fiado', 'orange')
+      toast('Escribe el nombre del cliente fiado', 'orange')
       return null
     }
 
@@ -44,7 +44,7 @@ export function useFinalizeSale() {
     const roundingAdjustment = chargeAmount - total
 
     if (cart.payMethod === 'efectivo' && cart.amountReceived > 0 && cart.amountReceived < chargeAmount) {
-      toast('⚠ El efectivo recibido no alcanza el total', 'orange')
+      toast('El efectivo recibido no alcanza el total', 'orange')
       return null
     }
 
@@ -68,12 +68,12 @@ export function useFinalizeSale() {
     } catch (err) {
       // The server re-checks stock at finalize time (two devices could sell the same last kg at
       // once) — this is the one place that rejection actually surfaces to the cashier.
-      toast('⚠ ' + (err instanceof Error ? err.message : String(err)), 'orange')
+      toast(err instanceof Error ? err.message : String(err), 'orange')
       return null
     }
 
     cart.clear()
-    toast('✓ Venta registrada', 'green')
+    toast('Venta registrada', 'green')
     return sale
   }
 }

@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { X } from 'lucide-react'
 
 interface CalculatorModalProps {
   open: boolean
@@ -84,9 +85,9 @@ export function CalculatorModal({ open, onClose, onUseAsPrice }: CalculatorModal
     <div className="fixed bottom-[70px] right-3.5 z-[3000] animate-[sheetUp_0.2s_ease] md:bottom-6 md:right-6" onClick={(e) => e.stopPropagation()}>
       <div className="w-[240px] overflow-hidden rounded-[20px] border border-br2 bg-s1 shadow-[var(--shadow-md)]">
         <div className="flex items-center justify-between border-b border-br bg-s1 px-3 py-1.5">
-          <span className="text-[11px] font-semibold text-txt2">🧮 Calculadora</span>
-          <button onClick={onClose} className="text-[13px] text-muted">
-            ✕
+          <span className="text-[11px] font-semibold text-txt2">Calculadora</span>
+          <button onClick={onClose} className="text-muted">
+            <X size={14} />
           </button>
         </div>
         <div className="border-b border-br bg-s2 px-4 py-3.5">
@@ -116,7 +117,7 @@ export function CalculatorModal({ open, onClose, onUseAsPrice }: CalculatorModal
             onClick={() => onUseAsPrice(parseFloat(num) || 0)}
             className="w-full rounded-[10px] border border-blue/30 bg-blue/10 py-2 text-[12px] font-bold text-blue"
           >
-            🏷️ Usar como precio en Producto libre
+            Usar como precio en Producto libre
           </button>
         </div>
       </div>

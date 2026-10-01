@@ -1,5 +1,6 @@
 import * as XLSX from 'xlsx'
 import type { Product } from '../../../types/product'
+import { findUnit } from '../../../types/unit'
 
 export interface ParsedImportRow {
   code: string
@@ -98,9 +99,17 @@ export function buildParsedRows(rawRows: Record<string, string>[], existingProdu
     const stock = parseFloat(get(row, 'stock', 'existencia', 'qty', 'quantity', 'cantidad', 'inventario')) || 0
     const min = parseFloat(get(row, 'stock mínimo', 'stock_minimo', 'min', 'minimo', 'minimum', 'stock min')) || 0
 
+    // Only an exact known unit code (kg, lb, L...) gets conversions/pricePer in the cart — an
+    // unrecognized spelling (e.g. "Kilogramo", "KG ") would otherwise silently import as a
+    // measured product with no working conversions, so fall back to 'unidad' and flag it.
+    const rawUnit = get(row, 'unidad', 'unit')
+    const matchedUnit = rawUnit ? findUnit(rawUnit.toLowerCase())?.value : undefined
+    const unit = matchedUnit ?? 'unidad'
+
     const warnings: string[] = []
     if (!price) warnings.push('sin precio')
     if (stock < 0) warnings.push('stock negativo')
+    if (rawUnit && !matchedUnit) warnings.push(`unidad "${rawUnit}" no reconocida, se usó "unidad"`)
 
     const existing = existingByCode.get(finalCode)
 
@@ -109,7 +118,7 @@ export function buildParsedRows(rawRows: Record<string, string>[], existingProdu
       name,
       brand: get(row, 'marca', 'brand'),
       cat: get(row, 'categoría', 'categoria', 'category', 'cat'),
-      unit: get(row, 'unidad', 'unit') || 'unidad',
+      unit,
       price,
       cost,
       stock,

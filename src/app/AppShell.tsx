@@ -13,9 +13,9 @@ import { useScannerStore } from '../store/useScannerStore'
 import { startSync } from '../sync'
 
 /** Mobile: header on top, single content column, thumb bar (`BottomNav`) at the bottom.
- * Desktop (`md:` and up): `Sidebar` takes over as the nav chrome instead, sitting beside the
- * content column under the same header — the one breakpoint switch every page inherits for
- * free, so individual pages only need to worry about their own internal layout. */
+ * Desktop (`md:` and up): `DesktopTabs` takes over as the nav chrome instead, a horizontal tab
+ * strip above the header — the one breakpoint switch every page inherits for free, so individual
+ * pages only need to worry about their own internal layout. */
 export function AppShell() {
   useKeyboardShortcuts()
 

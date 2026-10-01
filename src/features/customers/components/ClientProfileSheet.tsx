@@ -18,9 +18,9 @@ interface ClientProfileSheetProps {
 }
 
 const NEXT_TIER: Array<{ threshold: number; label: string }> = [
-  { threshold: 200, label: '🥉 Bronce' },
-  { threshold: 1000, label: '🥈 Plata' },
-  { threshold: 5000, label: '🥇 Oro' },
+  { threshold: 200, label: 'Bronce' },
+  { threshold: 1000, label: 'Plata' },
+  { threshold: 5000, label: 'Oro' },
 ]
 
 /** Customer profile — legacy `openProfile()` (index.html L4472-4530). */
@@ -58,7 +58,7 @@ export function ClientProfileSheet({ customer, onClose, onEdit, onSell }: Client
           <div>
             <div className="font-display text-[19px] font-bold">{customer.name}</div>
             <div className="mt-0.5 text-[11px] text-muted">Cliente desde {formatDate(customer.createdAt)}</div>
-            {customer.cedula && <div className="mt-0.5 text-[12px] text-txt2">🪪 {customer.cedula}</div>}
+            {customer.cedula && <div className="mt-0.5 text-[12px] text-txt2">{customer.cedula}</div>}
             <span className={`mt-1 inline-flex rounded-full border px-2 py-0.5 text-[11px] font-semibold ${stats.tier.badgeClass}`}>{stats.tier.label}</span>
           </div>
         </div>
@@ -71,25 +71,25 @@ export function ClientProfileSheet({ customer, onClose, onEdit, onSell }: Client
 
         <div className="mb-3.5">
           <div className="mb-1.5 flex justify-between text-[11px] text-muted">
-            <span>⭐ {formatQty(stats.pts)} puntos</span>
-            <span>{stats.next ? `Próx: ${stats.next.label} (−${formatMoney(stats.next.threshold - stats.spent)})` : '¡Nivel máximo! 🏆'}</span>
+            <span>{formatQty(stats.pts)} puntos</span>
+            <span>{stats.next ? `Próx: ${stats.next.label} (−${formatMoney(stats.next.threshold - stats.spent)})` : '¡Nivel máximo!'}</span>
           </div>
           <div className="h-1.5 overflow-hidden rounded-full bg-s3">
             <div className="h-full rounded-full bg-gradient-to-r from-lime to-orange" style={{ width: `${stats.barPct}%` }} />
           </div>
           <div className={`mt-1.5 text-[12px] ${stats.pts >= 50 ? 'text-purple' : 'text-muted'}`}>
-            {stats.pts >= 50 ? '🎁 Tiene descuento disponible al cobrar' : `Faltan ${formatQty(50 - stats.pts)} pts para obtener descuento`}
+            {stats.pts >= 50 ? 'Tiene descuento disponible al cobrar' : `Faltan ${formatQty(50 - stats.pts)} pts para obtener descuento`}
           </div>
         </div>
 
         {stats.fav && (
           <div className="mb-2 text-[13px] text-txt2">
-            ❤️ Favorito: <b>{stats.fav[0]}</b> ({stats.fav[1]} uds)
+            Favorito: <b>{stats.fav[0]}</b> ({stats.fav[1]} uds)
           </div>
         )}
-        {customer.phone && <div className="mb-1.5 text-[13px] text-txt2">📱 {customer.phone}</div>}
-        {customer.email && <div className="mb-1.5 text-[13px] text-txt2">✉️ {customer.email}</div>}
-        {customer.notes && <div className="mb-2.5 text-[13px] text-txt2">📝 {customer.notes}</div>}
+        {customer.phone && <div className="mb-1.5 text-[13px] text-txt2">{customer.phone}</div>}
+        {customer.email && <div className="mb-1.5 text-[13px] text-txt2">{customer.email}</div>}
+        {customer.notes && <div className="mb-2.5 text-[13px] text-txt2">{customer.notes}</div>}
 
         {stats.recent.length > 0 && (
           <>
@@ -119,10 +119,10 @@ export function ClientProfileSheet({ customer, onClose, onEdit, onSell }: Client
             Cerrar
           </button>
           <button onClick={onEdit} className="flex-1 rounded-[10px] border border-br2 py-2.5 text-[13px] text-txt2">
-            ✏ Editar
+            Editar
           </button>
           <button onClick={onSell} className="flex-1 rounded-[10px] bg-lime py-2.5 text-[13px] font-bold text-black">
-            🛒 Vender
+            Vender
           </button>
         </div>
       </BottomSheet>

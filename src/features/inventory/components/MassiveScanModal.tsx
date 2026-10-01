@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react'
+import { PauseCircle } from 'lucide-react'
 import type { Product } from '../../../types/product'
 import { useBarcodeScanner } from '../../../shared/hooks/useBarcodeScanner'
 import { confirmEntradasBulk } from '../../../db/repositories/entradas'
@@ -90,12 +91,12 @@ export function MassiveScanModal({ open, onClose, products }: MassiveScanModalPr
   function saveNewProduct() {
     if (!pendingCode) return
     if (!newName.trim()) {
-      toast('⚠ Escribe el nombre', 'orange')
+      toast('Escribe el nombre', 'orange')
       return
     }
     const price = parseFloat(newPrice) || 0
     if (!price) {
-      toast('⚠ Escribe el precio', 'orange')
+      toast('Escribe el precio', 'orange')
       return
     }
     addToLog(pendingCode, newName.trim(), true, { price, cost: parseFloat(newCost) || 0, cat: newCat.trim() })
@@ -148,11 +149,11 @@ export function MassiveScanModal({ open, onClose, products }: MassiveScanModalPr
         log.map((e) => ({ code: e.code, qty: e.qty })),
         'masivo',
       )
-      toast(`✓ ${formatQty(totalUnidades)} ud${totalUnidades !== 1 ? 's' : ''} agregadas a ${log.length} producto${log.length !== 1 ? 's' : ''}`, 'green')
+      toast(`${formatQty(totalUnidades)} ud${totalUnidades !== 1 ? 's' : ''} agregadas a ${log.length} producto${log.length !== 1 ? 's' : ''}`, 'green')
       setLog([])
       onClose()
     } catch (err) {
-      toast('⚠ ' + (err instanceof Error ? err.message : String(err)), 'orange')
+      toast(err instanceof Error ? err.message : String(err), 'orange')
     } finally {
       setBusy(false)
     }
@@ -166,11 +167,11 @@ export function MassiveScanModal({ open, onClose, products }: MassiveScanModalPr
     <div className="fixed inset-0 z-[3000] flex flex-col bg-bg">
       <div className="flex flex-shrink-0 items-center gap-3 border-b border-br bg-s1 px-4 py-3">
         <button onClick={onClose} className="flex-shrink-0 rounded-[10px] border border-br2 bg-s2 px-3 py-1.5 text-[13px] font-bold text-txt2">
-          ✕ Cerrar
+          Cerrar
         </button>
         <div className="min-w-0 flex-1">
-          <div className="font-display text-[16px] font-bold text-green">📦 Escaneo Masivo de Stock</div>
-          <div className="text-[11px] text-muted">{pendingCode ? '⏸ Código nuevo — completa los datos' : 'Apunta al código de barras'}</div>
+          <div className="font-display text-[16px] font-bold text-green">Escaneo Masivo de Stock</div>
+          <div className="text-[11px] text-muted">{pendingCode ? 'Código nuevo — completa los datos' : 'Apunta al código de barras'}</div>
         </div>
         <div className="flex flex-shrink-0 items-center gap-4">
           <div className="text-center">
@@ -190,13 +191,13 @@ export function MassiveScanModal({ open, onClose, products }: MassiveScanModalPr
           onClick={() => switchMode('cam')}
           className={`rounded-[10px] border px-3.5 py-1.5 text-[12px] font-bold ${mode === 'cam' ? 'border-green/40 bg-green/15 text-green' : 'border-br2 text-txt2'}`}
         >
-          📷 Cámara
+          Cámara
         </button>
         <button
           onClick={() => switchMode('hid')}
           className={`rounded-[10px] border px-3.5 py-1.5 text-[12px] font-bold ${mode === 'hid' ? 'border-green/40 bg-green/15 text-green' : 'border-br2 text-txt2'}`}
         >
-          📡 Lector USB/HID
+          Lector USB/HID
         </button>
       </div>
 
@@ -210,7 +211,7 @@ export function MassiveScanModal({ open, onClose, products }: MassiveScanModalPr
           {pendingCode && (
             <div className="absolute inset-0 flex items-center justify-center bg-black/70">
               <div className="text-center text-white">
-                <div className="mb-2 text-3xl">⏸</div>
+                <PauseCircle size={32} className="mx-auto mb-2" />
                 <div className="text-[13px] font-semibold">Completar producto nuevo</div>
               </div>
             </div>
@@ -220,7 +221,6 @@ export function MassiveScanModal({ open, onClose, products }: MassiveScanModalPr
         <div className="flex-shrink-0 border-b border-br bg-s2 px-6 py-5">
           <div className="flex min-h-[70px] items-center justify-center rounded-[14px] border-2 border-br2 bg-s1 px-5 py-4">
             <div className="text-center">
-              <div className="mb-1 text-3xl">📡</div>
               <div className="text-[13px] text-muted">Apunta el lector al código de barras</div>
             </div>
           </div>
@@ -230,7 +230,6 @@ export function MassiveScanModal({ open, onClose, products }: MassiveScanModalPr
       {pendingCode && (
         <div className="flex-shrink-0 border-b border-br bg-s2 px-4 py-3">
           <div className="mb-2.5 flex items-center gap-2">
-            <span className="text-[18px]">🆕</span>
             <div>
               <div className="text-[13px] font-bold text-orange">Código nuevo detectado</div>
               <div className="text-[11px] text-muted">{pendingCode}</div>
@@ -244,7 +243,7 @@ export function MassiveScanModal({ open, onClose, products }: MassiveScanModalPr
           </div>
           <div className="flex gap-2">
             <button onClick={saveNewProduct} className="flex-[2] rounded-[10px] bg-lime py-2.5 text-[14px] font-extrabold text-black">
-              ✓ Guardar y continuar
+              Guardar y continuar
             </button>
             <button onClick={skipUnknown} className="flex-1 rounded-[10px] border border-br2 py-2.5 text-[13px] text-txt2">
               Ignorar
@@ -257,7 +256,6 @@ export function MassiveScanModal({ open, onClose, products }: MassiveScanModalPr
         <div className="mb-2.5 field-label">Productos escaneados</div>
         {!log.length ? (
           <div className="py-10 text-center text-muted">
-            <div className="mb-2.5 text-4xl">📦</div>
             <div className="mb-1 text-[13px] font-semibold">Sin productos escaneados</div>
             <div className="text-[12px]">Escanea con la cámara o el lector USB para comenzar</div>
           </div>
@@ -279,7 +277,7 @@ export function MassiveScanModal({ open, onClose, products }: MassiveScanModalPr
                 </div>
                 <div className="flex-shrink-0 text-right font-mono text-[11px] text-muted">
                   Stock: {stockActual}
-                  <div className="text-lime">→ {stockActual + e.qty}</div>
+                  <div className="text-lime">{stockActual + e.qty}</div>
                 </div>
               </div>
             )
@@ -291,16 +289,16 @@ export function MassiveScanModal({ open, onClose, products }: MassiveScanModalPr
         {log.length > 0 && (
           <>
             <button onClick={undoLast} className="flex-shrink-0 rounded-[10px] border border-red/30 bg-red/10 px-4 py-2.5 text-[13px] font-bold text-red">
-              ↩ Deshacer
+              Deshacer
             </button>
             <button onClick={clearAll} className="flex-shrink-0 rounded-[10px] border border-br2 px-3.5 py-2.5 text-[12px] text-muted">
-              🗑 Limpiar
+              Limpiar
             </button>
           </>
         )}
         {log.length > 0 ? (
           <button disabled={busy} onClick={finalize} className="flex-1 rounded-xl bg-green py-3 text-[15px] font-extrabold text-black disabled:opacity-60">
-            ✓ Guardar todo al stock
+            Guardar todo al stock
           </button>
         ) : (
           <div className="flex-1 rounded-xl border border-dashed border-br2 bg-s2 py-3 text-center text-[13px] text-muted">Escanea un producto para comenzar</div>

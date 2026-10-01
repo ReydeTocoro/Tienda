@@ -1,4 +1,5 @@
 import { useLiveQuery } from 'dexie-react-hooks'
+import { X } from 'lucide-react'
 import { listAuditLog } from '../../../db/repositories/auditLog'
 import { BottomSheet } from '../../../shared/components/BottomSheet'
 import { formatDateTime } from '../../../shared/lib/currency'
@@ -9,10 +10,10 @@ interface AuditLogModalProps {
 }
 
 const TYPE_LABEL: Record<string, string> = {
-  merma: '📉 Merma',
-  ajuste: '📊 Ajuste',
-  importacion: '📥 Importación',
-  correccion_venta: '✏️ Corrección de venta',
+  merma: 'Merma',
+  ajuste: 'Ajuste',
+  importacion: 'Importación',
+  correccion_venta: 'Corrección de venta',
 }
 
 /** Read-only audit trail viewer — legacy `renderAuditList()` (index.html L5830-5862). */
@@ -25,17 +26,16 @@ export function AuditLogModal({ open, onClose }: AuditLogModalProps) {
     <BottomSheet open={open} onClose={onClose} maxWidthClass="max-w-[720px]">
       <div className="mb-3.5 flex items-center justify-between">
         <div>
-          <p className="font-display text-[18px] font-bold">📋 Log de Auditoría</p>
+          <p className="font-display text-[18px] font-bold">Log de Auditoría</p>
           <p className="mt-0.5 text-[12px] text-muted">Registro inalterable de todos los ajustes de inventario</p>
         </div>
-        <button onClick={onClose} className="rounded-lg border border-br2 bg-s2 px-3 py-1.5 text-[12px] text-txt2">
-          ✕
+        <button onClick={onClose} className="rounded-lg border border-br2 bg-s2 p-1.5 text-txt2">
+          <X size={16} />
         </button>
       </div>
 
       {!entries.length ? (
         <div className="p-8 text-center text-muted">
-          <div className="mb-2.5 text-4xl">📋</div>
           <p className="text-[13px]">Sin ajustes registrados aún.</p>
         </div>
       ) : (
@@ -54,7 +54,7 @@ export function AuditLogModal({ open, onClose }: AuditLogModalProps) {
                     <b>Motivo:</b> {a.reason}
                     <br />
                     <span className="text-muted">
-                      Antes: ${a.before.total.toFixed(2)} → Después: ${a.after.total.toFixed(2)}
+                      Antes: ${a.before.total.toFixed(2)} Después: ${a.after.total.toFixed(2)}
                     </span>
                   </div>
                 </>
@@ -71,14 +71,14 @@ export function AuditLogModal({ open, onClose }: AuditLogModalProps) {
                         {a.diff}
                       </div>
                       <div className="text-[10px] text-muted">
-                        {a.before} → {a.after}
+                        {a.before} {a.after}
                       </div>
                     </div>
                   </div>
                   <div className="flex flex-wrap items-center justify-between gap-1.5">
                     <div>
                       <span className="rounded-full bg-s2 px-2 py-0.5 text-[10px] font-bold text-txt2">{TYPE_LABEL[a.type] || a.type}</span>
-                      <span className="ml-2 text-[12px] text-txt2">📝 {a.reason}</span>
+                      <span className="ml-2 text-[12px] text-txt2">{a.reason}</span>
                     </div>
                     <div className="text-[10px] text-muted">
                       {formatDateTime(a.date)}

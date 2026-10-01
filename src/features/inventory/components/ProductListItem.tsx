@@ -1,3 +1,4 @@
+import { Pencil, Trash2 } from 'lucide-react'
 import type { Product } from '../../../types/product'
 import { unitShortLabel, unitFullName, isMeasuredUnit } from '../../../shared/lib/units'
 import { formatMoney, formatQty } from '../../../shared/lib/currency'
@@ -15,10 +16,10 @@ export function ProductListItem({ product: p, onEdit, onDelete }: ProductListIte
   const { requireAdmin } = usePermission()
 
   async function quickStock(delta: number) {
-    const ok = await requireAdmin('🔐 Ajuste de Stock', 'Se requiere PIN para modificar unidades de stock')
+    const ok = await requireAdmin('Ajuste de Stock', 'Se requiere PIN para modificar unidades de stock')
     if (!ok) return
     if (delta < 0 && p.stock <= 0) {
-      toast('⚠ Ya está en 0', 'orange')
+      toast('Ya está en 0', 'orange')
       return
     }
     const next = await adjustStock(p.code, delta)
@@ -40,7 +41,7 @@ export function ProductListItem({ product: p, onEdit, onDelete }: ProductListIte
           <div className="text-[14px] font-bold">
             {p.name}{' '}
             <span className={`ml-1 rounded-full border px-2 py-0.5 text-[11px] font-semibold ${low ? 'border-red/30 bg-red/10 text-red' : 'border-green/30 bg-green/10 text-green'}`}>
-              {low ? '⚠ Bajo' : '✓ OK'}
+              {low ? 'Bajo' : 'OK'}
             </span>
           </div>
           <div className="mt-0.5 font-mono text-[11px] text-muted">
@@ -83,11 +84,11 @@ export function ProductListItem({ product: p, onEdit, onDelete }: ProductListIte
             <button onClick={() => quickStock(1)} title="Sumar 1" className="rounded-[8px] border border-br2 px-2.5 py-1 text-[12px] text-txt2 transition-colors hover:border-green/40 hover:text-green">
               +1
             </button>
-            <button onClick={onEdit} className="rounded-[8px] border border-br2 px-2.5 py-1 text-[12px] text-txt2 transition-colors hover:border-lime/40 hover:text-lime">
-              ✏
+            <button onClick={onEdit} className="rounded-[8px] border border-br2 px-2.5 py-1 text-txt2 transition-colors hover:border-lime/40 hover:text-lime">
+              <Pencil size={14} />
             </button>
-            <button onClick={onDelete} className="rounded-[8px] bg-red px-2.5 py-1 text-[12px] text-white transition-opacity hover:opacity-85">
-              🗑
+            <button onClick={onDelete} className="rounded-[8px] bg-red px-2.5 py-1 text-white transition-opacity hover:opacity-85">
+              <Trash2 size={14} />
             </button>
           </div>
         </div>

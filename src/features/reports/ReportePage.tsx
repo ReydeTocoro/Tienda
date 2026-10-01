@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { FileBarChart, Lock, Plus } from 'lucide-react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../../db/index'
 import type { Sale } from '../../types/sale'
@@ -11,10 +12,9 @@ import { CierreZModal } from './components/CierreZModal'
 import { ExtraFormSheet } from './components/ExtraFormSheet'
 import { CierresHistoryList } from './components/CierresHistoryList'
 import { CorrectionsHistoryList } from './components/CorrectionsHistoryList'
-import { SecuritySettingsSection } from './components/SecuritySettingsSection'
 import { usePermission } from '../pin/usePermission'
 
-const PAY_LABEL: Record<string, string> = { efectivo: '💵 Efectivo', transferencia: '📲 Transferencia' }
+const PAY_LABEL: Record<string, string> = { efectivo: 'Efectivo', transferencia: 'Transferencia' }
 
 export function ReportePage() {
   const [dayKey, setDayKey] = useState(todayKey())
@@ -27,7 +27,7 @@ export function ReportePage() {
   const agg = useDayAggregation(dayKey, { onlyOpen: false })
 
   async function openCierreZ() {
-    const ok = await requireAdmin('🔐 Cierre de Caja', 'Acción definitiva — requiere PIN de seguridad')
+    const ok = await requireAdmin('Cierre de Caja', 'Acción definitiva — requiere PIN de seguridad')
     if (ok) setCierreZOpen(true)
   }
 
@@ -79,7 +79,7 @@ export function ReportePage() {
           <div className="field-label">Flujo neto del día</div>
           <div className={`my-1.5 font-mono text-[26px] font-bold ${agg.netDay >= 0 ? 'text-lime' : 'text-red'}`}>{formatMoney(agg.netDay)}</div>
           <div className="text-[11px] text-txt2">
-            {agg.netDay >= 0 ? '✓ Día positivo' : '⚠ Día negativo'}
+            {agg.netDay >= 0 ? 'Día positivo' : 'Día negativo'}
             {agg.fiadoTotalDay > 0 ? ` · En caja: ${formatMoney(agg.flujoCaja)}` : ''}
           </div>
         </div>
@@ -98,11 +98,11 @@ export function ReportePage() {
               </div>
             ))}
             <div className="flex justify-between border-t border-br pt-2">
-              <span className="text-[13px] font-bold text-green">✓ Cobrado en caja</span>
+              <span className="text-[13px] font-bold text-green">Cobrado en caja</span>
               <span className="font-mono font-bold text-green">{formatMoney(agg.cobradoReal)}</span>
             </div>
             <div className="flex justify-between pt-2">
-              <span className="text-[13px] text-red">📋 Fiado (por cobrar)</span>
+              <span className="text-[13px] text-red">Fiado (por cobrar)</span>
               <span className="font-mono font-semibold text-red">
                 {fiadosToday.length} · {formatMoney(agg.fiadoTotalDay)}
               </span>
@@ -111,11 +111,11 @@ export function ReportePage() {
         </div>
 
         <div>
-          <p className="mb-2 mt-3.5 text-[13px] font-bold uppercase tracking-wide text-red md:mt-0">📋 Fiados</p>
+          <p className="mb-2 mt-3.5 text-[13px] font-bold uppercase tracking-wide text-red md:mt-0">Fiados</p>
           <div className="mb-2.5 rounded-xl border border-red/20 bg-red/10 p-3.5">
             <div className="mb-2 text-[11px] font-bold uppercase tracking-wider text-red">Fiados generados hoy ({dayKey})</div>
             {!fiadosToday.length ? (
-              <div className="text-[13px] text-muted">Sin ventas fiadas en esta fecha ✓</div>
+              <div className="text-[13px] text-muted">Sin ventas fiadas en esta fecha </div>
             ) : (
               fiadosToday.map((s) => {
                 const paid = (s.fiadoPagos || []).reduce((a, p) => a + p.amount, 0)
@@ -129,7 +129,7 @@ export function ReportePage() {
                       </div>
                     </div>
                     <div className="text-right">
-                      <div className={`font-mono text-[14px] font-bold ${deuda <= 0 ? 'text-green' : 'text-red'}`}>{deuda <= 0 ? '✓ Pagado' : formatMoney(deuda)}</div>
+                      <div className={`font-mono text-[14px] font-bold ${deuda <= 0 ? 'text-green' : 'text-red'}`}>{deuda <= 0 ? 'Pagado' : formatMoney(deuda)}</div>
                       <div className="text-[10px] text-muted">Total: {formatMoney(s.total)}</div>
                     </div>
                   </div>
@@ -138,7 +138,7 @@ export function ReportePage() {
             )}
           </div>
           <div className="mb-3.5 rounded-xl border border-br bg-s1 p-3.5">
-            <div className="mb-2.5 field-label">📊 Cartera de fiados (todos los tiempos)</div>
+            <div className="mb-2.5 field-label">Cartera de fiados (todos los tiempos)</div>
             <div className="grid grid-cols-3 gap-2 text-center">
               <div>
                 <div className="field-label">Por cobrar</div>
@@ -186,30 +186,40 @@ export function ReportePage() {
       )}
 
       <div className="mt-2 mb-3.5 md:grid md:grid-cols-3 md:gap-3">
-        <button onClick={() => setReporteXOpen(true)} className="mb-2.5 w-full rounded-xl border-2 border-blue/30 bg-blue/10 py-3 text-[13px] font-bold text-blue transition-colors hover:bg-blue/15 md:mb-0">
-          📊 Reporte X — Lectura parcial (sin cerrar caja)
+        <button
+          onClick={() => setReporteXOpen(true)}
+          className="mb-2.5 flex w-full items-center justify-center gap-2 rounded-xl border-2 border-blue/30 bg-blue/10 py-3 text-[13px] font-bold text-blue transition-colors hover:bg-blue/15 md:mb-0"
+        >
+          <FileBarChart size={16} />
+          Reporte X — Lectura parcial (sin cerrar caja)
         </button>
-        <button onClick={openCierreZ} className="mb-2.5 w-full rounded-xl border border-red/30 bg-red/10 py-3.5 text-[15px] font-bold text-red transition-colors hover:bg-red/15 md:mb-0">
-          🔒 Reporte Z — Cierre definitivo de caja
+        <button
+          onClick={openCierreZ}
+          className="mb-2.5 flex w-full items-center justify-center gap-2 rounded-xl border border-red/30 bg-red/10 py-3.5 text-[15px] font-bold text-red transition-colors hover:bg-red/15 md:mb-0"
+        >
+          <Lock size={16} />
+          Reporte Z — Cierre definitivo de caja
         </button>
-        <button onClick={() => setExtraOpen(true)} className="w-full rounded-[10px] border border-br2 py-2.5 text-[13px] text-txt2 transition-colors hover:bg-s2">
-          + Registrar Movimiento (gasto / ingreso extra)
+        <button
+          onClick={() => setExtraOpen(true)}
+          className="flex w-full items-center justify-center gap-1.5 rounded-[10px] border border-br2 py-2.5 text-[13px] text-txt2 transition-colors hover:bg-s2"
+        >
+          <Plus size={14} />
+          Registrar Movimiento (gasto / ingreso extra)
         </button>
       </div>
 
       <div className="md:grid md:grid-cols-2 md:gap-6">
         <div>
-          <p className="mb-2 mt-5 md:mt-0 field-label">📁 Historial de cierres</p>
+          <p className="mb-2 mt-5 md:mt-0 field-label">Historial de cierres</p>
           <CierresHistoryList />
         </div>
 
         <div>
-          <p className="mb-2 mt-5 text-[13px] font-bold uppercase tracking-wide text-orange md:mt-0">✏️ Correcciones de facturas</p>
+          <p className="mb-2 mt-5 text-[13px] font-bold uppercase tracking-wide text-orange md:mt-0">Correcciones de facturas</p>
           <CorrectionsHistoryList />
         </div>
       </div>
-
-      <SecuritySettingsSection />
 
       <ReceiptSheet sale={receiptSale} onClose={() => setReceiptSale(null)} />
       <ReporteXModal open={reporteXOpen} dayKey={dayKey} onClose={() => setReporteXOpen(false)} />

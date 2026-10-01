@@ -26,13 +26,13 @@ export function CorrectionsHistoryList() {
         return (
           <div key={e.id} className="mb-2 rounded-[10px] border-l-4 border-orange bg-s2 p-2.5 text-[12px]">
             <div className="font-mono text-[11px] font-bold text-orange">
-              ✏️ {formatSaleId(e.saleId)} · {formatDateTime(e.date)} <span className={`ml-2 font-mono ${diffColor}`}>{diffStr}</span>
+              {formatSaleId(e.saleId)} · {formatDateTime(e.date)} <span className={`ml-2 font-mono ${diffColor}`}>{diffStr}</span>
             </div>
             <div className="mt-0.5 leading-relaxed text-txt2">
               <b>Motivo:</b> {e.reason}
               <br />
               <span className="text-muted">
-                Antes: {formatMoney(e.before.total)} → Después: {formatMoney(e.after.total)}
+                Antes: {formatMoney(e.before.total)} Después: {formatMoney(e.after.total)}
               </span>
             </div>
           </div>

@@ -66,10 +66,10 @@ export function InventarioPage() {
     const existing = products.find((p) => p.code.toLowerCase() === code.toLowerCase())
     if (existing) {
       setEditing(existing)
-      toast('📦 Editando: ' + existing.name, 'lime')
+      toast('Editando: ' + existing.name, 'lime')
     } else {
       setEditing(null)
-      toast('➕ Código nuevo listo para registrar', 'orange')
+      toast('Código nuevo listo para registrar', 'orange')
     }
   }
 
@@ -101,7 +101,7 @@ export function InventarioPage() {
   }, [products, search])
 
   async function handleDelete(p: Product) {
-    const isAdmin = await requireAdmin('🔐 Eliminar Producto', 'Se requiere PIN para eliminar del inventario')
+    const isAdmin = await requireAdmin('Eliminar Producto', 'Se requiere PIN para eliminar del inventario')
     if (!isAdmin) return
     const ok = await confirm({ message: `¿Eliminar ${p.name}?`, danger: true, confirmLabel: 'Eliminar' })
     if (!ok) return
@@ -117,25 +117,25 @@ export function InventarioPage() {
     try {
       const rawRows = await parseImportFile(file)
       if (!rawRows.length) {
-        toast('⚠ Archivo vacío o sin datos válidos', 'orange')
+        toast('Archivo vacío o sin datos válidos', 'orange')
         return
       }
       const { parsed, errors } = buildParsedRows(rawRows, products)
       if (!parsed.length) {
-        toast('❌ No se pudo leer ningún producto válido', 'red')
+        toast('No se pudo leer ningún producto válido', 'red')
         return
       }
       setImportFileName(file.name)
       setImportRows(parsed)
       setImportErrors(errors)
     } catch (err) {
-      toast('❌ Error al leer: ' + (err instanceof Error ? err.message : String(err)), 'red')
+      toast('Error al leer: ' + (err instanceof Error ? err.message : String(err)), 'red')
     }
   }
 
   async function confirmImportRows(dupAction: DupAction) {
     const summary = await applyImport(importRows, dupAction)
-    let msg = `✓ Importación: ${summary.added} nuevos · ${summary.updated} actualizados`
+    let msg = `Importación: ${summary.added} nuevos · ${summary.updated} actualizados`
     if (summary.skipped) msg += ` · ${summary.skipped} omitidos`
     toast(msg, 'purple')
     setImportRows([])
@@ -164,7 +164,7 @@ export function InventarioPage() {
           />
 
           <div className="mb-3.5 rounded-[14px] border border-br bg-s1 p-3.5">
-            <div className="mb-2.5 field-label">💰 Inversión en Stock</div>
+            <div className="mb-2.5 field-label">Inversión en Stock</div>
             <div className="grid grid-cols-2 gap-2.5">
               <Stat label="Costo total invertido" value={formatMoney(summary.totalCostValue)} color="text-orange" />
               <Stat label="Valor de venta total" value={formatMoney(summary.totalSaleValue)} color="text-lime" />
@@ -173,11 +173,11 @@ export function InventarioPage() {
             </div>
             <div className="mt-3 flex flex-wrap gap-3 border-t border-br pt-2.5 text-[12px]">
               <span className="text-txt2">
-                📦 {products.length} producto{products.length !== 1 ? 's' : ''}
+                {products.length} producto{products.length !== 1 ? 's' : ''}
               </span>
-              {summary.lowStock > 0 && <span className="text-orange">⚠ {summary.lowStock} stock bajo</span>}
-              {summary.outStock > 0 && <span className="text-red">✗ {summary.outStock} sin stock</span>}
-              {summary.lowStock === 0 && summary.outStock === 0 && <span className="text-green">✓ Todo en orden</span>}
+              {summary.lowStock > 0 && <span className="text-orange">{summary.lowStock} stock bajo</span>}
+              {summary.outStock > 0 && <span className="text-red">{summary.outStock} sin stock</span>}
+              {summary.lowStock === 0 && summary.outStock === 0 && <span className="text-green">Todo en orden</span>}
             </div>
           </div>
 
@@ -197,35 +197,34 @@ export function InventarioPage() {
 
         {/* Browse column — search, bulk tools, and the product list as a card grid on desktop. */}
         <div className="md:min-w-0 md:flex-1">
-          <input className="search-input" placeholder="🔍 Buscar producto..." value={search} onChange={(e) => setSearch(e.target.value)} />
+          <input className="search-input" placeholder="Buscar producto..." value={search} onChange={(e) => setSearch(e.target.value)} />
 
           <div className="mb-2 grid grid-cols-2 gap-2 md:grid-cols-4">
             <button onClick={() => exportExcel(products, settings?.storeName ?? 'Mi Tienda')} className="rounded-[10px] border border-green/25 bg-green/10 py-2.5 text-[12px] font-semibold text-green transition-colors hover:bg-green/15">
-              📊 Exportar Excel
+              Exportar Excel
             </button>
             <button onClick={() => exportCSV(products, settings?.storeName ?? 'Mi Tienda')} className="rounded-[10px] border border-blue/25 bg-blue/10 py-2.5 text-[12px] font-semibold text-blue transition-colors hover:bg-blue/15">
-              📄 Exportar CSV
+              Exportar CSV
             </button>
             <button onClick={() => downloadImportTemplate(products, settings?.storeName ?? 'Mi Tienda')} className="rounded-[10px] border border-br2 bg-s2 py-2.5 text-[12px] text-txt2 transition-colors hover:bg-s3">
-              📋 Plantilla CSV
+              Plantilla CSV
             </button>
             <button onClick={() => fileInputRef.current?.click()} className="rounded-[10px] border border-purple/25 bg-purple/10 py-2.5 text-[12px] font-semibold text-purple transition-colors hover:bg-purple/15">
-              📥 Importar CSV/Excel
+              Importar CSV/Excel
             </button>
           </div>
           <div className="mb-3.5 grid grid-cols-2 gap-2 md:max-w-md">
             <button onClick={() => setCyclicOpen(true)} className="rounded-[10px] border border-orange/25 bg-orange/10 py-2.5 text-[12px] font-semibold text-orange transition-colors hover:bg-orange/15">
-              🔢 Conteo Cíclico
+              Conteo Cíclico
             </button>
             <button onClick={() => setAuditOpen(true)} className="rounded-[10px] border border-br2 bg-s2 py-2.5 text-[12px] text-txt2 transition-colors hover:bg-s3">
-              📋 Log de Auditoría
+              Log de Auditoría
             </button>
           </div>
           <input ref={fileInputRef} type="file" accept=".xlsx,.xls,.csv,.txt,.json" className="hidden" onChange={handleFileSelected} />
 
           {!filtered.length ? (
             <div className="p-10 text-center text-muted">
-              <div className="mb-2.5 text-4xl">📦</div>
               <p className="text-[13px]">Sin productos aún</p>
             </div>
           ) : (
@@ -270,9 +269,9 @@ export function InventarioPage() {
 
 function Stat({ label, value, color, small }: { label: string; value: string; color: string; small?: boolean }) {
   return (
-    <div>
+    <div className="min-w-0">
       <div className="mb-0.5 text-[11px] text-muted">{label}</div>
-      <div className={`font-mono font-bold ${small ? 'text-[18px]' : 'text-[22px]'} ${color}`}>{value}</div>
+      <div className={`break-words font-mono font-bold ${small ? 'text-[13px]' : 'text-[16px]'} ${color}`}>{value}</div>
     </div>
   )
 }

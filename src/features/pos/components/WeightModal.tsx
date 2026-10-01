@@ -18,7 +18,10 @@ interface WeightModalProps {
  * (index.html L2559-2754). */
 export function WeightModal({ product: p, editIndex, onClose }: WeightModalProps) {
   const baseUnit = p.unit || 'kg'
-  const [val, setVal] = useState('0')
+  // Cart always stores measured items' qty in the product's base unit, so editing an existing
+  // line starts from that same value/unit rather than a blank "0" the user has to reconstruct.
+  const editingQty = editIndex !== null ? useCartStore.getState().items[editIndex]?.qty : undefined
+  const [val, setVal] = useState(editingQty !== undefined ? String(editingQty) : '0')
   const [unit, setUnit] = useState(baseUnit)
   const addWeightedItem = useCartStore((s) => s.addWeightedItem)
 
@@ -40,11 +43,11 @@ export function WeightModal({ product: p, editIndex, onClose }: WeightModalProps
 
   function confirm() {
     if (raw <= 0) {
-      toast('⚠ Ingresa una cantidad', 'orange')
+      toast('Ingresa una cantidad', 'orange')
       return
     }
     if (exceedsStock) {
-      toast('⚠ Stock insuficiente', 'orange')
+      toast('Stock insuficiente', 'orange')
       return
     }
     const qtyRounded = parseFloat(qtyInBase.toFixed(4))
@@ -53,7 +56,7 @@ export function WeightModal({ product: p, editIndex, onClose }: WeightModalProps
       p.stock,
       editIndex,
     )
-    toast(`✓ ${formatQty(raw)} ${unitShortLabel(unit)} de ${p.name} agregado`, 'lime')
+    toast(`${formatQty(raw)} ${unitShortLabel(unit)} de ${p.name} agregado`, 'lime')
     onClose()
   }
 
@@ -110,7 +113,7 @@ export function WeightModal({ product: p, editIndex, onClose }: WeightModalProps
 
         {exceedsStock && (
           <div className="mb-3.5 rounded-[10px] bg-red/10 px-4 py-2.5 text-[13px] font-semibold text-red">
-            ⚠ Solo hay {formatQty(p.stock)} {unitShortLabel(baseUnit)} en stock
+            Solo hay {formatQty(p.stock)} {unitShortLabel(baseUnit)} en stock
           </div>
         )}
 
@@ -127,7 +130,7 @@ export function WeightModal({ product: p, editIndex, onClose }: WeightModalProps
             disabled={exceedsStock}
             className="col-span-2 rounded-[10px] bg-lime py-3 text-[15px] font-bold text-black disabled:cursor-not-allowed disabled:bg-br2 disabled:text-muted"
           >
-            {exceedsStock ? '⚠ Excede el stock' : `✓ ${editIndex !== null ? 'Actualizar' : 'Agregar al carrito'}`}
+            {exceedsStock ? 'Excede el stock' : editIndex !== null ? 'Actualizar' : 'Agregar al carrito'}
           </button>
         </div>
       </div>

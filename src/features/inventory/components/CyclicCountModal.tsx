@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { X } from 'lucide-react'
 import type { Product } from '../../../types/product'
 import { BottomSheet } from '../../../shared/components/BottomSheet'
 import { applyCyclicCountAdjustments } from '../../../db/repositories/inventoryOps'
@@ -20,7 +21,7 @@ export function CyclicCountModal({ open, onClose, products }: CyclicCountModalPr
   const [counts, setCounts] = useState<Record<string, number>>({})
   const [reasons, setReasons] = useState<Record<string, string>>({})
   const [busy, setBusy] = useState(false)
-  const { requireAdmin } = usePermission()
+  const { requireAdmin, currentUserName } = usePermission()
 
   const cats = useMemo(() => Array.from(new Set(products.map((p) => p.cat).filter(Boolean))).sort(), [products])
   const filtered = useMemo(() => (catFilter === '__all__' ? products : products.filter((p) => (p.cat || '') === catFilter)), [products, catFilter]);
@@ -52,19 +53,19 @@ export function CyclicCountModal({ open, onClose, products }: CyclicCountModalPr
     }
     const missing = diffs.filter(([code]) => !reasons[code]?.trim())
     if (missing.length) {
-      toast('⚠ Completa el motivo de cada diferencia', 'orange')
+      toast('Completa el motivo de cada diferencia', 'orange')
       return
     }
-    const ok = await requireAdmin('🔐 Ajuste de Inventario', 'Se requiere PIN para aplicar ajustes de conteo cíclico')
+    const ok = await requireAdmin('Ajuste de Inventario', 'Se requiere PIN para aplicar ajustes de conteo cíclico')
     if (!ok) return
     setBusy(true)
     try {
       const settings = await getSettings()
       const n = await applyCyclicCountAdjustments(
         diffs.map(([code, counted]) => ({ code, counted, reason: reasons[code] })),
-        settings.lastCajero || 'Usuario',
+        currentUserName || settings.lastCajero || 'Usuario',
       )
-      toast(`✓ ${n} ajuste${n !== 1 ? 's' : ''} aplicado${n !== 1 ? 's' : ''} y registrados`, 'orange')
+      toast(`${n} ajuste${n !== 1 ? 's' : ''} aplicado${n !== 1 ? 's' : ''} y registrados`, 'orange')
       handleClose()
     } finally {
       setBusy(false)
@@ -77,11 +78,11 @@ export function CyclicCountModal({ open, onClose, products }: CyclicCountModalPr
     <BottomSheet open={open} onClose={handleClose} maxWidthClass="max-w-[720px]">
       <div className="mb-3.5 flex items-center justify-between">
         <div>
-          <p className="font-display text-[18px] font-bold">🔢 Conteo Cíclico de Stock</p>
+          <p className="font-display text-[18px] font-bold">Conteo Cíclico de Stock</p>
           <p className="mt-0.5 text-[12px] text-muted">Compara el stock del sistema con el conteo físico real</p>
         </div>
-        <button onClick={handleClose} className="rounded-lg border border-br2 bg-s2 px-3 py-1.5 text-[12px] text-txt2">
-          ✕
+        <button onClick={handleClose} className="rounded-lg border border-br2 bg-s2 p-1.5 text-txt2">
+          <X size={16} />
         </button>
       </div>
 
@@ -161,7 +162,7 @@ export function CyclicCountModal({ open, onClose, products }: CyclicCountModalPr
                 />
                 {hasCounted && (
                   <div className={`min-w-[90px] text-right text-[12px] font-bold ${diff === 0 ? 'text-green' : diff! > 0 ? 'text-lime' : 'text-red'}`}>
-                    {diff === 0 ? '✓ Correcto' : diff! > 0 ? `+${diff} sobrante` : `${diff} faltante`}
+                    {diff === 0 ? 'Correcto' : diff! > 0 ? `+${diff} sobrante` : `${diff} faltante`}
                   </div>
                 )}
               </div>
@@ -185,7 +186,7 @@ export function CyclicCountModal({ open, onClose, products }: CyclicCountModalPr
         </button>
         {diffs.length > 0 && (
           <button disabled={busy} onClick={apply} className="flex-[2] rounded-[10px] bg-orange py-2.5 text-[14px] font-extrabold text-black disabled:opacity-60">
-            ⚠ Aplicar {diffs.length} ajuste{diffs.length !== 1 ? 's' : ''} de inventario
+            Aplicar {diffs.length} ajuste{diffs.length !== 1 ? 's' : ''} de inventario
           </button>
         )}
       </div>

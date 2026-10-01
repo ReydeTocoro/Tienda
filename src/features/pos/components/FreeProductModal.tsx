@@ -34,7 +34,7 @@ export function FreeProductModal({ open, onClose, prefillPrice }: FreeProductMod
 
   return (
     <Modal open={open} onClose={onClose}>
-      <div className="mb-1 font-display text-[18px] font-bold">🏷️ Producto libre</div>
+      <div className="mb-1 font-display text-[18px] font-bold">Producto libre</div>
       <div className="mb-4 text-[12px] text-muted">Sin stock registrado — describe y pon el precio</div>
 
       <label className="mb-1 block field-label">Descripción *</label>
@@ -61,7 +61,7 @@ export function FreeProductModal({ open, onClose, prefillPrice }: FreeProductMod
           Cancelar
         </button>
         <button onClick={confirm} className="flex-[2] rounded-[10px] bg-orange py-2.5 text-[14px] font-bold text-black">
-          ✓ Agregar al carrito
+          Agregar al carrito
         </button>
       </div>
     </Modal>

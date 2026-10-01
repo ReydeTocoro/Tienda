@@ -65,7 +65,7 @@ export const useCartStore = create<CartState>((set, get) => ({
     if (idx >= 0) {
       const existing = items[idx]
       if (existing.qty + qty > p.stock) {
-        toast('⚠ Stock insuficiente', 'orange')
+        toast('Stock insuficiente', 'orange')
         return
       }
       const next = [...items]
@@ -73,7 +73,7 @@ export const useCartStore = create<CartState>((set, get) => ({
       set({ items: next })
     } else {
       if (qty > p.stock) {
-        toast('⚠ Stock insuficiente', 'orange')
+        toast('Stock insuficiente', 'orange')
         return
       }
       set({
@@ -86,7 +86,7 @@ export const useCartStore = create<CartState>((set, get) => ({
     const items = get().items
     if (editIndex !== null && editIndex !== undefined) {
       if (item.qty > stock) {
-        toast('⚠ Stock insuficiente', 'orange')
+        toast('Stock insuficiente', 'orange')
         return
       }
       const next = [...items]
@@ -98,7 +98,7 @@ export const useCartStore = create<CartState>((set, get) => ({
     if (idx >= 0) {
       const merged = parseFloat((items[idx].qty + item.qty).toFixed(4))
       if (merged > stock) {
-        toast('⚠ Stock insuficiente', 'orange')
+        toast('Stock insuficiente', 'orange')
         return
       }
       const next = [...items]
@@ -106,7 +106,7 @@ export const useCartStore = create<CartState>((set, get) => ({
       set({ items: next })
     } else {
       if (item.qty > stock) {
-        toast('⚠ Stock insuficiente', 'orange')
+        toast('Stock insuficiente', 'orange')
         return
       }
       set({ items: [...items, item] })
@@ -132,7 +132,7 @@ export const useCartStore = create<CartState>((set, get) => ({
     const item = items[index]
     if (!item) return
     if (delta > 0 && !item.isFree && maxStock !== undefined && item.qty + delta > maxStock) {
-      toast('⚠ Stock máximo alcanzado', 'orange')
+      toast('Stock máximo alcanzado', 'orange')
       return
     }
     const nextQty = item.qty + delta

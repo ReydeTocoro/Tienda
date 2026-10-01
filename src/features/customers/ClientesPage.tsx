@@ -66,7 +66,7 @@ export function ClientesPage() {
         </button>
         <input
           className="search-input md:order-1 md:mb-3.5 md:flex-1"
-          placeholder="🔍 Nombre, cédula o teléfono..."
+          placeholder="Nombre, cédula o teléfono..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
@@ -74,7 +74,6 @@ export function ClientesPage() {
 
       {!filtered.length ? (
         <div className="p-10 text-center text-muted">
-          <div className="mb-2.5 text-4xl">👥</div>
           <p className="text-[13px]">Sin clientes aún</p>
         </div>
       ) : (
@@ -89,14 +88,14 @@ export function ClientesPage() {
               <div className="min-w-0 flex-1">
                 <div className="overflow-hidden text-ellipsis whitespace-nowrap text-[14px] font-bold">{c.name}</div>
                 <div className="mt-0.5 text-[11px] text-muted">
-                  {c.cedula ? '🪪 ' + c.cedula + ' · ' : ''}
+                  {c.cedula ? c.cedula + ' · ' : ''}
                   {c.phone || 'Sin teléfono'} · {salesCount} compra{salesCount !== 1 ? 's' : ''}
                 </div>
                 <span className={`mt-1 inline-flex rounded-full border px-2 py-0.5 text-[10px] font-semibold ${t.badgeClass}`}>{t.label}</span>
               </div>
               <div className="flex-shrink-0 text-right">
                 <div className="font-mono text-[14px] text-lime">{formatMoney(spent)}</div>
-                <div className="text-[11px] text-muted">⭐ {formatQty(pts)} pts</div>
+                <div className="text-[11px] text-muted">{formatQty(pts)} pts</div>
               </div>
             </button>
           ))}
