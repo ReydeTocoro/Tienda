@@ -49,20 +49,28 @@ export function useFinalizeSale() {
     }
 
     const isCash = cart.payMethod === 'efectivo' && cart.amountReceived > 0
-    const sale = await finalizeSale({
-      items: cart.items,
-      subtotal,
-      discount,
-      total: chargeAmount,
-      roundingAdjustment: roundingAdjustment !== 0 ? roundingAdjustment : undefined,
-      amountReceived: isCash ? cart.amountReceived : undefined,
-      changeGiven: isCash ? cart.amountReceived - chargeAmount : undefined,
-      payMethod: cart.payMethod,
-      customerId: cart.customerId,
-      customerName: cart.customerName,
-      fiadoName: cart.payMethod === 'fiado' ? cart.customerName ?? cart.fiadoName.trim() : undefined,
-      notes: cart.notes.trim() || undefined,
-    })
+    let sale: Sale
+    try {
+      sale = await finalizeSale({
+        items: cart.items,
+        subtotal,
+        discount,
+        total: chargeAmount,
+        roundingAdjustment: roundingAdjustment !== 0 ? roundingAdjustment : undefined,
+        amountReceived: isCash ? cart.amountReceived : undefined,
+        changeGiven: isCash ? cart.amountReceived - chargeAmount : undefined,
+        payMethod: cart.payMethod,
+        customerId: cart.customerId,
+        customerName: cart.customerName,
+        fiadoName: cart.payMethod === 'fiado' ? cart.customerName ?? cart.fiadoName.trim() : undefined,
+        notes: cart.notes.trim() || undefined,
+      })
+    } catch (err) {
+      // The server re-checks stock at finalize time (two devices could sell the same last kg at
+      // once) — this is the one place that rejection actually surfaces to the cashier.
+      toast('⚠ ' + (err instanceof Error ? err.message : String(err)), 'orange')
+      return null
+    }
 
     cart.clear()
     toast('✓ Venta registrada', 'green')

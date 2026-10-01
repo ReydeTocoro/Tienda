@@ -29,7 +29,7 @@ interface CartState {
   amountReceived: number
 
   addUnitItem: (p: AddUnitSource, qty?: number) => void
-  addWeightedItem: (item: CartItem, editIndex?: number | null) => void
+  addWeightedItem: (item: CartItem, stock: number, editIndex?: number | null) => void
   addFreeItem: (desc: string, price: number, qty: number) => void
   changeQty: (index: number, delta: number, maxStock?: number) => void
   removeItem: (index: number) => void
@@ -82,9 +82,13 @@ export const useCartStore = create<CartState>((set, get) => ({
     }
   },
 
-  addWeightedItem: (item, editIndex = null) => {
+  addWeightedItem: (item, stock, editIndex = null) => {
     const items = get().items
     if (editIndex !== null && editIndex !== undefined) {
+      if (item.qty > stock) {
+        toast('⚠ Stock insuficiente', 'orange')
+        return
+      }
       const next = [...items]
       next[editIndex] = item
       set({ items: next })
@@ -92,10 +96,19 @@ export const useCartStore = create<CartState>((set, get) => ({
     }
     const idx = items.findIndex((i) => i.code === item.code)
     if (idx >= 0) {
+      const merged = parseFloat((items[idx].qty + item.qty).toFixed(4))
+      if (merged > stock) {
+        toast('⚠ Stock insuficiente', 'orange')
+        return
+      }
       const next = [...items]
-      next[idx] = { ...next[idx], qty: parseFloat((next[idx].qty + item.qty).toFixed(4)), price: item.price }
+      next[idx] = { ...next[idx], qty: merged, price: item.price }
       set({ items: next })
     } else {
+      if (item.qty > stock) {
+        toast('⚠ Stock insuficiente', 'orange')
+        return
+      }
       set({ items: [...items, item] })
     }
   },

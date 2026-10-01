@@ -28,6 +28,7 @@ export function WeightModal({ product: p, editIndex, onClose }: WeightModalProps
   const raw = parseFloat(val) || 0
   const qtyInBase = unit === baseUnit ? raw : convert(raw, unit, baseUnit) ?? raw
   const total = qtyInBase * pricePer
+  const exceedsStock = qtyInBase > p.stock
 
   function pressKey(k: string) {
     setVal((s) => {
@@ -42,9 +43,14 @@ export function WeightModal({ product: p, editIndex, onClose }: WeightModalProps
       toast('⚠ Ingresa una cantidad', 'orange')
       return
     }
+    if (exceedsStock) {
+      toast('⚠ Stock insuficiente', 'orange')
+      return
+    }
     const qtyRounded = parseFloat(qtyInBase.toFixed(4))
     addWeightedItem(
       { code: p.code, name: p.name, price: pricePer, cost: p.cost, qty: qtyRounded, brand: p.brand, unit: baseUnit, isFree: false },
+      p.stock,
       editIndex,
     )
     toast(`✓ ${formatQty(raw)} ${unitShortLabel(unit)} de ${p.name} agregado`, 'lime')
@@ -102,6 +108,12 @@ export function WeightModal({ product: p, editIndex, onClose }: WeightModalProps
           <span className="font-mono text-[22px] font-bold text-lime">{formatMoney(total)}</span>
         </div>
 
+        {exceedsStock && (
+          <div className="mb-3.5 rounded-[10px] bg-red/10 px-4 py-2.5 text-[13px] font-semibold text-red">
+            ⚠ Solo hay {formatQty(p.stock)} {unitShortLabel(baseUnit)} en stock
+          </div>
+        )}
+
         <div className="mb-3.5">
           <NumericKeypad onKey={pressKey} />
         </div>
@@ -110,8 +122,12 @@ export function WeightModal({ product: p, editIndex, onClose }: WeightModalProps
           <button onClick={onClose} className="rounded-[10px] border border-br2 py-3 text-[13px] font-semibold text-txt2">
             Cancelar
           </button>
-          <button onClick={confirm} className="col-span-2 rounded-[10px] bg-lime py-3 text-[15px] font-bold text-black">
-            ✓ {editIndex !== null ? 'Actualizar' : 'Agregar al carrito'}
+          <button
+            onClick={confirm}
+            disabled={exceedsStock}
+            className="col-span-2 rounded-[10px] bg-lime py-3 text-[15px] font-bold text-black disabled:cursor-not-allowed disabled:bg-br2 disabled:text-muted"
+          >
+            {exceedsStock ? '⚠ Excede el stock' : `✓ ${editIndex !== null ? 'Actualizar' : 'Agregar al carrito'}`}
           </button>
         </div>
       </div>

@@ -26,7 +26,15 @@ async function pullAll(): Promise<void> {
   await Promise.all(
     TABLES.map(async (table) => {
       const rows = await apiGet<unknown[]>(`/api/${table}`)
-      await db.table(table).bulkPut(rows as never[])
+      const t = db.table(table)
+      // Replace, not merge: a row deleted server-side while this client was disconnected (or a
+      // bulk reset like wiping the catalog to re-import a real product list) would otherwise
+      // never get removed from the local mirror — bulkPut only adds/updates by key. Both in one
+      // transaction so useLiveQuery subscribers never see the table empty mid-refresh.
+      await db.transaction('rw', t, async () => {
+        await t.clear()
+        await t.bulkPut(rows as never[])
+      })
     }),
   )
 }

@@ -42,6 +42,18 @@ export function salesRouter(db: Database.Database) {
     const input = req.body as FinalizeSaleInput
     try {
       const { sale, broadcasts } = db.transaction(() => {
+        // Checked here (not just client-side) because this is the one place two devices selling
+        // the same product at once can't race each other — better-sqlite3 transactions run fully
+        // synchronously, so no other request's handler can interleave between this check and the
+        // stock writes below.
+        for (const item of input.items) {
+          if (item.isFree) continue
+          const p = getRow<Product>(db, 'products', 'code', item.code)
+          if (p && item.qty > (p.stock || 0)) {
+            throw new Error(`Stock insuficiente de "${p.name}" (quedan ${p.stock})`)
+          }
+        }
+
         const date = new Date().toISOString()
         const dayKey = date.slice(0, 10)
 
