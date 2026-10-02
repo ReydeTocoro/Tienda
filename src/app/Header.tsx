@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
+import { Sun, Moon } from 'lucide-react'
 import { getSettings, updateSettings } from '../db/repositories/settings'
 import { Modal } from '../shared/components/Modal'
 import { toast } from '../store/useToastStore'
@@ -45,8 +46,8 @@ export function Header() {
         <div className="mt-px tracking-widest field-label">Sistema de caja</div>
       </button>
       <div className="flex items-center gap-2.5 md:gap-4">
-        <button onClick={toggleTheme} title="Cambiar tema" className="text-[17px] leading-none opacity-70 transition-opacity hover:opacity-100">
-          {settings?.theme === 'light' ? '' : ''}
+        <button onClick={toggleTheme} title="Cambiar tema" className="leading-none text-txt2 opacity-70 transition-opacity hover:opacity-100">
+          {settings?.theme === 'light' ? <Sun size={18} /> : <Moon size={18} />}
         </button>
         <div className="text-right font-mono text-[11px] text-txt2">
           <div>{now.toLocaleDateString('es', { weekday: 'short', day: 'numeric', month: 'short' })}</div>

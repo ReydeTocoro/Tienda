@@ -65,7 +65,6 @@ export function FiadosPage() {
                       <span className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full border-2 border-red/25 bg-red/10 text-[12px] text-red">
                         {initials(g.name)}
                       </span>
-                      {isPaid ? '' : ''}
                       {g.name}
                     </div>
                     {c && (
