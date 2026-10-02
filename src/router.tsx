@@ -7,6 +7,8 @@ import { FiadosPage } from './features/fiados/FiadosPage'
 import { HistorialPage } from './features/history/HistorialPage'
 import { ReportePage } from './features/reports/ReportePage'
 import { ConfiguracionPage } from './features/settings/ConfiguracionPage'
+import { CajasPage } from './features/cash/CajasPage'
+import { ProveedoresPage } from './features/suppliers/ProveedoresPage'
 import { AdminGate } from './features/pin/AdminGate'
 
 export const router = createBrowserRouter([
@@ -25,6 +27,22 @@ export const router = createBrowserRouter([
       { path: '/clientes', element: <ClientesPage /> },
       { path: '/fiados', element: <FiadosPage /> },
       { path: '/historial', element: <HistorialPage /> },
+      {
+        path: '/cajas',
+        element: (
+          <AdminGate title="Acceso restringido" subtitle="Las cajas requieren PIN de administrador">
+            <CajasPage />
+          </AdminGate>
+        ),
+      },
+      {
+        path: '/proveedores',
+        element: (
+          <AdminGate title="Acceso restringido" subtitle="Proveedores y compras requieren PIN de administrador">
+            <ProveedoresPage />
+          </AdminGate>
+        ),
+      },
       {
         path: '/reporte',
         element: (

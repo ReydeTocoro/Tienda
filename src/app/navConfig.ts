@@ -1,15 +1,19 @@
 import { useLiveQuery } from 'dexie-react-hooks'
-import { ShoppingCart, Package, Users, ClipboardList, Archive, BarChart3, Settings } from 'lucide-react'
+import { ShoppingCart, Package, Users, ClipboardList, Archive, BarChart3, Settings, Wallet, Truck } from 'lucide-react'
 import type { ComponentType } from 'react'
 import { db } from '../db/index'
 import { groupFiados, groupTotals } from '../features/fiados/lib/fiadoGrouping'
+import { payableBalance } from '../shared/lib/cash'
+import { todayKey } from '../shared/lib/currency'
 
 export interface NavItem {
   to: string
   label: string
   icon: ComponentType<{ size?: number; className?: string }>
   end?: boolean
-  badgeKey?: 'lowStock' | 'fiados'
+  /** Label for the cramped mobile bottom bar, when the full one doesn't fit. */
+  shortLabel?: string
+  badgeKey?: 'lowStock' | 'fiados' | 'payables'
   requiresAdmin?: boolean
   /** Subtitle shown on the admin-PIN prompt when this route is gated. */
   gateSubtitle?: string
@@ -25,6 +29,8 @@ export const NAV_ITEMS: NavItem[] = [
   { to: '/clientes', label: 'Clientes', icon: Users },
   { to: '/fiados', label: 'Fiados', icon: ClipboardList, badgeKey: 'fiados' },
   { to: '/historial', label: 'Historial', icon: Archive },
+  { to: '/cajas', label: 'Cajas', icon: Wallet, requiresAdmin: true, gateSubtitle: 'Las cajas requieren PIN de administrador' },
+  { to: '/proveedores', label: 'Proveedores', shortLabel: 'Proveed.', icon: Truck, badgeKey: 'payables', requiresAdmin: true, gateSubtitle: 'Proveedores y compras requieren PIN de administrador' },
   { to: '/reporte', label: 'Reporte', icon: BarChart3, requiresAdmin: true, gateSubtitle: 'Los reportes requieren PIN de administrador' },
   { to: '/configuracion', label: 'Config.', icon: Settings, requiresAdmin: true, gateSubtitle: 'La configuración requiere PIN de administrador' },
 ]
@@ -37,5 +43,14 @@ export function useNavBadges() {
     [],
     0,
   )
-  return { lowStock: lowStockCount, fiados: fiadoCount }
+  // Supplier debts already past their due date.
+  const overdueCount = useLiveQuery(
+    async () => {
+      const today = todayKey()
+      return (await db.payables.toArray()).filter((p) => payableBalance(p) > 0 && p.dueDate < today).length
+    },
+    [],
+    0,
+  )
+  return { lowStock: lowStockCount, fiados: fiadoCount, payables: overdueCount }
 }

@@ -3,9 +3,8 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../../db/index'
 import type { Sale } from '../../types/sale'
 import { formatDateTime, formatMoney, formatQty } from '../../shared/lib/currency'
-import { formatPurchaseId, formatSaleId } from '../../shared/lib/id'
+import { formatOrderId, formatSaleId } from '../../shared/lib/id'
 import { ReceiptSheet } from '../../shared/components/ReceiptSheet'
-import { PurchaseFormSheet } from './components/PurchaseFormSheet'
 import { CorrectionModal } from './components/CorrectionModal'
 import { usePermission } from '../pin/usePermission'
 
@@ -19,9 +18,8 @@ type Row = { kind: 'venta'; date: string; sale: Sale } | { kind: 'compra'; date:
 
 export function HistorialPage() {
   const sales = useLiveQuery(() => db.sales.orderBy('date').reverse().toArray(), [], []) as Sale[]
-  const purchases = useLiveQuery(() => db.purchases.orderBy('date').reverse().toArray(), [], [])
+  const orders = useLiveQuery(() => db.purchaseOrders.where('status').equals('recibido').toArray(), [], [])
   const [receiptSale, setReceiptSale] = useState<Sale | null>(null)
-  const [purchaseOpen, setPurchaseOpen] = useState(false)
   const [correctingSale, setCorrectingSale] = useState<Sale | null>(null)
   const { requireAdmin } = usePermission()
 
@@ -34,18 +32,19 @@ export function HistorialPage() {
 
   const rows: Row[] = useMemo(() => {
     const a: Row[] = sales.map((s) => ({ kind: 'venta', date: s.date, sale: s }))
-    const b: Row[] = purchases.map((p) => ({ kind: 'compra', date: p.date, id: p.id, desc: p.desc, total: p.total }))
+    const b: Row[] = orders.map((o) => ({
+      kind: 'compra',
+      date: o.receivedAt ?? o.createdAt,
+      id: o.id,
+      desc: `${o.supplierName} · ${o.lines.filter((l) => (l.qtyReceived ?? 0) > 0).length} producto(s) recibidos`,
+      total: o.receivedTotal ?? o.total,
+    }))
     return [...a, ...b].sort((x, y) => (x.date < y.date ? 1 : -1))
-  }, [sales, purchases])
+  }, [sales, orders])
 
   return (
     <div className="p-3.5 md:mx-auto md:max-w-[1400px] md:p-5">
-      <div className="mb-3.5 flex items-center justify-between">
-        <p className="font-display text-[21px] font-bold md:text-[22px]">Historial</p>
-        <button onClick={() => setPurchaseOpen(true)} className="rounded-[10px] border border-br2 px-3 py-2 text-[12px] text-txt2 transition-colors hover:bg-s2">
-          + Compra
-        </button>
-      </div>
+      <p className="mb-3.5 font-display text-[21px] font-bold md:text-[22px]">Historial</p>
 
       {!rows.length ? (
         <div className="p-10 text-center text-muted">
@@ -92,8 +91,8 @@ export function HistorialPage() {
                 <div className="flex items-start justify-between">
                   <div>
                     <div className="font-mono text-[12px] text-orange">
-                      {formatPurchaseId(r.id)}{' '}
-                      <span className="rounded-full bg-orange/10 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-orange">Compra</span>
+                      {formatOrderId(r.id)}{' '}
+                      <span className="rounded-full bg-orange/10 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-orange">Pedido recibido</span>
                     </div>
                     <div className="mt-0.5 text-[10px] text-muted">{formatDateTime(r.date)}</div>
                   </div>
@@ -111,7 +110,6 @@ export function HistorialPage() {
         onClose={() => setReceiptSale(null)}
         onCorrect={receiptSale ? () => requestCorrection(receiptSale) : undefined}
       />
-      <PurchaseFormSheet open={purchaseOpen} onClose={() => setPurchaseOpen(false)} />
       <CorrectionModal sale={correctingSale} onClose={() => setCorrectingSale(null)} onCorrected={() => setCorrectingSale(null)} />
     </div>
   )

@@ -9,7 +9,7 @@ import { ReceiptSheet } from '../../shared/components/ReceiptSheet'
 import { formatSaleId } from '../../shared/lib/id'
 import { ReporteXModal } from './components/ReporteXModal'
 import { CierreZModal } from './components/CierreZModal'
-import { ExtraFormSheet } from './components/ExtraFormSheet'
+import { MovementFormSheet } from '../cash/components/MovementFormSheet'
 import { CierresHistoryList } from './components/CierresHistoryList'
 import { CorrectionsHistoryList } from './components/CorrectionsHistoryList'
 import { usePermission } from '../pin/usePermission'
@@ -74,7 +74,7 @@ export function ReportePage() {
         <Kpi label="Ventas del día" value={formatMoney(agg.totalVentas)} color="text-green" sub={`${agg.numTx} transacción${agg.numTx !== 1 ? 'es' : ''}`} />
         <Kpi label="Ganancia bruta" value={formatMoney(agg.totalGanancia)} color="text-lime" sub={`Margen: ${agg.totalVentas ? ((agg.totalGanancia / agg.totalVentas) * 100).toFixed(1) : 0}%`} />
         <Kpi label="Ticket promedio" value={formatMoney(agg.avgTicket)} color="text-blue" sub={`Desc. dados: ${formatMoney(agg.totalDescuentos)}`} />
-        <Kpi label="Compras / Gastos" value={formatMoney(agg.totalCompras + agg.totalExOut)} color="text-red" sub={`Extras ingreso: +${formatMoney(agg.totalExIn)}`} />
+        <Kpi label="Egresos de caja" value={formatMoney(agg.totalExOut)} color="text-red" sub={`Otros ingresos: +${formatMoney(agg.totalExIn)}`} />
         <div className="col-span-2 rounded-[14px] border border-br bg-s1 p-4 text-center md:col-span-4">
           <div className="field-label">Flujo neto del día</div>
           <div className={`my-1.5 font-mono text-[26px] font-bold ${agg.netDay >= 0 ? 'text-lime' : 'text-red'}`}>{formatMoney(agg.netDay)}</div>
@@ -205,7 +205,7 @@ export function ReportePage() {
           className="flex w-full items-center justify-center gap-1.5 rounded-[10px] border border-br2 py-2.5 text-[13px] text-txt2 transition-colors hover:bg-s2"
         >
           <Plus size={14} />
-          Registrar Movimiento (gasto / ingreso extra)
+          Registrar gasto / ingreso en Caja Menor
         </button>
       </div>
 
@@ -224,7 +224,7 @@ export function ReportePage() {
       <ReceiptSheet sale={receiptSale} onClose={() => setReceiptSale(null)} />
       <ReporteXModal open={reporteXOpen} dayKey={dayKey} onClose={() => setReporteXOpen(false)} />
       <CierreZModal open={cierreZOpen} dayKey={dayKey} onClose={() => setCierreZOpen(false)} onClosed={() => setCierreZOpen(false)} />
-      <ExtraFormSheet open={extraOpen} onClose={() => setExtraOpen(false)} />
+      <MovementFormSheet open={extraOpen} onClose={() => setExtraOpen(false)} caja="menor" lockCaja />
     </div>
   )
 }

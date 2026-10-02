@@ -33,6 +33,7 @@ export function DesktopTabs() {
             to={to}
             end={end}
             onClick={(e) => handleClick(e, item)}
+            title={label}
             className={({ isActive }) =>
               `group relative flex items-center gap-2 rounded-t-lg border border-b-0 px-4 py-2 text-[13px] font-semibold transition-colors ${
                 isActive ? 'border-br bg-bg text-lime' : 'border-transparent text-txt2 hover:bg-s3 hover:text-txt'
@@ -40,11 +41,11 @@ export function DesktopTabs() {
             }
           >
             <Icon size={16} className="flex-shrink-0" />
-            <span>{label}</span>
+            <span className="hidden group-aria-[current=page]:inline lg:inline">{label}</span>
             {count > 0 && (
               <span
                 className={`min-w-[18px] rounded-full px-1.5 text-center text-[10px] font-bold leading-[16px] text-black ${
-                  badgeKey === 'fiados' ? 'bg-red text-white' : 'bg-orange'
+                  badgeKey === 'fiados' || badgeKey === 'payables' ? 'bg-red text-white' : 'bg-orange'
                 }`}
               >
                 {count > 99 ? '99+' : count}

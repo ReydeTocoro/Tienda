@@ -45,9 +45,8 @@ export function ReporteXModal({ open, dayKey, onClose }: ReporteXModalProps) {
         <Row label="Cobrado en caja" value={formatMoney(agg.cobradoReal)} color="text-green" bold />
         {agg.fiadoTotalDay > 0 && <Row label="Fiado (pendiente)" value={formatMoney(agg.fiadoTotalDay)} color="text-red" />}
         <div className="my-2 border-t border-dashed border-br2" />
-        {agg.totalCompras > 0 && <Row label="Compras proveedor" value={'-' + formatMoney(agg.totalCompras)} color="text-orange" />}
-        {agg.totalExOut > 0 && <Row label="Egresos extra" value={'-' + formatMoney(agg.totalExOut)} color="text-orange" />}
-        {agg.totalExIn > 0 && <Row label="Ingresos extra" value={'+' + formatMoney(agg.totalExIn)} color="text-lime" />}
+        {agg.totalExOut > 0 && <Row label="Egresos de caja" value={'-' + formatMoney(agg.totalExOut)} color="text-orange" />}
+        {agg.totalExIn > 0 && <Row label="Otros ingresos (abonos, etc.)" value={'+' + formatMoney(agg.totalExIn)} color="text-lime" />}
         <div className="mt-2 flex justify-between border-t border-br2 pt-2 text-[14px] font-bold">
           <span>FLUJO NETO</span>
           <span className={agg.netDay >= 0 ? 'text-lime' : 'text-red'}>{formatMoney(agg.netDay)}</span>

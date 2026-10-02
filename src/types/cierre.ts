@@ -7,6 +7,7 @@ export interface PayBreak {
 export type Cuadre = 'perfecto' | 'sobrante' | 'faltante'
 
 export interface Arqueo {
+  /** What the Caja Menor ledger said the drawer should hold. */
   efectivoSistema: number
   efectivoFisico: number
   diferencia: number
@@ -22,11 +23,15 @@ export interface Cierre {
   totalVentas: number
   totalGanancia: number
   numTx: number
-  totalCompras: number
+  /** Cash that entered outside of sales (extra income, fiado payments) / left the drawer (expenses, supplier payments). */
   totalExIn: number
   totalExOut: number
   netDay: number
   payBreak: PayBreak
   arqueo: Arqueo
+  /** Moved to Caja Mayor at closing, and what stayed in the drawer for tomorrow. */
+  traslado?: number
+  dejadoEnCaja?: number
+  sessionId?: number
   notas?: string
 }

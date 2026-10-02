@@ -21,6 +21,7 @@ import { CalculatorModal } from './components/CalculatorModal'
 import { QuickDiscountModal } from './components/QuickDiscountModal'
 import { VentaKpiBar } from './components/VentaKpiBar'
 import { ClientBar } from './components/ClientBar'
+import { CajaBanner } from '../cash/components/CajaBanner'
 import { ClientPickerSheet } from './components/ClientPickerSheet'
 import { useFinalizeSale } from './hooks/useFinalizeSale'
 
@@ -155,6 +156,7 @@ export function VentaPage() {
        * header row — it's the thing the cashier watches the whole time. */}
       <div className="flex min-h-0 flex-1 overflow-hidden">
         <div className="flex w-[52%] flex-shrink-0 flex-col overflow-hidden md:w-[56%] xl:w-[58%]">
+          <CajaBanner />
           <ClientBar onOpen={() => setPickerOpen(true)} />
           <VentaKpiBar onClickLowStock={() => setLowStockOnly(true)} />
 

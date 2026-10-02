@@ -46,6 +46,12 @@ export function CierresHistoryList() {
                 </span>
               </div>
             )}
+            {c.traslado !== undefined && (
+              <div className="mt-1 text-[11px] text-txt2">
+                Trasladado a Caja Mayor: <span className="font-mono font-semibold text-lime">{formatMoney(c.traslado)}</span>
+                {c.dejadoEnCaja !== undefined && <> · Quedó en caja: <span className="font-mono font-semibold">{formatMoney(c.dejadoEnCaja)}</span></>}
+              </div>
+            )}
             {c.notas && <div className="mt-1 text-[11px] text-muted">{c.notas}</div>}
           </div>
         )

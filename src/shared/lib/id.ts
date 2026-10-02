@@ -6,8 +6,8 @@ export function formatSaleId(id: number | undefined): string {
   return '#' + String(id ?? 0).padStart(4, '0')
 }
 
-export function formatPurchaseId(id: number | undefined): string {
-  return '#C' + String(id ?? 0).padStart(4, '0')
+export function formatOrderId(id: number | undefined): string {
+  return '#P' + String(id ?? 0).padStart(4, '0')
 }
 
 export function formatCierreId(id: number | undefined): string {

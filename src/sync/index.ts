@@ -6,7 +6,21 @@ import { apiGet } from '../api/client'
  * once from AppShell. Read functions in src/db/repositories/*.ts keep reading Dexie directly —
  * this module is the only thing that writes to Dexie now. */
 
-const TABLES = ['products', 'sales', 'purchases', 'customers', 'extras', 'cierres', 'auditLog', 'entradas', 'settings', 'usuarios'] as const
+const TABLES = [
+  'products',
+  'sales',
+  'customers',
+  'cierres',
+  'auditLog',
+  'entradas',
+  'settings',
+  'usuarios',
+  'cashMovements',
+  'cashSessions',
+  'suppliers',
+  'purchaseOrders',
+  'payables',
+] as const
 
 interface SyncMessage {
   table: (typeof TABLES)[number]

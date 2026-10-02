@@ -6,6 +6,8 @@ import type { Product } from '../../src/types/product'
 import type { CorrectionAuditEntry, SaleSnapshot } from '../../src/types/auditLog'
 import { listAll, getRow, putRow, insertAutoRow, errorMessage, roundQty } from './generic'
 import { broadcast, type BroadcastMsg } from '../broadcast'
+import { recordFiadoCollection, recordSaleCorrection, recordSaleReceipt, type CollectMethod } from '../domain/cash'
+import { dayKeyOf } from '../../src/shared/lib/currency'
 
 const TABLE = 'sales'
 
@@ -55,7 +57,7 @@ export function salesRouter(db: Database.Database) {
         }
 
         const date = new Date().toISOString()
-        const dayKey = date.slice(0, 10)
+        const dayKey = dayKeyOf(date)
 
         let ganancia = 0
         for (const item of input.items) {
@@ -87,6 +89,7 @@ export function salesRouter(db: Database.Database) {
         }
         const sale = insertAutoRow(db, TABLE, saleData)
         const broadcasts: BroadcastMsg[] = [{ table: TABLE, op: 'put', data: sale }]
+        recordSaleReceipt(db, broadcasts, sale)
 
         for (const item of input.items) {
           if (item.isFree) continue
@@ -109,22 +112,28 @@ export function salesRouter(db: Database.Database) {
   })
 
   /** legacy pagarFiado()/condonarFiado() (repositories/sales.ts L93-103) — both use this same
-   * mechanic, condoning is just a different note. */
+   * mechanic; `condone` marks the forgiven case, which closes the debt without any cash coming in.
+   * A real payment is cash into the Caja Menor. */
   router.post('/:id/pagar-completo', (req, res) => {
     const saleId = Number(req.params.id)
     const note = (req.body?.note as string) || 'Pago completo'
+    const condone = req.body?.condone === true
+    const method: CollectMethod = req.body?.method === 'transferencia' ? 'transferencia' : 'efectivo'
     try {
-      const { debt, sale } = db.transaction(() => {
+      const { debt, broadcasts } = db.transaction(() => {
         const s = getRow<Sale>(db, TABLE, 'id', saleId)
         if (!s) throw new Error('Venta no encontrada')
         const debt = fiadoDebt(s)
-        if (debt <= 0) return { debt: 0, sale: s }
-        const pagos = [...(s.fiadoPagos || []), { amount: debt, date: new Date().toISOString(), note }]
-        const u: Sale = { ...s, fiadoPagos: pagos }
+        const broadcasts: BroadcastMsg[] = []
+        if (debt <= 0) return { debt: 0, broadcasts }
+        const pago: FiadoPago = { amount: debt, date: new Date().toISOString(), note, ...(condone ? { condonado: true } : { method }) }
+        const u: Sale = { ...s, fiadoPagos: [...(s.fiadoPagos || []), pago] }
         putRow(db, TABLE, 'id', saleId, {}, u)
-        return { debt, sale: u }
+        broadcasts.push({ table: TABLE, op: 'put', data: u })
+        if (!condone) recordFiadoCollection(db, broadcasts, { ...u, id: saleId }, debt, method)
+        return { debt, broadcasts }
       })()
-      if (debt > 0) broadcast({ table: TABLE, op: 'put', data: sale })
+      broadcasts.forEach(broadcast)
       res.json({ debt })
     } catch (err) {
       res.status(400).json({ error: errorMessage(err) })
@@ -133,7 +142,8 @@ export function salesRouter(db: Database.Database) {
 
   /** legacy pagarTodosLosFiados()/condonarTodosLosFiados() (repositories/sales.ts L106-120). */
   router.post('/pagar-todos', (req, res) => {
-    const { saleIds, note } = req.body as { saleIds: number[]; note: string }
+    const { saleIds, note, condone, method: rawMethod } = req.body as { saleIds: number[]; note: string; condone?: boolean; method?: CollectMethod }
+    const method: CollectMethod = rawMethod === 'transferencia' ? 'transferencia' : 'efectivo'
     const { total, broadcasts } = db.transaction(() => {
       let total = 0
       const broadcasts: BroadcastMsg[] = []
@@ -143,10 +153,11 @@ export function salesRouter(db: Database.Database) {
         const debt = fiadoDebt(s)
         if (debt <= 0) continue
         total += debt
-        const pagos = [...(s.fiadoPagos || []), { amount: debt, date: new Date().toISOString(), note }]
-        const u: Sale = { ...s, fiadoPagos: pagos }
+        const pago: FiadoPago = { amount: debt, date: new Date().toISOString(), note, ...(condone === true ? { condonado: true } : { method }) }
+        const u: Sale = { ...s, fiadoPagos: [...(s.fiadoPagos || []), pago] }
         putRow(db, TABLE, 'id', id, {}, u)
         broadcasts.push({ table: TABLE, op: 'put', data: u })
+        if (condone !== true) recordFiadoCollection(db, broadcasts, { ...u, id }, debt, method)
       }
       return { total, broadcasts }
     })()
@@ -158,14 +169,16 @@ export function salesRouter(db: Database.Database) {
     const saleId = Number(req.params.id)
     const pago = req.body as FiadoPago
     try {
-      const updated = db.transaction(() => {
+      const { updated, broadcasts } = db.transaction(() => {
         const s = getRow<Sale>(db, TABLE, 'id', saleId)
         if (!s) throw new Error('Venta no encontrada')
         const u: Sale = { ...s, fiadoPagos: [...(s.fiadoPagos || []), pago] }
         putRow(db, TABLE, 'id', saleId, {}, u)
-        return u
+        const broadcasts: BroadcastMsg[] = [{ table: TABLE, op: 'put', data: u }]
+        if (!pago.condonado) recordFiadoCollection(db, broadcasts, { ...u, id: saleId }, pago.amount, pago.method === 'transferencia' ? 'transferencia' : 'efectivo')
+        return { updated: u, broadcasts }
       })()
-      broadcast({ table: TABLE, op: 'put', data: updated })
+      broadcasts.forEach(broadcast)
       res.status(201).json(updated)
     } catch (err) {
       res.status(400).json({ error: errorMessage(err) })
@@ -245,6 +258,7 @@ export function salesRouter(db: Database.Database) {
         const updatedSale: Sale = { ...s, ...patch }
         putRow(db, TABLE, 'id', saleId, {}, updatedSale)
         broadcasts.push({ table: TABLE, op: 'put', data: updatedSale })
+        recordSaleCorrection(db, broadcasts, { ...updatedSale, id: saleId }, newTotal - before.total)
 
         return { sale: updatedSale, broadcasts }
       })()

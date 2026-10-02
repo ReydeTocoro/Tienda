@@ -6,6 +6,10 @@ export interface FiadoPago {
   amount: number
   date: string
   note: string
+  /** The debt was forgiven, not collected: closes it without any money entering a caja. */
+  condonado?: boolean
+  /** How the payment was collected (absent on older rows = efectivo). */
+  method?: 'efectivo' | 'transferencia'
 }
 
 export interface Sale {

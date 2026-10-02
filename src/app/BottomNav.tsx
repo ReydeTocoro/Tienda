@@ -21,7 +21,7 @@ export function BottomNav() {
   return (
     <nav className="z-50 flex flex-shrink-0 border-t border-br bg-s1 pb-[env(safe-area-inset-bottom,0px)] md:hidden">
       {NAV_ITEMS.map((item) => {
-        const { to, label, icon: Icon, end, badgeKey } = item
+        const { to, label, shortLabel, icon: Icon, end, badgeKey } = item
         const count = badgeKey ? badges[badgeKey] : 0
         return (
           <NavLink
@@ -42,14 +42,14 @@ export function BottomNav() {
                   {count > 0 && (
                     <span
                       className={`absolute -right-2 -top-1.5 min-w-[15px] rounded-full px-1 text-center text-[9px] font-bold leading-[14px] text-black ${
-                        badgeKey === 'fiados' ? 'bg-red text-white' : 'bg-orange'
+                        badgeKey === 'fiados' || badgeKey === 'payables' ? 'bg-red text-white' : 'bg-orange'
                       }`}
                     >
                       {count > 99 ? '99+' : count}
                     </span>
                   )}
                 </span>
-                {label}
+                {shortLabel ?? label}
                 {isActive && <span className="absolute bottom-0 left-1/2 h-0.5 w-5 -translate-x-1/2 rounded-t-sm bg-lime" />}
               </>
             )}

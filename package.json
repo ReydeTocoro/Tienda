@@ -9,7 +9,8 @@
     "lint": "oxlint",
     "preview": "vite preview",
     "server": "tsx server/index.ts",
-    "typecheck:server": "tsc --noEmit -p server/tsconfig.json"
+    "typecheck:server": "tsc --noEmit -p server/tsconfig.json",
+    "check:cash": "tsx server/selfcheck.ts"
   },
   "dependencies": {
     "@tailwindcss/postcss": "^4.3.3",
@@ -42,6 +43,7 @@
     "@types/ws": "^8.18.1",
     "@vitejs/plugin-react": "^6.1.0",
     "oxlint": "^1.79.0",
+    "supabase": "^2.119.0",
     "tsx": "^4.20.6",
     "typescript": "~6.0.2",
     "vite": "^8.2.2"

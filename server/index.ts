@@ -8,14 +8,17 @@ import { addClient } from './broadcast'
 import { productsRouter } from './routes/products'
 import { customersRouter } from './routes/customers'
 import { salesRouter } from './routes/sales'
-import { purchasesRouter } from './routes/purchases'
-import { extrasRouter } from './routes/extras'
 import { cierresRouter } from './routes/cierres'
 import { auditLogRouter } from './routes/auditLog'
 import { entradasRouter } from './routes/entradas'
 import { settingsRouter } from './routes/settings'
 import { inventoryOpsRouter } from './routes/inventoryOps'
 import { usuariosRouter } from './routes/usuarios'
+import { cashRouter } from './routes/cash'
+import { listRouter } from './routes/listRouter'
+import { suppliersRouter } from './routes/suppliers'
+import { purchaseOrdersRouter } from './routes/purchaseOrders'
+import { payablesRouter } from './routes/payables'
 
 const app = express()
 app.use(express.json())
@@ -23,14 +26,18 @@ app.use(express.json())
 app.use('/api/products', productsRouter(db))
 app.use('/api/customers', customersRouter(db))
 app.use('/api/sales', salesRouter(db))
-app.use('/api/purchases', purchasesRouter(db))
-app.use('/api/extras', extrasRouter(db))
 app.use('/api/cierres', cierresRouter(db))
 app.use('/api/auditLog', auditLogRouter(db))
 app.use('/api/entradas', entradasRouter(db))
 app.use('/api/settings', settingsRouter(db))
 app.use('/api/inventory', inventoryOpsRouter(db))
 app.use('/api/usuarios', usuariosRouter(db))
+app.use('/api/cash', cashRouter(db))
+app.use('/api/cashMovements', listRouter(db, 'cashMovements'))
+app.use('/api/cashSessions', listRouter(db, 'cashSessions'))
+app.use('/api/suppliers', suppliersRouter(db))
+app.use('/api/purchaseOrders', purchaseOrdersRouter(db))
+app.use('/api/payables', payablesRouter(db))
 
 // Serve the Vite production build (npm run build) so the PC and any phone on the same WiFi hit
 // this one server for both the app shell and the API — no separate dev server needed for the

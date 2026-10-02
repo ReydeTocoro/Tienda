@@ -1,20 +1,18 @@
 import type { Sale, PayMethod } from '../../types/sale'
-import type { Purchase } from '../../types/purchase'
-import type { Extra } from '../../types/extra'
+import type { CashMovement, MovementType } from '../../types/cash'
 
 export type PayBreak = Record<PayMethod, number>
 
 export interface DayAggregate {
   dayKey: string
   ventasDay: Sale[]
-  comprasDay: Purchase[]
-  extrasDay: Extra[]
+  /** Caja Menor movements of the day that aren't sales: extra income, fiado collections, expenses, supplier payments. */
+  movementsDay: CashMovement[]
   totalVentas: number
   totalGanancia: number
   totalDescuentos: number
   numTx: number
   avgTicket: number
-  totalCompras: number
   totalExIn: number
   totalExOut: number
   netDay: number
@@ -25,6 +23,10 @@ export interface DayAggregate {
   /** netDay minus today's new fiado (money that's owed but not in hand). */
   flujoCaja: number
 }
+
+/** What counts as the day's cash flow besides sales (sales come from the sales table; transfers and
+ * arqueo adjustments are internal bookkeeping, not business income or expense). */
+const DAY_FLOW_TYPES = new Set<MovementType>(['ingreso', 'egreso', 'abono_fiado', 'pago_proveedor'])
 
 export interface ComputeDayAggregateOptions {
   /** true = only rows not yet marked by a previous Cierre Z (used by the Cierre Z flow to
@@ -40,16 +42,14 @@ export interface ComputeDayAggregateOptions {
 export function computeDayAggregate(
   dayKey: string,
   sales: Sale[],
-  purchases: Purchase[],
-  extras: Extra[],
+  movements: CashMovement[],
   options: ComputeDayAggregateOptions = {},
 ): DayAggregate {
   const onlyOpen = options.onlyOpen ?? false
   const isOpen = (closedInCierreId?: number) => !onlyOpen || closedInCierreId == null
 
   const ventasDay = sales.filter((s) => s.dayKey === dayKey && isOpen(s.closedInCierreId))
-  const comprasDay = purchases.filter((p) => p.dayKey === dayKey && isOpen(p.closedInCierreId))
-  const extrasDay = extras.filter((e) => e.dayKey === dayKey && isOpen(e.closedInCierreId))
+  const movementsDay = movements.filter((m) => m.caja === 'menor' && m.dayKey === dayKey && DAY_FLOW_TYPES.has(m.type) && isOpen(m.closedInCierreId))
 
   const totalVentas = ventasDay.reduce((a, s) => a + s.total, 0)
   const totalGanancia = ventasDay.reduce((a, s) => a + (s.ganancia || 0), 0)
@@ -57,11 +57,10 @@ export function computeDayAggregate(
   const numTx = ventasDay.length
   const avgTicket = numTx ? totalVentas / numTx : 0
 
-  const totalCompras = comprasDay.reduce((a, p) => a + p.total, 0)
-  const totalExIn = extrasDay.filter((e) => e.type === 'ingreso').reduce((a, e) => a + e.amount, 0)
-  const totalExOut = extrasDay.filter((e) => e.type === 'egreso').reduce((a, e) => a + e.amount, 0)
+  const totalExIn = movementsDay.filter((m) => m.direction === 'in').reduce((a, m) => a + m.amount, 0)
+  const totalExOut = movementsDay.filter((m) => m.direction === 'out').reduce((a, m) => a + m.amount, 0)
 
-  const netDay = totalVentas + totalExIn - totalCompras - totalExOut
+  const netDay = totalVentas + totalExIn - totalExOut
 
   const payBreak: PayBreak = { efectivo: 0, transferencia: 0, fiado: 0 }
   ventasDay.forEach((s) => {
@@ -74,14 +73,12 @@ export function computeDayAggregate(
   return {
     dayKey,
     ventasDay,
-    comprasDay,
-    extrasDay,
+    movementsDay,
     totalVentas,
     totalGanancia,
     totalDescuentos,
     numTx,
     avgTicket,
-    totalCompras,
     totalExIn,
     totalExOut,
     netDay,

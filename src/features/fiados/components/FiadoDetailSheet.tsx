@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import type { FiadoGroup } from '../lib/fiadoGrouping'
 import { groupTotals } from '../lib/fiadoGrouping'
-import { getFiadoDebt, addFiadoPago, payFiadoInFull, payAllFiados } from '../../../db/repositories/sales'
+import { getFiadoDebt, addFiadoPago, payFiadoInFull, payAllFiados, type CollectMethod } from '../../../db/repositories/sales'
 import { BottomSheet } from '../../../shared/components/BottomSheet'
 import { AbonoModal } from './AbonoModal'
 import { useConfirm } from '../../../store/useConfirmStore'
@@ -21,6 +21,7 @@ interface FiadoDetailSheetProps {
 /** legacy `openFiadoDetail()` (index.html L4834-4996). */
 export function FiadoDetailSheet({ group, customer, onClose }: FiadoDetailSheetProps) {
   const [abonoTarget, setAbonoTarget] = useState<{ saleId: number; maxDebt: number } | null>(null)
+  const [method, setMethod] = useState<CollectMethod>('efectivo')
   const confirm = useConfirm()
   const { requireAdmin } = usePermission()
 
@@ -35,7 +36,7 @@ export function FiadoDetailSheet({ group, customer, onClose }: FiadoDetailSheetP
 
   async function abonar(amount: number, note: string) {
     if (!abonoTarget) return
-    await addFiadoPago(abonoTarget.saleId, { amount, date: new Date().toISOString(), note })
+    await addFiadoPago(abonoTarget.saleId, { amount, date: new Date().toISOString(), note, method })
     toast(`Abono de ${formatMoney(amount)} registrado`, 'green')
     setAbonoTarget(null)
   }
@@ -45,7 +46,7 @@ export function FiadoDetailSheet({ group, customer, onClose }: FiadoDetailSheetP
     if (!isAdmin) return
     const ok = await confirm(`¿Marcar este fiado como pagado en su totalidad (${formatMoney(debt)})?`)
     if (!ok) return
-    await payFiadoInFull(saleId)
+    await payFiadoInFull(saleId, 'Pago completo', false, method)
     toast('Fiado pagado', 'green')
   }
 
@@ -54,7 +55,7 @@ export function FiadoDetailSheet({ group, customer, onClose }: FiadoDetailSheetP
     if (!isAdmin) return
     const ok = await confirm({ message: `¿Condonar (perdonar) esta deuda de ${formatMoney(debt)}? Se marcará como cancelada sin cobro.`, danger: true })
     if (!ok) return
-    await payFiadoInFull(saleId, 'Deuda condonada/abandonada')
+    await payFiadoInFull(saleId, 'Deuda condonada/abandonada', true)
     toast('Deuda condonada', 'muted')
   }
 
@@ -67,6 +68,8 @@ export function FiadoDetailSheet({ group, customer, onClose }: FiadoDetailSheetP
     const paid = await payAllFiados(
       group.sales.map((s) => s.id!),
       'Pago total de todos los fiados',
+      false,
+      method,
     )
     toast(`${formatMoney(paid)} cobrados`, 'green')
   }
@@ -80,6 +83,7 @@ export function FiadoDetailSheet({ group, customer, onClose }: FiadoDetailSheetP
     await payAllFiados(
       group.sales.map((s) => s.id!),
       'Deuda condonada/abandonada',
+      true,
     )
     toast('Deudas condonadas', 'muted')
   }
@@ -116,6 +120,23 @@ export function FiadoDetailSheet({ group, customer, onClose }: FiadoDetailSheetP
             <div className="font-mono text-[15px] font-semibold text-txt2">{formatMoney(totalOwed)}</div>
           </div>
         </div>
+
+        {totalDebt > 0 && (
+          <div className="mb-3">
+            <div className="mb-1.5 field-label">El cliente paga por</div>
+            <div className="flex gap-2">
+              {(['efectivo', 'transferencia'] as const).map((m) => (
+                <button
+                  key={m}
+                  onClick={() => setMethod(m)}
+                  className={`flex-1 rounded-[10px] border py-2 text-[12px] font-semibold transition-colors ${method === m ? 'border-lime bg-lime/15 text-lime' : 'border-br2 text-txt2 hover:bg-s2'}`}
+                >
+                  {m === 'efectivo' ? 'Efectivo (Caja Menor)' : 'Transferencia (Caja Mayor)'}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
         {totalDebt > 0 ? (
           <div className="mb-4 grid grid-cols-2 gap-2">
@@ -154,6 +175,7 @@ export function FiadoDetailSheet({ group, customer, onClose }: FiadoDetailSheetP
                 <div key={i} className="flex justify-between text-[11px] text-green">
                   <span>
                     Abono {formatDateTime(p.date)}
+                    {p.method === 'transferencia' ? ' · Transferencia' : ''}
                     {p.note ? ' · ' + p.note : ''}
                   </span>
                   <span>+{formatMoney(p.amount)}</span>
@@ -181,7 +203,7 @@ export function FiadoDetailSheet({ group, customer, onClose }: FiadoDetailSheetP
         </button>
       </BottomSheet>
 
-      <AbonoModal open={!!abonoTarget} maxDebt={abonoTarget?.maxDebt ?? 0} onClose={() => setAbonoTarget(null)} onConfirm={abonar} />
+      <AbonoModal open={!!abonoTarget} maxDebt={abonoTarget?.maxDebt ?? 0} method={method} onClose={() => setAbonoTarget(null)} onConfirm={abonar} />
     </>
   )
 }

@@ -16,6 +16,7 @@ npm run build              # tsc -b && vite build
 npm run lint                # oxlint
 npm run preview
 npm run typecheck:server   # tsc --noEmit -p server/tsconfig.json (server isn't covered by the app build)
+npm run check:cash         # assert-based self-check of the money logic (cajas, traslados, pedidos, cuentas por pagar, cierre) on an in-memory SQLite — never the real DB
 ```
 
 There is no test runner configured. There's no single-test command because there are no tests — follow Ponytail's rule of leaving a runnable self-check (assert-based `demo()`/`__main__` or a small `test_*` file) only for non-trivial logic you add, not a full suite.
@@ -31,9 +32,10 @@ For a real end-to-end check of the client-server sync, `npm run build` then `npm
 The app used to be single-device, IndexedDB-only. It's now a client-server app so multiple devices (a PC and a phone, say) see the same live data:
 
 - **`server/`** — Express + `better-sqlite3`, the source of truth. Each Dexie table has a mirror SQLite table storing one `json` blob column per row (plus a couple of indexed columns like `customers.cedula` where a query needs them) — see `server/db.ts` and the helpers in `server/routes/generic.ts` (`listAll`/`getRow`/`putRow`/`deleteRow`/`insertAutoRow`). Every write handler calls `broadcast()` (`server/broadcast.ts`) over WebSocket (`/ws`) after writing. In production the server also serves the built `dist/` as static files, so PC and phone hit one process for both the UI and the API.
-- **`src/db/`** — Dexie (IndexedDB) is now a **local mirror/cache, not the source of truth**. `src/db/schema.ts` defines the same 9 tables. `src/sync/index.ts` connects the WebSocket, does a full pull of all tables on every (re)connect, and applies each broadcast (`put`/`delete`) into Dexie. It's mounted once from `src/app/AppShell.tsx`.
+- **`src/db/`** — Dexie (IndexedDB) is now a **local mirror/cache, not the source of truth**. `src/db/schema.ts` defines the same tables (`TABLES` in `src/sync/index.ts` is the list). `src/sync/index.ts` connects the WebSocket, does a full pull of all tables on every (re)connect, and applies each broadcast (`put`/`delete`) into Dexie. It's mounted once from `src/app/AppShell.tsx`.
 - **`src/db/repositories/*.ts`** — one file per entity, the only place components should touch data. **Read functions still read Dexie directly** (`db.products.toArray()`, etc.) and are consumed via `useLiveQuery` from `dexie-react-hooks`, unchanged from before the server existed. **Write functions now call the server** via `src/api/client.ts` (`apiPost`/`apiPut`/`apiDelete`) instead of writing Dexie — the mirror updates itself when the broadcast comes back over the WebSocket, so a repository never writes to Dexie after a mutation.
 - Transactional operations (stock changes tied to a sale, package-opening, cyclic count adjustments, import) live as dedicated server endpoints using `db.transaction(fn)` (synchronous, `better-sqlite3`) rather than being ported 1:1 from the old async Dexie transactions — see `server/routes/inventoryOps.ts`, `server/routes/sales.ts`.
+- **Money logic lives in `server/domain/`** (`cash.ts`, `purchasing.ts`, `cierre.ts`): plain functions `(db, out, input)` that run inside the caller's transaction and push the rows they touched onto `out`; `runAndBroadcast` (`server/domain/tx.ts`) commits first and broadcasts after, so a rejected operation changes nothing. Routes stay thin. `npm run check:cash` exercises these.
 - When adding a new entity or field: update the type in `src/types/`, the Dexie schema (`src/db/schema.ts`), the server table (`server/db.ts`), the repository's read/write split, and the corresponding `server/routes/*.ts` handler + `broadcast()` call. `TABLES` in `src/sync/index.ts` must list every synced table.
 
 ### Networking beyond local WiFi
@@ -53,7 +55,11 @@ Remote access (from outside the local network) goes through Tailscale (`tailscal
 
 `Sale` (`src/types/sale.ts`) carries `chargeOverride`, `amountReceived`, `changeGiven`, and `roundingAdjustment` as explicit, separate fields from `subtotal`/`discount`/`total` — never fold a rounding or tender adjustment into those base fields, the UI (`CartPanel`) and reports rely on them staying transparent and separately inspectable.
 
-Cierre Z (day close) is **non-destructive**: sales/purchases/extras get `closedInCierreId` stamped on them, they're never deleted. Any report/aggregation logic must filter on that field rather than assuming "current day close = current data".
+Cierre Z (day close) is **non-destructive**: sales and cash movements get `closedInCierreId` stamped on them, they're never deleted. Any report/aggregation logic must filter on that field rather than assuming "current day close = current data". It is also how the Caja Menor workday ends: the expected cash is the ledger balance (computed server-side), the gap against the counted cash becomes an `ajuste_arqueo` movement, and an optional transfer to the Caja Mayor happens in the same transaction.
+
+**Cajas are a ledger, not stored balances** (`cashMovements`, `src/types/cash.ts`): a caja's balance is always the sum of its movements (`balanceOf` in `src/shared/lib/cash.ts`), amounts are always positive with a `direction`, and nothing is ever edited or deleted — corrections are new movements. Caja Menor = the drawer (cash sales, fiado collections, petty expenses; a `cashSessions` row per opened workday); Caja Mayor = safe/bank (receives transfers, pays payroll/rent/utilities/suppliers). Money lands where it physically is: cash sales and cash fiado payments go to the Menor, bank-transfer ones to the Mayor (`medio: 'transferencia'`); fiado sales and forgiven debts move nothing. The first opening ever is the start of the books (base inicial of the Menor + optional saldo inicial of the Mayor) — sales from before the cajas existed are deliberately not back-filled. Spending from a caja is rejected when its balance is insufficient.
+
+**Purchasing** (`suppliers`, `purchaseOrders`, `payables`): stock only grows in `receiveOrder`, in the same transaction that books the payment (cash out of the chosen caja) or the account payable (due date = receipt day + the supplier's credit days). The old free-form `extras`/`purchases` tables were replaced by this. Day keys are computed in the store's timezone (`dayKeyOf` in `src/shared/lib/currency.ts`), never from UTC.
 
 ## Config notes
 

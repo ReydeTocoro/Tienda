@@ -3,6 +3,9 @@ import type { Sale, PayMethod, FiadoPago } from '../../types/sale'
 import type { CartItem } from '../../types/cartItem'
 import { apiPost, apiPut } from '../../api/client'
 
+/** How a fiado payment is collected: cash goes to the Caja Menor, a bank transfer to the Caja Mayor. */
+export type CollectMethod = 'efectivo' | 'transferencia'
+
 export interface FinalizeSaleInput {
   items: CartItem[]
   subtotal: number
@@ -42,15 +45,16 @@ export function getFiadoDebt(sale: Sale): number {
 }
 
 /** Mark the remainder of a fiado sale as paid in one shot — legacy `pagarFiado()`.
- * `condonarFiado` uses the same mechanic with a different note. */
-export async function payFiadoInFull(saleId: number, note = 'Pago completo'): Promise<number> {
-  const { debt } = await apiPost<{ debt: number }>(`/api/sales/${saleId}/pagar-completo`, { note })
+ * `condonarFiado` uses the same mechanic with `condone = true`: the debt is closed but no money
+ * enters any caja (a real payment does, in the caja matching `method`). */
+export async function payFiadoInFull(saleId: number, note = 'Pago completo', condone = false, method: CollectMethod = 'efectivo'): Promise<number> {
+  const { debt } = await apiPost<{ debt: number }>(`/api/sales/${saleId}/pagar-completo`, { note, condone, method })
   return debt
 }
 
 /** legacy `pagarTodosLosFiados()`/`condonarTodosLosFiados()`. */
-export async function payAllFiados(saleIds: number[], note: string): Promise<number> {
-  const { total } = await apiPost<{ total: number }>('/api/sales/pagar-todos', { saleIds, note })
+export async function payAllFiados(saleIds: number[], note: string, condone = false, method: CollectMethod = 'efectivo'): Promise<number> {
+  const { total } = await apiPost<{ total: number }>('/api/sales/pagar-todos', { saleIds, note, condone, method })
   return total
 }
 

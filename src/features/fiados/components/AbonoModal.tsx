@@ -1,16 +1,19 @@
 import { useState } from 'react'
 import { Modal } from '../../../shared/components/Modal'
 import { formatMoney } from '../../../shared/lib/currency'
+import type { CollectMethod } from '../../../db/repositories/sales'
 
 interface AbonoModalProps {
   open: boolean
   maxDebt: number
+  /** Where the money goes: efectivo → Caja Menor, transferencia → Caja Mayor. */
+  method: CollectMethod
   onClose: () => void
   onConfirm: (amount: number, note: string) => void
 }
 
 /** legacy `abonarFiado()` (index.html L4919-4951). */
-export function AbonoModal({ open, maxDebt, onClose, onConfirm }: AbonoModalProps) {
+export function AbonoModal({ open, maxDebt, method, onClose, onConfirm }: AbonoModalProps) {
   const [amount, setAmount] = useState('')
   const [note, setNote] = useState('')
 
@@ -41,7 +44,8 @@ export function AbonoModal({ open, maxDebt, onClose, onConfirm }: AbonoModalProp
         </button>
       </div>
       <label className="mb-1 block field-label">Nota del abono (opcional)</label>
-      <input className="input mb-4" value={note} onChange={(e) => setNote(e.target.value)} placeholder="Ej: Efectivo, transferencia..." />
+      <input className="input mb-1.5" value={note} onChange={(e) => setNote(e.target.value)} placeholder="Ej: Efectivo, transferencia..." />
+      <div className="mb-4 text-[11px] text-muted">{method === 'transferencia' ? 'Cobro por transferencia: el abono se acredita a la Caja Mayor.' : 'Cobro en efectivo: el abono entra a la Caja Menor.'}</div>
       <div className="flex gap-2">
         <button onClick={onClose} className="flex-1 rounded-[10px] border border-br2 py-2.5 text-[13px] text-txt2">
           Cancelar

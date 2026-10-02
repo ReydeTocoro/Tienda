@@ -30,10 +30,17 @@ export function formatDate(iso: string | undefined | null): string {
   return new Date(iso).toLocaleDateString(LOCALE, { day: 'numeric', month: 'short', year: 'numeric' })
 }
 
-export function todayKey(): string {
-  return new Date().toISOString().slice(0, 10)
+/** The shop's calendar day, 'YYYY-MM-DD'. Pinned to the store's timezone instead of UTC: with
+ * `toISOString().slice(0, 10)` a sale at 8 pm in Colombia (UTC-5) already belonged to "tomorrow",
+ * so the day — and the cash close — rolled over at 7 pm. Shared by the client and the server so
+ * both always agree on which day a movement belongs to. */
+const STORE_TIMEZONE = 'America/Bogota'
+const dayFormatter = new Intl.DateTimeFormat('en-CA', { timeZone: STORE_TIMEZONE, year: 'numeric', month: '2-digit', day: '2-digit' })
+
+export function dayKeyOf(when: string | Date): string {
+  return dayFormatter.format(typeof when === 'string' ? new Date(when) : when)
 }
 
-export function dayKeyOf(iso: string): string {
-  return iso.slice(0, 10)
+export function todayKey(): string {
+  return dayKeyOf(new Date())
 }
