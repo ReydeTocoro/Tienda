@@ -223,8 +223,8 @@ export function ProductForm({ product, onSaved, onCancel, scanSeed, onOpenCamera
   }
 
   return (
-    <form onSubmit={handleSubmit} className="rounded-[14px] border border-br bg-s1 p-3.5">
-      <p className="mb-3 text-[14px] font-bold">{editing ? `Editando: ${product!.name}` : 'Agregar Producto'}</p>
+    <form onSubmit={handleSubmit}>
+      <p className="mb-3.5 font-display text-[18px] font-bold">{editing ? `Editando: ${product!.name}` : 'Nuevo producto'}</p>
 
       <div className="grid grid-cols-2 gap-2.5">
         <Field label="Código / Barcode">
@@ -388,18 +388,16 @@ export function ProductForm({ product, onSaved, onCancel, scanSeed, onOpenCamera
       </div>
 
       <div className="mt-3 flex gap-2">
-        {editing && (
-          <button
-            type="button"
-            onClick={() => {
-              setF(EMPTY)
-              onCancel()
-            }}
-            className="rounded-[10px] border border-br2 px-4 py-2.5 text-[13px] font-semibold text-txt2"
-          >
-            Cancelar
-          </button>
-        )}
+        <button
+          type="button"
+          onClick={() => {
+            setF(EMPTY)
+            onCancel()
+          }}
+          className="rounded-[10px] border border-br2 px-4 py-2.5 text-[13px] font-semibold text-txt2"
+        >
+          Cancelar
+        </button>
         <button type="submit" className="flex-1 rounded-[10px] bg-lime py-3 text-[15px] font-bold text-black">
           {editing ? 'Actualizar Producto' : 'Guardar Producto'}
         </button>

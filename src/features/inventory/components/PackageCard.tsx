@@ -9,6 +9,8 @@ import { usePermission } from '../../pin/usePermission'
 
 interface PackageCardProps {
   product: Product
+  /** Margin and invested amount are cost data — only shown while the inventory costs are revealed. */
+  showCosts?: boolean
   onEdit: () => void
   onDelete: () => void
 }
@@ -17,7 +19,7 @@ interface PackageCardProps {
  * (index.html L3771-3845) plus the direct quick actions (L3976-4043). All three quick
  * actions bypassed PIN entirely in the legacy app (a real bug the plan calls out) — here
  * they all go through `requireAdmin()` first. */
-export function PackageCard({ product: p, onEdit, onDelete }: PackageCardProps) {
+export function PackageCard({ product: p, showCosts = false, onEdit, onDelete }: PackageCardProps) {
   const suelta = useLiveQuery(() => (p.codigoSuelta ? db.products.get(p.codigoSuelta) : undefined), [p.codigoSuelta])
   const qSueltas = suelta?.stock ?? 0
   const lowPaq = p.stock <= p.min
@@ -138,14 +140,16 @@ export function PackageCard({ product: p, onEdit, onDelete }: PackageCardProps) 
         <span>
           Suelta: <b className="font-mono text-green">{formatMoney(p.precioSuelta || 0)}</b>
         </span>
-        {p.cost > 0 && (
+        {showCosts && p.cost > 0 && (
           <span>
             Margen: <b className="font-mono text-blue">{lineMargin.toFixed(1)}%</b>
           </span>
         )}
-        <span>
-          Invertido: <b className="font-mono text-orange">{formatMoney(lineValue)}</b>
-        </span>
+        {showCosts && (
+          <span>
+            Invertido: <b className="font-mono text-orange">{formatMoney(lineValue)}</b>
+          </span>
+        )}
       </div>
     </div>
   )

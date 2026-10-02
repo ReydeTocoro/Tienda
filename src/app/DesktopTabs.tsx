@@ -1,12 +1,14 @@
 import { NavLink, useNavigate } from 'react-router-dom'
 import type { MouseEvent } from 'react'
 import { NAV_ITEMS, useNavBadges, type NavItem } from './navConfig'
+import { HeaderTools } from './HeaderTools'
 import { usePermission } from '../features/pin/usePermission'
 
 /** Desktop chrome — a horizontal tab strip across the very top of the window, like switching
  * between open browser tabs: the active tab's background matches the page below it (so it
- * reads as "merged" into the content) while inactive tabs sit recessed in the strip. Hidden
- * below `md:`, where `BottomNav` is the nav instead (mobile is untouched by this). */
+ * reads as "merged" into the content) while inactive tabs sit recessed in the strip. The clock
+ * and theme toggle sit in its right corner. Hidden below `md:`, where `BottomNav` is the nav
+ * instead (mobile gets the same tools from the slim `Header`). */
 export function DesktopTabs() {
   const badges = useNavBadges()
   const { requireAdmin } = usePermission()
@@ -51,6 +53,9 @@ export function DesktopTabs() {
           </NavLink>
         )
       })}
+      <div className="ml-auto flex items-center self-center pl-3 pr-2">
+        <HeaderTools />
+      </div>
     </nav>
   )
 }

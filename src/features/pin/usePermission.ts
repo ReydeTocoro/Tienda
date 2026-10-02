@@ -18,14 +18,16 @@ async function verifyAdmin(entered: string): Promise<PinVerifyResult> {
 /** The one permission mechanism for the whole app (replaces legacy's two mixed systems:
  * `admin-only` CSS classes + ad-hoc checks in `navInventario`/`navReporte`). Call
  * `requireAdmin()` before any sensitive action; it resolves immediately if the session is
- * already unlocked, otherwise it prompts the PIN modal and resolves with the result. */
+ * already unlocked, otherwise it prompts the PIN modal and resolves with the result.
+ * `force` prompts even when the session is already unlocked — for data that has to stay hidden
+ * on a shared screen even from someone who already got into the section (inventory costs). */
 export function usePermission() {
   const isAdmin = usePinStore((s) => s.isAdminUnlocked)
   const currentUserName = usePinStore((s) => s.lastIdentity)
   const ask = usePinStore((s) => s.ask)
 
-  async function requireAdmin(title?: string, subtitle?: string): Promise<boolean> {
-    if (usePinStore.getState().isAdminUnlocked) return true
+  async function requireAdmin(title?: string, subtitle?: string, opts?: { force?: boolean }): Promise<boolean> {
+    if (!opts?.force && usePinStore.getState().isAdminUnlocked) return true
     const result = await ask(title ?? 'Acceso protegido', subtitle ?? 'Ingresa tu PIN de seguridad', verifyAdmin)
     if (result.ok) usePinStore.getState().markAdminUnlocked()
     return result.ok

@@ -19,12 +19,14 @@ interface EntradaRapidaProps {
   onOpenCamera: () => void
   onOpenMassive: () => void
   searchInputRef: RefObject<HTMLInputElement | null>
+  /** Body only — no collapsible card/header — for hosting inside a dialog that supplies its own title. */
+  embedded?: boolean
 }
 
 /** Single-item restock panel — legacy "Entrada de Mercancía" (index.html L1107-1177,
  * `confirmarEntrada()` L3290-3302). */
 export const EntradaRapida = forwardRef<EntradaRapidaHandle, EntradaRapidaProps>(function EntradaRapida(
-  { products, open, onToggle, onOpenCamera, onOpenMassive, searchInputRef },
+  { products, open, onToggle, onOpenCamera, onOpenMassive, searchInputRef, embedded = false },
   ref,
 ) {
   const [search, setSearch] = useState('')
@@ -87,22 +89,24 @@ export const EntradaRapida = forwardRef<EntradaRapidaHandle, EntradaRapidaProps>
   const entradaStep = selected && isMeasuredUnit(selected.unit) ? 0.1 : 1
 
   return (
-    <div className={`mb-3.5 overflow-hidden rounded-2xl border-2 bg-s1 transition-colors ${open ? 'border-green' : 'border-green/20'}`}>
-      <button onClick={onToggle} className="flex w-full items-center justify-between px-3.5 py-3 text-left">
-        <div className="flex items-center gap-2.5">
-          <div className="flex h-9 w-9 items-center justify-center rounded-[10px] border border-green/25 bg-green/10 text-green">
-            <Package size={18} />
+    <div className={embedded ? '' : `mb-3.5 overflow-hidden rounded-2xl border-2 bg-s1 transition-colors ${open ? 'border-green' : 'border-green/20'}`}>
+      {!embedded && (
+        <button onClick={onToggle} className="flex w-full items-center justify-between px-3.5 py-3 text-left">
+          <div className="flex items-center gap-2.5">
+            <div className="flex h-9 w-9 items-center justify-center rounded-[10px] border border-green/25 bg-green/10 text-green">
+              <Package size={18} />
+            </div>
+            <div>
+              <div className="text-[14px] font-bold">Entrada de Mercancía</div>
+              <div className="text-[11px] text-muted">Escanea o busca para sumar al stock</div>
+            </div>
           </div>
-          <div>
-            <div className="text-[14px] font-bold">Entrada de Mercancía</div>
-            <div className="text-[11px] text-muted">Escanea o busca para sumar al stock</div>
-          </div>
-        </div>
-        <span className={`text-[20px] text-muted transition-transform ${open ? 'rotate-90' : ''}`}>›</span>
-      </button>
+          <span className={`text-[20px] text-muted transition-transform ${open ? 'rotate-90' : ''}`}>›</span>
+        </button>
+      )}
 
-      {open && (
-        <div className="border-t border-br p-3.5">
+      {(open || embedded) && (
+        <div className={embedded ? '' : 'border-t border-br p-3.5'}>
           <button
             onClick={onOpenMassive}
             className="mb-2.5 flex w-full items-center gap-2.5 rounded-xl border-2 border-green/25 bg-green/10 px-3.5 py-3 text-left text-green"
