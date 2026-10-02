@@ -2,6 +2,7 @@ import { NavLink, useNavigate } from 'react-router-dom'
 import type { MouseEvent } from 'react'
 import { NAV_ITEMS, useNavBadges, type NavItem } from './navConfig'
 import { HeaderTools } from './HeaderTools'
+import { StoreBrand } from './StoreBrand'
 import { usePermission } from '../features/pin/usePermission'
 
 /** Desktop chrome — a horizontal tab strip across the very top of the window, like switching
@@ -24,6 +25,9 @@ export function DesktopTabs() {
 
   return (
     <nav className="hidden flex-shrink-0 items-end gap-1 bg-s2 px-2 pt-2 md:flex">
+      <div className="mb-1.5 mr-3 flex items-center self-center border-r border-br2 pr-3">
+        <StoreBrand />
+      </div>
       {NAV_ITEMS.map((item) => {
         const { to, label, icon: Icon, end, badgeKey } = item
         const count = badgeKey ? badges[badgeKey] : 0

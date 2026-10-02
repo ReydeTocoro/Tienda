@@ -23,12 +23,26 @@ export function ConfiguracionPage() {
   const [status, setStatus] = useState<{ text: string; ok: boolean } | null>(null)
   const lengthHydrated = useRef(false)
 
+  const [storeName, setStoreName] = useState('')
+  const nameHydrated = useRef(false)
+
   useEffect(() => {
     if (!lengthHydrated.current && settings) {
       setPinLength(settings.pinLength)
       lengthHydrated.current = true
     }
+    if (!nameHydrated.current && settings) {
+      setStoreName(settings.storeName)
+      nameHydrated.current = true
+    }
   }, [settings])
+
+  async function saveStoreName() {
+    const name = storeName.trim()
+    if (!name) return
+    await updateSettings({ storeName: name })
+    toast('Nombre de la tienda actualizado', 'lime')
+  }
 
   async function savePin() {
     const re = new RegExp(`^\\d{${pinLength}}$`)
@@ -62,6 +76,20 @@ export function ConfiguracionPage() {
   return (
     <div className="p-3.5 md:mx-auto md:max-w-[1200px] md:p-6">
       <p className="mb-3.5 font-display text-[21px] font-bold md:text-[26px]">Configuración</p>
+
+      <p className="mb-2 field-label">Nombre de la tienda</p>
+      <div className="mb-3.5 flex gap-2 rounded-xl border border-br2 bg-s2 p-3.5 md:max-w-md">
+        <input
+          className="input"
+          value={storeName}
+          onChange={(e) => setStoreName(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && saveStoreName()}
+          placeholder="Mi Tienda Pro"
+        />
+        <button onClick={saveStoreName} className="flex-shrink-0 rounded-[10px] bg-lime px-4 py-2 text-[13px] font-bold text-black transition-opacity hover:opacity-90">
+          Guardar
+        </button>
+      </div>
 
       <div className="md:grid md:grid-cols-2 md:items-start md:gap-6">
         <div>
