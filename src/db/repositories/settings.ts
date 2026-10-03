@@ -7,9 +7,9 @@ const DEFAULT_PIN = '1234'
 
 /** Read path — unchanged: stays on the local Dexie mirror. The fallback default row created
  * here the first time a client reads before its first sync pull lands is never sent to the
- * server, but it's harmless: server/db.ts seeds the exact same defaults (same hash of "1234")
- * on its own first run, and the next sync pull overwrites this local row with the server's
- * authoritative copy anyway. */
+ * server, but it's harmless: the first migration seeds the exact same defaults (same hash of
+ * "1234"), and the next sync pull overwrites this local row with the server's authoritative copy
+ * anyway. */
 export async function getSettings(): Promise<Settings> {
   const existing = await db.settings.get('main')
   if (existing) return existing

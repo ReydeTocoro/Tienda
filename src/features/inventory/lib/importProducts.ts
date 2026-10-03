@@ -1,6 +1,6 @@
 import * as XLSX from 'xlsx'
 import type { Product } from '../../../types/product'
-import { findUnit } from '../../../types/unit'
+import { UNITS } from '../../../types/unit'
 
 export interface ParsedImportRow {
   code: string
@@ -99,11 +99,11 @@ export function buildParsedRows(rawRows: Record<string, string>[], existingProdu
     const stock = parseFloat(get(row, 'stock', 'existencia', 'qty', 'quantity', 'cantidad', 'inventario')) || 0
     const min = parseFloat(get(row, 'stock mínimo', 'stock_minimo', 'min', 'minimo', 'minimum', 'stock min')) || 0
 
-    // Only an exact known unit code (kg, lb, L...) gets conversions/pricePer in the cart — an
+    // Only a known unit code (kg, lb, L... in any capitalization) gets conversions/pricePer in the cart — an
     // unrecognized spelling (e.g. "Kilogramo", "KG ") would otherwise silently import as a
     // measured product with no working conversions, so fall back to 'unidad' and flag it.
     const rawUnit = get(row, 'unidad', 'unit')
-    const matchedUnit = rawUnit ? findUnit(rawUnit.toLowerCase())?.value : undefined
+    const matchedUnit = rawUnit ? UNITS.find((u) => u.value.toLowerCase() === rawUnit.toLowerCase())?.value : undefined
     const unit = matchedUnit ?? 'unidad'
 
     const warnings: string[] = []
