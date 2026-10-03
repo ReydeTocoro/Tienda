@@ -33,7 +33,7 @@ export default defineConfig({
         ],
       },
       workbox: {
-        globPatterns: ['**/*.{js,css,html,png,svg,ico}'],
+        globPatterns: ['**/*.{js,css,html,png,svg,ico,jpg}'],
         // The API must always hit the network, never the app-shell fallback.
         navigateFallbackDenylist: [/^\/api\//],
       },

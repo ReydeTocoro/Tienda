@@ -11,6 +11,7 @@ import { BottomSheet } from '../../../shared/components/BottomSheet'
 import { MoneyInput } from '../../../shared/components/MoneyInput'
 import { ClientBar } from './ClientBar'
 import { CartLine } from './CartLine'
+import { BILLS } from '../lib/bills'
 
 interface CartPanelProps {
   products: Product[]
@@ -24,8 +25,6 @@ const PAY_METHODS: Array<{ key: 'efectivo' | 'transferencia' | 'fiado'; label: s
   { key: 'transferencia', label: 'Transfer.', icon: Smartphone },
   { key: 'fiado', label: 'Fiado', icon: Handshake },
 ]
-
-const QUICK_BILLS = [5000, 10000, 20000, 50000, 100000]
 
 export function CartPanel({ products, onEditMeasured, onOpenDiscount, onCheckout }: CartPanelProps) {
   const items = useCartStore((s) => s.items)
@@ -121,7 +120,7 @@ export function CartPanel({ products, onEditMeasured, onOpenDiscount, onCheckout
 
       {/* Payment method, discount/notes shortcuts, and the final confirm all live here — pulled
        * out of the cart column so the product list above never has to compete for space. */}
-      <BottomSheet open={checkoutOpen} onClose={() => setCheckoutOpen(false)} maxWidthClass="max-w-[440px]">
+      <BottomSheet open={checkoutOpen} onClose={() => setCheckoutOpen(false)} maxWidthClass="max-w-[500px]">
         <div className="mb-3.5 flex items-center gap-3">
           <span className="font-display text-[19px] font-bold">Cobrar</span>
           <span className="ml-auto font-mono text-[13px] text-txt2">{totalItems} ítem{totalItems !== 1 ? 's' : ''}</span>
@@ -166,19 +165,23 @@ export function CartPanel({ products, onEditMeasured, onOpenDiscount, onCheckout
               value={amountReceived}
               onChange={(v) => setAmountReceived(v ?? 0)}
             />
-            <div className="mb-2 grid grid-cols-3 gap-1.5">
-              {QUICK_BILLS.map((bill) => (
+            <div className="mb-2 grid grid-cols-4 gap-1.5">
+              {BILLS.map(({ value, img }) => (
                 <button
-                  key={bill}
-                  onClick={() => setAmountReceived(bill)}
-                  className="rounded-lg border border-br2 bg-s2 py-1.5 text-[12px] font-mono text-txt2 transition-colors hover:border-lime/40 hover:text-lime"
+                  key={value}
+                  onClick={() => setAmountReceived(value)}
+                  aria-label={formatMoney(value)}
+                  title={formatMoney(value)}
+                  className={`overflow-hidden rounded-md shadow-xs transition active:scale-[0.96] ${
+                    amountReceived === value ? 'ring-2 ring-lime' : 'ring-1 ring-br2 hover:ring-lime/50'
+                  }`}
                 >
-                  {formatMoney(bill)}
+                  <img src={img} alt="" draggable={false} className="block aspect-[2.2/1] w-full bg-s2 object-contain" />
                 </button>
               ))}
               <button
                 onClick={() => setAmountReceived(chargeAmount)}
-                className="rounded-lg border border-lime/40 bg-lime/10 py-1.5 text-[12px] font-semibold text-lime"
+                className="flex aspect-[2.2/1] items-center justify-center rounded-md border border-lime/40 bg-lime/10 text-[12px] font-semibold text-lime"
               >
                 Exacto
               </button>
