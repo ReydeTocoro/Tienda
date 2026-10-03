@@ -22,8 +22,15 @@ export async function getSettings(): Promise<Settings> {
     theme: 'light',
     hidScannerEnabled: true,
   }
-  await db.settings.put(defaults)
-  return defaults
+  // `add`, not `put`: the sync pull can land while the default hash above is being computed, and a
+  // `put` would then overwrite the server's real settings — the real PIN included — with these
+  // defaults (PIN 1234 accepted on a fresh device until the next reload).
+  try {
+    await db.settings.add(defaults)
+    return defaults
+  } catch {
+    return (await db.settings.get('main')) ?? defaults
+  }
 }
 
 export async function updateSettings(patch: Partial<Omit<Settings, 'key'>>): Promise<void> {

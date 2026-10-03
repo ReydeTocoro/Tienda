@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { usePinStore } from '../../store/usePinStore'
 import { usePinGate, PIN_MAX_ATTEMPTS } from './usePinGate'
 
@@ -14,6 +14,18 @@ export function PinModal() {
   const { pinLength, isLocked, remainingSecs, registerFailure, registerSuccess } = usePinGate()
   const [error, setError] = useState('')
   const [shake, setShake] = useState(false)
+  const dialogRef = useRef<HTMLDialogElement>(null)
+
+  // A native modal <dialog>, like every other overlay: it lands in the top layer *above* a sheet
+  // that is already open (e.g. "Pagar todo" inside the fiado sheet asks for the PIN). A plain
+  // z-indexed div ended up underneath that sheet, unreachable by touch.
+  useEffect(() => {
+    const el = dialogRef.current
+    if (request && el && !el.open) {
+      el.showModal()
+      el.focus() // the dialog itself, not the first key of the pad
+    }
+  }, [request])
 
   useEffect(() => {
     setError('')
@@ -80,7 +92,12 @@ export function PinModal() {
   const attemptPct = (attempts / PIN_MAX_ATTEMPTS) * 100
 
   return (
-    <div className="fixed inset-0 z-[9500] flex items-center justify-center bg-black/95 p-5 backdrop-blur-sm">
+    <dialog
+      ref={dialogRef}
+      tabIndex={-1}
+      onCancel={(e) => e.preventDefault()}
+      className="m-0 flex h-dvh max-h-none w-screen max-w-none items-center justify-center overflow-hidden border-0 bg-transparent p-5 text-txt outline-none backdrop:bg-black/95 backdrop:backdrop-blur-sm"
+    >
       <div className={`w-full max-w-[340px] rounded-[24px] border border-br2 bg-s1 px-[26px] pb-[26px] pt-[30px] text-center shadow-[var(--shadow-md)] ${shake ? 'animate-[pinShake_0.45s_ease]' : ''}`}>
         <div className="mb-3.5 inline-flex items-center gap-1.5 rounded-full border border-lime/30 bg-lime/10 px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-lime">
           Acceso protegido
@@ -136,6 +153,6 @@ export function PinModal() {
           Cancelar
         </button>
       </div>
-    </div>
+    </dialog>
   )
 }
