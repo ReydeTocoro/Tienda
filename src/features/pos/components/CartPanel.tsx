@@ -1,13 +1,16 @@
 import { useMemo, useState } from 'react'
-import { Banknote, Smartphone, Handshake, X, Trash2, FileText } from 'lucide-react'
+import { Banknote, Smartphone, Handshake, Trash2, FileText, ShoppingCart } from 'lucide-react'
 import type { Product } from '../../../types/product'
 import { useCartStore } from '../../../store/useCartStore'
+import { toast } from '../../../store/useToastStore'
 import { useCartTotals } from '../hooks/useFinalizeSale'
 import { useSelectedCustomerLoyalty } from '../hooks/useSelectedCustomerLoyalty'
 import { formatMoney, formatQty } from '../../../shared/lib/currency'
-import { unitShortLabel, isMeasuredUnit } from '../../../shared/lib/units'
+import { isMeasuredUnit } from '../../../shared/lib/units'
 import { BottomSheet } from '../../../shared/components/BottomSheet'
 import { MoneyInput } from '../../../shared/components/MoneyInput'
+import { ClientBar } from './ClientBar'
+import { CartLine } from './CartLine'
 
 interface CartPanelProps {
   products: Product[]
@@ -48,12 +51,21 @@ export function CartPanel({ products, onEditMeasured, onOpenDiscount, onCheckout
   const { subtotal, discount, discountLabel, total, chargeAmount, roundingAdjustment } = useCartTotals(loyaltyPts)
 
   const stockByCode = useMemo(() => new Map(products.map((p) => [p.code, p.stock])), [products])
-  const totalItems = items.reduce((a, i) => a + i.qty, 0)
+  // A weighed/measured line is one item, however many kg or metres it holds ("16.5 ítems" read like a bug).
+  const totalItems = items.reduce((a, i) => a + (isMeasuredUnit(i.unit) ? 1 : i.qty), 0)
 
   const discLabel = discountLabel === 'manual' ? `Desc. manual (${manualDiscountPct}%)` : discountLabel === 'loyalty' ? `Desc. cliente (${formatQty(loyaltyPts)} pts)` : ''
 
   const change = amountReceived - chargeAmount
   const insufficientCash = payMethod === 'efectivo' && amountReceived > 0 && change < 0
+
+  function startCheckout() {
+    if (!items.length) {
+      toast('Agrega productos al carrito para cobrar', 'orange')
+      return
+    }
+    setCheckoutOpen(true)
+  }
 
   function confirmCheckout() {
     if (insufficientCash) return
@@ -62,97 +74,50 @@ export function CartPanel({ products, onEditMeasured, onOpenDiscount, onCheckout
   }
 
   return (
-    <div className="flex h-full flex-col overflow-hidden bg-bg">
-      <div className="flex flex-shrink-0 items-center justify-between border-b border-br bg-s1 px-3 py-2 md:px-4 md:py-2.5">
-        <span className="text-[13px] font-bold md:text-[14px]">Carrito</span>
+    // The cart is one self-contained card — title, customer, lines and the Cobrar button all belong
+    // to it, so nothing reads as page chrome — and it never changes shape: an empty cart keeps the
+    // same header, customer row and Cobrar button, there is just nothing to charge yet.
+    <div className="@container flex h-full flex-col overflow-hidden rounded-2xl border border-br bg-s1 shadow-sm">
+      <div className="flex flex-shrink-0 items-center justify-between px-3.5 py-2.5">
+        <span className="font-display text-[15px] font-bold">Carrito</span>
         <span className="font-mono text-[11px] text-lime">{totalItems > 0 ? `${totalItems} ítem${totalItems !== 1 ? 's' : ''}` : ''}</span>
       </div>
+
+      <ClientBar />
 
       {/* Product list always gets the full remaining space — payment details live in a
        * dedicated sheet instead (opened from the Cobrar button below), so this never gets
        * squeezed by the payment-method grid + quick actions like it used to. */}
       <div className="flex-1 overflow-y-auto">
         {!items.length ? (
-          <div className="p-8 text-center text-muted">
-            <p className="text-[13px]">Carrito vacío</p>
+          <div className="flex h-full flex-col items-center justify-center gap-1.5 p-8 text-center text-muted">
+            <ShoppingCart size={28} strokeWidth={1.5} />
+            <p className="text-[13px] font-semibold text-txt2">Carrito vacío</p>
+            <p className="text-[11px]">Toca un producto o escanea un código</p>
           </div>
         ) : (
-          items.map((item, i) => {
-            const measured = isMeasuredUnit(item.unit)
-            const ul = measured ? unitShortLabel(item.unit) : null
-            return (
-              <div key={i} className="border-b border-br px-3 py-2.5">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0 flex-1">
-                    <div className="truncate text-[13px] font-semibold">
-                      {item.name}
-                      {item.isFree && (
-                        <span className="ml-1 rounded border border-orange/30 bg-orange/10 px-1 py-px text-[9px] font-bold text-orange">LIBRE</span>
-                      )}
-                    </div>
-                    <div className="truncate font-mono text-[10px] text-muted">
-                      {item.isFree ? 'Sin código' : item.code}
-                      {item.brand ? ' · ' + item.brand : ''}
-                    </div>
-                  </div>
-                  <button onClick={() => removeItem(i)} className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-md text-muted transition-colors hover:bg-red/10 hover:text-red">
-                    <X size={14} />
-                  </button>
-                </div>
-
-                <div className="mt-1.5 flex items-center justify-between gap-2">
-                  {measured ? (
-                    <div className="flex items-center gap-2">
-                      <span className="whitespace-nowrap font-mono text-[12px] text-lime">
-                        {formatQty(item.qty)} {ul}
-                      </span>
-                      <button onClick={() => onEditMeasured(i)} className="rounded border border-br2 bg-s3 px-1.5 py-0.5 text-[10px] text-txt2">
-                        editar
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="flex items-center gap-1">
-                      <button
-                        onClick={() => changeQty(i, -1)}
-                        className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-md border border-br2 bg-s3 text-[14px] transition-colors hover:border-lime/40 hover:text-lime"
-                      >
-                        −
-                      </button>
-                      <span className="w-[22px] text-center font-mono text-[13px]">{formatQty(item.qty)}</span>
-                      <button
-                        disabled={item.isFree}
-                        onClick={() => changeQty(i, 1, stockByCode.get(item.code))}
-                        className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-md border border-br2 bg-s3 text-[14px] transition-colors hover:border-lime/40 hover:text-lime disabled:opacity-30 disabled:hover:border-br2 disabled:hover:text-txt"
-                      >
-                        +
-                      </button>
-                    </div>
-                  )}
-                  <div className="text-right">
-                    <div className="font-mono text-[10px] text-muted">
-                      {formatMoney(item.price)}
-                      {measured ? `/${ul}` : ''}
-                    </div>
-                    <div className="font-mono text-[13px] font-medium text-lime">{formatMoney(item.price * item.qty)}</div>
-                  </div>
-                </div>
-              </div>
-            )
-          })
+          items.map((item, i) => (
+            <CartLine
+              key={i}
+              item={item}
+              onChangeQty={(delta) => changeQty(i, delta, stockByCode.get(item.code))}
+              onRemove={() => removeItem(i)}
+              onEditMeasured={() => onEditMeasured(i)}
+            />
+          ))
         )}
       </div>
 
-      {items.length > 0 && (
-        <div className="flex-shrink-0 border-t border-br bg-s1 px-3.5 py-3">
-          <button
-            onClick={() => setCheckoutOpen(true)}
-            className="flex w-full items-center justify-between rounded-[10px] bg-green px-4 py-3 text-black transition-transform hover:brightness-110 active:scale-[0.98]"
-          >
-            <span className="text-[14px] font-bold">Cobrar</span>
-            <span className="font-mono text-[17px] font-bold">{formatMoney(chargeAmount)}</span>
-          </button>
-        </div>
-      )}
+      <div className="flex-shrink-0 border-t border-br px-2.5 py-3 sm:px-3.5">
+        <button
+          onClick={startCheckout}
+          aria-disabled={!items.length}
+          className={`flex w-full items-center justify-between gap-2 rounded-[10px] bg-green px-3 py-3 text-black transition active:scale-[0.98] sm:px-4 ${items.length ? 'hover:brightness-110' : 'opacity-50'}`}
+        >
+          <span className="text-[13px] font-bold sm:text-[14px]">Cobrar</span>
+          <span className="font-mono text-[14px] font-bold sm:text-[17px]">{formatMoney(chargeAmount)}</span>
+        </button>
+      </div>
 
       {/* Payment method, discount/notes shortcuts, and the final confirm all live here — pulled
        * out of the cart column so the product list above never has to compete for space. */}

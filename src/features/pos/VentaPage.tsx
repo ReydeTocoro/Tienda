@@ -20,9 +20,7 @@ import { FreeProductModal } from './components/FreeProductModal'
 import { CalculatorModal } from './components/CalculatorModal'
 import { QuickDiscountModal } from './components/QuickDiscountModal'
 import { VentaKpiBar } from './components/VentaKpiBar'
-import { ClientBar } from './components/ClientBar'
 import { CajaBanner } from '../cash/components/CajaBanner'
-import { ClientPickerSheet } from './components/ClientPickerSheet'
 import { useFinalizeSale } from './hooks/useFinalizeSale'
 
 export function VentaPage() {
@@ -39,7 +37,6 @@ export function VentaPage() {
   const [receiptSale, setReceiptSale] = useState<Sale | null>(null)
   const [cameraOpen, setCameraOpen] = useState(false)
   const [flash, setFlash] = useState<{ show: boolean; success: boolean }>({ show: false, success: true })
-  const [pickerOpen, setPickerOpen] = useState(false)
 
   const searchRef = useRef<HTMLInputElement>(null)
   const dropdownMatches = useMemo(() => searchMatches(products, search), [products, search])
@@ -151,13 +148,12 @@ export function VentaPage() {
 
   return (
     <div className="mx-auto flex h-full max-w-[1800px] flex-col">
-      {/* Left column carries everything that builds the sale (client, KPIs, search, grid); the
-       * cart is a standalone right column spanning the full height, not boxed under a shared
-       * header row — it's the thing the cashier watches the whole time. */}
+      {/* Left column carries everything that finds products (KPIs, search, grid); the cart is a
+       * standalone card in the right column spanning the full height — it's the thing the cashier
+       * watches the whole time, so it owns its title, customer and Cobrar button. */}
       <div className="flex min-h-0 flex-1 overflow-hidden">
         <div className="flex w-[52%] flex-shrink-0 flex-col overflow-hidden md:w-[56%] xl:w-[58%]">
           <CajaBanner />
-          <ClientBar onOpen={() => setPickerOpen(true)} />
           <VentaKpiBar onClickLowStock={() => setLowStockOnly(true)} />
 
           <div className="flex flex-shrink-0 gap-2 px-3 py-2 md:px-4">
@@ -215,7 +211,7 @@ export function VentaPage() {
             />
           </div>
         </div>
-        <div className="flex-1 overflow-hidden">
+        <div className="flex-1 overflow-hidden p-2 md:p-3">
           <CartPanel products={products} onEditMeasured={handleEditMeasured} onOpenDiscount={() => setDiscOpen(true)} onCheckout={handleCheckout} />
         </div>
       </div>
@@ -234,7 +230,6 @@ export function VentaPage() {
       />
       <QuickDiscountModal open={discOpen} onClose={() => setDiscOpen(false)} />
       <ReceiptSheet sale={receiptSale} onClose={() => setReceiptSale(null)} />
-      <ClientPickerSheet open={pickerOpen} onClose={() => setPickerOpen(false)} />
       <CameraOverlay open={cameraOpen} videoRef={scanner.videoRef} onClose={() => setCameraOpen(false)} />
       <ScanFlashOverlay show={flash.show} success={flash.success} />
     </div>

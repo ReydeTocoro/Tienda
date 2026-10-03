@@ -39,14 +39,24 @@ function columnsForWidth(w: number) {
 
 const ROW_HEIGHT = 132
 
+const ALL = '__all__'
+
 export function ProductGrid({ products, cart, search, activeCat, onSetCat, onPick, onOpenFree, lowStockOnly }: ProductGridProps) {
-  const cats = useMemo(() => ['__all__', ...Array.from(new Set(products.map((p) => p.cat).filter(Boolean))).sort()], [products])
+  const catCounts = useMemo(() => {
+    const m = new Map<string, number>()
+    for (const p of products) m.set(p.cat || '', (m.get(p.cat || '') ?? 0) + 1)
+    return m
+  }, [products])
+  const cats = useMemo(() => [...catCounts.keys()].sort((a, b) => (a === '' ? 1 : b === '' ? -1 : a.localeCompare(b, 'es'))), [catCounts])
+  // The chosen category can vanish (its last product recategorized or deleted from another device):
+  // fall back to "all" rather than an empty grid under a blank selector.
+  const cat = activeCat === ALL || catCounts.has(activeCat) ? activeCat : ALL
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
     let list = products.filter((p) => {
       if (lowStockOnly) return p.stock > 0 && p.min > 0 && p.stock <= p.min
-      if (activeCat !== '__all__' && (p.cat || '') !== activeCat) return false
+      if (cat !== ALL && (p.cat || '') !== cat) return false
       if (!q) return true
       return p.name.toLowerCase().includes(q) || p.code.toLowerCase().includes(q) || (p.brand || '').toLowerCase().includes(q)
     })
@@ -56,7 +66,7 @@ export function ProductGrid({ products, cart, search, activeCat, onSetCat, onPic
       return a.name.localeCompare(b.name)
     })
     return list
-  }, [products, search, activeCat, lowStockOnly])
+  }, [products, search, cat, lowStockOnly])
 
   const columns = useColumnCount()
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -77,22 +87,22 @@ export function ProductGrid({ products, cart, search, activeCat, onSetCat, onPic
 
   return (
     <div className="flex h-full flex-col overflow-hidden border-r border-br bg-bg">
-      <div className="flex flex-shrink-0 items-center justify-between border-b border-br bg-s1 px-3 py-2 md:px-4 md:py-2.5">
+      <div className="flex flex-shrink-0 items-center gap-2 border-b border-br bg-s1 px-3 py-2 md:px-4">
         <span className="text-[13px] font-bold md:text-[14px]">Productos</span>
-        <span className="font-mono text-[11px] text-muted">{filtered.length}</span>
-      </div>
-      <div className="flex flex-shrink-0 gap-1.5 overflow-x-auto border-b border-br bg-s1 px-2.5 py-2 [scrollbar-width:none] md:px-4">
-        {cats.map((c) => (
-          <button
-            key={c}
-            onClick={() => onSetCat(c)}
-            className={`flex-shrink-0 whitespace-nowrap rounded-full border px-2.5 py-1 text-[11px] font-semibold transition-colors ${
-              activeCat === c ? 'border-lime bg-lime/15 text-lime' : 'border-br2 text-txt2 hover:border-br2 hover:bg-s2 hover:text-txt'
-            }`}
-          >
-            {c === '__all__' ? 'Todos' : c}
-          </button>
-        ))}
+        <select
+          value={cat}
+          onChange={(e) => onSetCat(e.target.value)}
+          aria-label="Filtrar por categoría"
+          className={`input w-auto min-w-0 max-w-[230px] py-1 text-[12px] ${cat !== ALL ? 'border-lime' : ''}`}
+        >
+          <option value={ALL}>Todas ({products.length})</option>
+          {cats.map((c) => (
+            <option key={c || '__none__'} value={c}>
+              {c || 'Sin categoría'} ({catCounts.get(c)})
+            </option>
+          ))}
+        </select>
+        <span className="ml-auto hidden font-mono text-[11px] text-muted sm:inline">{filtered.length}</span>
       </div>
       {!filtered.length ? (
         <div className="flex flex-1 items-center justify-center p-7 text-center text-muted">

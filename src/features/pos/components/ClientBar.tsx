@@ -1,37 +1,50 @@
+import { useState } from 'react'
+import { ChevronRight, UserRound } from 'lucide-react'
 import { useCartStore } from '../../../store/useCartStore'
 import { useSelectedCustomerLoyalty } from '../hooks/useSelectedCustomerLoyalty'
+import { CustomerAvatar } from '../../customers/components/CustomerAvatar'
 import { formatQty } from '../../../shared/lib/currency'
+import { ClientPickerSheet } from './ClientPickerSheet'
 
-interface ClientBarProps {
-  onOpen: () => void
-}
-
-/** Selected-customer bar + loyalty discount banner — legacy `.client-bar`/`#disc-banner`
- * (index.html L972-984, `updateClientBar()` L3542-3559). */
-export function ClientBar({ onOpen }: ClientBarProps) {
+/** Customer row of the cart: the first section under the cart title, so who the sale is for is
+ * decided inside the cart itself. Shows the picked customer (tier-colored avatar, tier, points
+ * and whether the points discount is already available) and opens the picker on tap.
+ * Legacy `.client-bar`/`#disc-banner` (index.html L972-984, `updateClientBar()` L3542-3559). */
+export function ClientBar() {
   const customerName = useCartStore((s) => s.customerName)
-  const { pts, tier } = useSelectedCustomerLoyalty()
+  const { spent, pts, tier } = useSelectedCustomerLoyalty()
+  const [open, setOpen] = useState(false)
 
   return (
-    <div className="flex flex-shrink-0 items-center gap-2 px-3 pt-2">
-      <button
-        onClick={onOpen}
-        className={`flex min-w-0 flex-1 items-center justify-between rounded-xl border bg-s2 px-3.5 py-2.5 text-left ${customerName ? 'border-lime' : 'border-br2'}`}
-      >
-        <div className="min-w-0">
-          <div className="field-label">Cliente</div>
-          <div className="overflow-hidden text-ellipsis whitespace-nowrap text-[14px] font-semibold">
-            {customerName ? `${customerName} · ${tier.label}` : 'Sin cliente'}
-          </div>
-          {customerName && <div className="mt-0.5 font-mono text-[11px] text-lime">{formatQty(pts)} puntos</div>}
+    <div className="flex-shrink-0 border-y border-br">
+      <button onClick={() => setOpen(true)} title="Seleccionar cliente" className="flex w-full items-center gap-2.5 px-3.5 py-2.5 text-left transition-colors hover:bg-s2">
+        {customerName ? (
+          <CustomerAvatar name={customerName} spent={spent} size={34} />
+        ) : (
+          <span className="flex h-[34px] w-[34px] flex-shrink-0 items-center justify-center rounded-full border border-dashed border-br2 text-muted">
+            <UserRound size={16} />
+          </span>
+        )}
+        <div className="min-w-0 flex-1">
+          {customerName ? (
+            <>
+              <div className="truncate text-[13px] font-semibold">{customerName}</div>
+              <div className="truncate text-[11px] text-muted">
+                {tier.label}
+                {pts >= 50 && <span className="text-purple"> · Descuento disponible</span>}
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="field-label">Cliente</div>
+              <div className="text-[13px] font-semibold text-txt2">Sin cliente</div>
+            </>
+          )}
         </div>
-        <span className="flex-shrink-0 text-[18px] text-muted">›</span>
+        {customerName && <span className="hidden flex-shrink-0 font-mono text-[12px] font-bold text-lime sm:inline">{formatQty(pts)} pts</span>}
+        <ChevronRight size={16} className="flex-shrink-0 text-muted" />
       </button>
-      {customerName && pts >= 50 && (
-        <div className="flex flex-shrink-0 items-center gap-1.5 rounded-[10px] border border-purple/25 bg-purple/10 px-2.5 py-2 text-[12px] text-purple">
-          Descuento disponible
-        </div>
-      )}
+      <ClientPickerSheet open={open} onClose={() => setOpen(false)} />
     </div>
   )
 }
