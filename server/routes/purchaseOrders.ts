@@ -1,56 +1,35 @@
 import { Router } from 'express'
-import type Database from 'better-sqlite3'
-import { errorMessage, listAll } from './generic'
-import { runAndBroadcast } from '../domain/tx'
+import type { Db } from '../db'
+import { handle } from './http'
 import { cancelOrder, createOrder, receiveOrder, sendOrder, updateOrder, type OrderInput, type ReceiveInput } from '../domain/purchasing'
-import type { PurchaseOrder } from '../../src/types/purchaseOrder'
 
-export function purchaseOrdersRouter(db: Database.Database) {
+export function purchaseOrdersRouter(db: Db) {
   const router = Router()
 
-  router.get('/', (_req, res) => {
-    res.json(listAll<PurchaseOrder>(db, 'purchaseOrders'))
-  })
+  router.post(
+    '/',
+    handle(async (req) => db.tx((q) => createOrder(q, req.body as OrderInput)), 201),
+  )
 
-  router.post('/', (req, res) => {
-    try {
-      res.status(201).json(runAndBroadcast(db, (out) => createOrder(db, out, req.body as OrderInput)))
-    } catch (err) {
-      res.status(400).json({ error: errorMessage(err) })
-    }
-  })
+  router.put(
+    '/:id',
+    handle(async (req) => db.tx((q) => updateOrder(q, Number(req.params.id), req.body as OrderInput))),
+  )
 
-  router.put('/:id', (req, res) => {
-    try {
-      res.json(runAndBroadcast(db, (out) => updateOrder(db, out, Number(req.params.id), req.body as OrderInput)))
-    } catch (err) {
-      res.status(400).json({ error: errorMessage(err) })
-    }
-  })
+  router.post(
+    '/:id/send',
+    handle(async (req) => db.tx((q) => sendOrder(q, Number(req.params.id)))),
+  )
 
-  router.post('/:id/send', (req, res) => {
-    try {
-      res.json(runAndBroadcast(db, (out) => sendOrder(db, out, Number(req.params.id))))
-    } catch (err) {
-      res.status(400).json({ error: errorMessage(err) })
-    }
-  })
+  router.post(
+    '/:id/cancel',
+    handle(async (req) => db.tx((q) => cancelOrder(q, Number(req.params.id)))),
+  )
 
-  router.post('/:id/cancel', (req, res) => {
-    try {
-      res.json(runAndBroadcast(db, (out) => cancelOrder(db, out, Number(req.params.id))))
-    } catch (err) {
-      res.status(400).json({ error: errorMessage(err) })
-    }
-  })
-
-  router.post('/:id/receive', (req, res) => {
-    try {
-      res.json(runAndBroadcast(db, (out) => receiveOrder(db, out, Number(req.params.id), req.body as ReceiveInput)))
-    } catch (err) {
-      res.status(400).json({ error: errorMessage(err) })
-    }
-  })
+  router.post(
+    '/:id/receive',
+    handle(async (req) => db.tx((q) => receiveOrder(q, Number(req.params.id), req.body as ReceiveInput))),
+  )
 
   return router
 }

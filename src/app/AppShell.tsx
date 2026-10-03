@@ -11,6 +11,7 @@ import { useKeyboardShortcuts } from '../shared/hooks/useKeyboardShortcuts'
 import { getSettings } from '../db/repositories/settings'
 import { useScannerStore } from '../store/useScannerStore'
 import { startSync } from '../sync'
+import { warmUpApi } from '../api/client'
 
 /** Mobile: header on top, single content column, thumb bar (`BottomNav`) at the bottom.
  * Desktop (`md:` and up): `DesktopTabs` takes over as the nav chrome instead, a horizontal tab
@@ -21,6 +22,7 @@ export function AppShell() {
 
   useEffect(() => {
     startSync()
+    warmUpApi()
   }, [])
 
   const settings = useLiveQuery(() => getSettings())

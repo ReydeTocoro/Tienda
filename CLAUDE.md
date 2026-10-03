@@ -4,51 +4,67 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Branches
 
-GitHub only has `main`, and it carries the whole app (React 19 + TypeScript + Vite + Tailwind 4 + Zustand client, Node/SQLite server); the old single-file HTML/JS/CSS app survives only as `legacy/`. Day-to-day work happens on the local `react-rewrite` branch and is published with `git push origin HEAD:main` (merge `origin/main` into it first if it moved). Commit and push only when the user asks; `MIOS/` (their real Excel with costs and suppliers) is git-ignored and must never be committed.
+GitHub only has `main`, and it carries the whole app (React 19 + TypeScript + Vite + Tailwind 4 + Zustand client, Express API, Supabase Postgres); the old single-file HTML/JS/CSS app survives only as `legacy/`. Day-to-day work happens on the local `react-rewrite` branch and is published with `git push origin HEAD:main` (merge `origin/main` into it first if it moved). Commit and push only when the user asks; `MIOS/` (their real Excel with costs and suppliers) is git-ignored and must never be committed.
 
 ## Commands
 
 ```
-npm run dev              # Vite dev server (proxies /api and /ws to localhost:3001 — run the server separately)
-npm run server            # Node server: tsx server/index.ts (Express + better-sqlite3 + ws), http://0.0.0.0:3001
-npm run build              # tsc -b && vite build
-npm run lint                # oxlint
-npm run preview
-npm run typecheck:server   # tsc --noEmit -p server/tsconfig.json (server isn't covered by the app build)
-npm run check:cash         # assert-based self-check of the money logic (cajas, traslados, pedidos, cuentas por pagar, cierre) on an in-memory SQLite — never the real DB
+npm run dev               # Vite dev server (proxies /api to localhost:3001 — run `npm run server` alongside)
+npm run server            # the API locally: tsx server/index.ts (Express → Supabase Postgres), http://0.0.0.0:3001
+npm run build             # tsc -b && vite build → dist/
+npm run lint              # oxlint — exits 0 even with its standing warnings, see Config notes
+npm run typecheck:server  # tsc --noEmit -p server/tsconfig.json (server isn't covered by the app build)
+npm run check:cash        # assert-based self-check of the money logic (cajas, traslados, pedidos, cuentas por pagar, cierre) on an in-memory Postgres (PGlite) built from the real migration
+npm run db:push           # apply supabase/migrations to the Supabase database (append `-- --dry-run` to only list them)
+npm run db:import         # ALREADY RUN (2026-10-02): it copied the old SQLite file into Supabase and REPLACES every table there, so running it again would wipe the live store's data — don't
+npm run build:functions   # esbuild server/serverApp.ts → functions/lib/server.js (the Function's bundle)
+npm run deploy            # build + build:functions + firebase deploy (Hosting + Function) to plastimax-fr
 ```
 
-There is no test runner configured. There's no single-test command because there are no tests — follow Ponytail's rule of leaving a runnable self-check (assert-based `demo()`/`__main__` or a small `test_*` file) only for non-trivial logic you add, not a full suite.
+There is no test runner configured, so there is no single-test command. Per Ponytail's rule, only non-trivial logic you add gets a runnable self-check (assert-based, like `server/selfcheck.ts`) — not a full suite.
 
-For a real end-to-end check of the client-server sync, `npm run build` then `npm run server`, and hit `http://localhost:3001` from two devices on the same network — see "Client-server architecture" below.
+**There is one database, and it is production**: the Supabase project `vwydllsxuyfxtyrgvtdk` holds the store's real data, and both `npm run server` and the deployed Function write to it. Exercise money logic through `npm run check:cash` (PGlite, in memory), never by trying writes in the running app. `npm run build` also rewrites `dist/`, which `npm run server` serves.
 
-`npm install-scripts approve <pkg>` was already run for `better-sqlite3` and `esbuild` (native/postinstall builds) and is recorded in `package.json`'s `allowScripts` — a fresh `npm install` should not need it re-approved.
+`npm install-scripts approve <pkg>` was already run for `better-sqlite3`, `esbuild` and `core-js` (native/postinstall builds) and is recorded in `package.json`'s `allowScripts` — a fresh `npm install` should not need it re-approved. `functions/` has its own `package.json`; run `npm install` there once before the first deploy.
 
 ## Architecture
 
-### Client-server model (the thing to understand first)
+### Cloud model (the thing to understand first)
 
-The app used to be single-device, IndexedDB-only. It's now a client-server app so multiple devices (a PC and a phone, say) see the same live data:
+Several devices (a PC and a phone, say) share the same live data through the internet:
 
-- **`server/`** — Express + `better-sqlite3`, the source of truth. Each Dexie table has a mirror SQLite table storing one `json` blob column per row (plus a couple of indexed columns like `customers.cedula` where a query needs them) — see `server/db.ts` and the helpers in `server/routes/generic.ts` (`listAll`/`getRow`/`putRow`/`deleteRow`/`insertAutoRow`). Every write handler calls `broadcast()` (`server/broadcast.ts`) over WebSocket (`/ws`) after writing. In production the server also serves the built `dist/` as static files, so PC and phone hit one process for both the UI and the API.
-- **`src/db/`** — Dexie (IndexedDB) is now a **local mirror/cache, not the source of truth**. `src/db/schema.ts` defines the same tables (`TABLES` in `src/sync/index.ts` is the list). `src/sync/index.ts` connects the WebSocket, does a full pull of all tables on every (re)connect, and applies each broadcast (`put`/`delete`) into Dexie. It's mounted once from `src/app/AppShell.tsx`.
-- **`src/db/repositories/*.ts`** — one file per entity, the only place components should touch data. **Read functions still read Dexie directly** (`db.products.toArray()`, etc.) and are consumed via `useLiveQuery` from `dexie-react-hooks`, unchanged from before the server existed. **Write functions now call the server** via `src/api/client.ts` (`apiPost`/`apiPut`/`apiDelete`) instead of writing Dexie — the mirror updates itself when the broadcast comes back over the WebSocket, so a repository never writes to Dexie after a mutation.
-- Transactional operations (stock changes tied to a sale, package-opening, cyclic count adjustments, import) live as dedicated server endpoints using `db.transaction(fn)` (synchronous, `better-sqlite3`) rather than being ported 1:1 from the old async Dexie transactions — see `server/routes/inventoryOps.ts`, `server/routes/sales.ts`.
-- **Money logic lives in `server/domain/`** (`cash.ts`, `purchasing.ts`, `cierre.ts`): plain functions `(db, out, input)` that run inside the caller's transaction and push the rows they touched onto `out`; `runAndBroadcast` (`server/domain/tx.ts`) commits first and broadcasts after, so a rejected operation changes nothing. Routes stay thin. `npm run check:cash` exercises these.
-- When adding a new entity or field: update the type in `src/types/`, the Dexie schema (`src/db/schema.ts`), the server table (`server/db.ts`), the repository's read/write split, and the corresponding `server/routes/*.ts` handler + `broadcast()` call. `TABLES` in `src/sync/index.ts` must list every synced table.
+- **Supabase Postgres is the source of truth** (`supabase/migrations`). Each table mirrors a Dexie table: a primary-key column plus `data jsonb` holding the whole row exactly as its type in `src/types/` defines it. Triggers do the bookkeeping: `sync_row` copies the key into `data` (so an insert comes back carrying its generated id) and stamps `updated_at`; `log_deletion` records deletes in `deletions`. `sync_meta.epoch` is bumped when data is reloaded wholesale (`db:import`), which makes every device drop its mirror and pull everything again.
+- **Reads go straight from the browser to Supabase.** `src/sync/index.ts` keeps the Dexie mirror current: on every (re)connect it pulls the rows whose `updated_at` passed its per-table cursor (all of them the first time), replays `deletions`, then applies Realtime `postgres_changes` as they arrive. `src/db/repositories/*.ts` read Dexie only, through `useLiveQuery`, so the app keeps showing the last known data offline.
+- **Writes go through the API** (`server/`, Express): `src/api/client.ts` (`apiPost`/`apiPut`/`apiDelete`) sends the Supabase session as a Bearer token, and a repository never writes Dexie itself (Realtime brings the result back). The API runs as the Firebase Function `api` (`functions/index.js`, region us-east4, next to the database) behind the Hosting rewrite `/api/**`; locally it's `npm run server`, with Vite proxying `/api`. It connects through the Supabase session pooler with certificate verification (`server/supabaseCa.ts`) — the direct `db.<ref>.supabase.co` host is IPv6-only.
+- **Who can do what:** Supabase Auth (email + password) says who someone is. The `staff` table says they work at the store, and neither reads (RLS policy `staff can read`, via `public.is_staff()`) nor writes (`server/auth.ts`, which verifies the token with `/auth/v1/user` and then checks `staff`) work without it. Browsers can never write tables directly (privileges revoked). Grant access with `insert into public.staff (email, name) values (...)` after creating the user in the Supabase dashboard.
+- **Money logic lives in `server/domain/`** (`cash.ts`, `purchasing.ts`, `cierre.ts`): plain async functions `(q, input)` that run inside the caller's `db.tx`, so a rejected operation changes nothing. `db.tx` (`server/db.ts`) takes one app-wide `pg_advisory_xact_lock` first, so writes run one at a time — the guarantee the old synchronous SQLite server had — and a stock or balance check can't be raced by another device. Every route goes through `handle()` (`server/routes/http.ts`), because Express 4 doesn't catch rejected promises.
+- Adding a new entity touches:
+  - the type in `src/types/`;
+  - a **new** migration in `supabase/migrations` (table with `data jsonb` + `updated_at`, both triggers, RLS policy, privileges, `supabase_realtime` publication) applied with `npm run db:push`;
+  - the Dexie schema in `src/db/schema.ts` as a **new** `this.version(n+1).stores({...})` block (never edit an earlier one; `null` drops a table);
+  - the route in `server/routes/*.ts`, mounted in `server/app.ts`;
+  - the repository's read/write split;
+  - `TABLES` in `src/sync/index.ts`, which must list every synced table.
 
-### Networking beyond local WiFi
+  A plain new field on an existing entity needs none of that schema work — Dexie only declares *indexed* fields and Postgres keeps the row as `data` — only a new index or table does.
+- The default `Settings` row exists twice and the two copies must stay identical: the seed in the first migration and the `getSettings()` fallback in `src/db/repositories/settings.ts` (initial admin PIN `1234`).
 
-Remote access (from outside the local network) goes through Tailscale (`tailscale serve`), not port-forwarding or a cloud backend — deliberately no Firebase/Supabase/third-party backend anywhere in this project. On the phone (Termux + proot-distro Ubuntu), `tienda-start`/`tienda-stop`/`tienda-status` (in `$PREFIX/bin`, outside this repo) start/stop both `tailscaled` and `npm run server` together. Those scripts must be run from a plain Termux shell, never from inside an already-entered `proot-distro login` session (nesting proot-distro sessions doesn't work).
+### Deployment and secrets
+
+- Firebase project `plastimax-fr`: Hosting serves `dist/` at https://plastimax-fr.web.app (`firebase.json`, SPA rewrite, immutable `/assets/**`, no-cache service worker) and rewrites `/api/**` to the Function. `npm run deploy` does it all; the Firebase CLI is installed globally and logged in.
+- Secrets: the database URL (with the password) lives in `.env.local` (git-ignored, read by the local server and the db scripts) and in Secret Manager as `SUPABASE_DB_URL` for the Function (`firebase functions:secrets:set SUPABASE_DB_URL`, then redeploy the Function). Public config: `.env` (`VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY`, bundled into the app) and `functions/.env`. The publishable key is public by design.
+- Deliberately no Firebase SDK in the app: Firebase only hosts; Supabase does auth, data and realtime.
 
 ### Frontend structure
 
-- `src/app/` — shell chrome: `AppShell.tsx` (layout + mounts global effects: sync, theme, scanner, keyboard shortcuts), `Header`/`Sidebar`/`BottomNav` (mobile gets `BottomNav`, `md:`+ swaps in `Sidebar` — one breakpoint switch, pages don't special-case it), `navConfig.ts` (single source of nav items + live badge counts, shared by both chromes).
-- `src/features/<name>/` — one folder per route/domain (`pos`, `inventory`, `customers`, `fiados`, `invoices`, `reports`, `pin`), each with its own `components/`, `hooks/`, and sometimes `lib/` for pure logic (e.g. `features/fiados/lib/fiadoGrouping.ts`, shared by nav badges and the Fiados page).
+- `src/app/` — shell chrome: `AppShell.tsx` (layout + mounts global effects: sync, API warm-up, theme, scanner, keyboard shortcuts), `Header`/`DesktopTabs`/`BottomNav` (mobile gets the slim `Header` + `BottomNav`, `md:`+ swaps in the `DesktopTabs` top bar — one breakpoint switch, pages don't special-case it), `navConfig.ts` (single source of nav items + live badge counts, shared by both chromes).
+- `src/features/auth/` — `AuthGate` (wraps the router in `App.tsx`: nothing loads until a staff member signs in; non-staff accounts are signed straight back out), `LoginPage`, and `SessionSection` (Configuración's sign-out, which also clears the local mirror).
+- `src/features/<name>/` — one folder per route/domain (`pos`, `inventory`, `customers`, `fiados`, `invoices`, `cash` for Cajas, `suppliers` for Proveedores and purchasing, `reports`, `settings`, `pin`, `auth`), each with its own `components/`, `hooks/`, and sometimes `lib/` for pure logic (e.g. `features/fiados/lib/fiadoGrouping.ts`, shared by nav badges and the Fiados page).
+- `src/api/` — `supabase.ts` (the single Supabase client) and `client.ts` (the write API wrapper).
 - `src/store/` — Zustand stores for ephemeral UI/client state (cart draft, toasts, confirm dialog, PIN session, scanner on/off). Persisted business data goes through `src/db/`, not a store.
 - `src/shared/` — cross-feature `components/` (e.g. `ToastHost`, `ConfirmDialog` — both driven by their Zustand stores and rendered once from `AppShell`), `hooks/`, `lib/`. Stock, Clientes, Fiados and Facturas are spreadsheet-style lists on the shared virtualized `DataTable` (with `SearchInput`, `AddFab`, `Chip` and `lib/sortRows`): build any new list that way rather than as a card grid.
 - Native `<dialog>` is the standard modal primitive (backdrop, Escape, focus trap, top-layer stacking all come free) — don't hand-roll a new overlay/portal for a modal.
-- Admin-gated actions (Inventario, Reporte, etc.) go through `usePermission().requireAdmin()` (`src/features/pin/usePermission.ts`), the single permission mechanism — it resolves immediately if already unlocked this session, otherwise prompts `PinModal`. Don't invent a second gating mechanism.
+- Admin gating inside the app has a single mechanism, `usePermission().requireAdmin()` (`src/features/pin/usePermission.ts`): it resolves immediately if the session is already unlocked, otherwise prompts `PinModal`; `{ force: true }` prompts every time, for data that must stay hidden even inside an unlocked section (the inventory's purchase prices). Whole sections (`/inventario`, `/cajas`, `/proveedores`, `/reporte`, `/configuracion`) are wrapped in `AdminGate` in `src/router.tsx`, which calls it, so direct URLs and reloads are covered too. The PIN is a UI-level gate between people sharing a signed-in device — `sha256(entered)` is compared in the browser with the mirrored `settings.pinHash` or an active admin `usuario` — on top of the login, which is what the API and RLS enforce. Don't invent a second gating mechanism.
 
 ### Cash-register domain specifics
 
@@ -62,7 +78,10 @@ Cierre Z (day close) is **non-destructive**: sales and cash movements get `close
 
 ## Config notes
 
-- TypeScript: bundler-mode resolution, `verbatimModuleSyntax`, extensionless relative imports, `noUnusedLocals`/`noUnusedParameters` enforced — `npm run build`'s `tsc -b` will fail on unused vars/params, don't rely on lint alone to catch that. The server has its own `server/tsconfig.json` (checked separately via `npm run typecheck:server`, not part of `npm run build`).
+- TypeScript: bundler-mode resolution, `verbatimModuleSyntax`, extensionless relative imports, `noUnusedLocals`/`noUnusedParameters` enforced — `npm run build`'s `tsc -b` will fail on unused vars/params, don't rely on lint alone to catch that. The server has its own `server/tsconfig.json` (checked separately via `npm run typecheck:server`, not part of `npm run build`), with `erasableSyntaxOnly` (no enums or constructor parameter properties).
 - Lint: `oxlint` (`.oxlintrc.json`), not ESLint.
 - Tailwind 4 (`@theme` tokens in `src/index.css`, `.dark` class variant applied to `<body>` from `AppShell`'s theme effect) — no `tailwind.config.js`, tokens live in CSS.
-- `legacy/` is the old app's static assets (kept for reference/migration, not part of the build).
+- Colors come only from those tokens, never hex/rgba in components. `lime` is the brand green (primary buttons, active state); the other hues are statuses. Text on any solid color is `text-on-solid` (white in light mode, near-black in dark). Zones are separated by `border-br` hairlines and cards lifted with `shadow-xs` (the shadow color follows the theme through `--shadow-rgb`); `br2` is for the outline of controls.
+- `legacy/` is the old app's static assets (kept for reference/migration, not part of the build). `server/data/tienda.db` is the old SQLite database, frozen since the move to Supabase (its last consistent copy is in `server/data/backups/*-antes-migracion-nube/`); it is git-ignored and nothing reads it anymore.
+- `npm run lint` exits 0 but has a standing baseline of React-compiler warnings (`react(refs)`, `react(set-state-in-effect)`, and `react(incompatible-library)` for `useVirtualizer` in `DataTable`/`ProductGrid`): judge new code by whether it adds warnings, and treat `npm run build` + `npm run typecheck:server` as the real gate.
+- Windows checkout with `core.autocrlf=true` and no `.gitattributes`: older files are CRLF in the working tree, newer ones LF. A multi-line `Edit` doesn't match the CRLF ones — normalize `\r\n` in a small script (and restore it) instead of rewriting the whole file, so diffs stay small.

@@ -1,57 +1,73 @@
-import Database from 'better-sqlite3'
-import { createHash } from 'node:crypto'
-import { fileURLToPath } from 'node:url'
-import path from 'node:path'
-import fs from 'node:fs'
-import type { Settings } from '../src/types/settings'
+import pg from 'pg'
+import type { PGlite } from '@electric-sql/pglite'
+import { SUPABASE_CA } from './supabaseCa'
 
-/** Every table mirrors Dexie's own shape (see src/db/schema.ts): a primary key column for
- * lookups/uniqueness, plus a `json` column holding the full row exactly as the client type
- * defines it (Sale.items, Cierre.payBreak/arqueo, the AuditLogEntry union, etc. all round-trip
- * losslessly without hand-mapping every nested field to a SQL column — Dexie itself works the
- * same way: it only indexes the handful of fields declared in `.stores()`, everything else is
- * an opaque object in IndexedDB). `cedula` on customers is the one extra indexed column,
- * because addCustomer/updateCustomer need a real duplicate-cedula lookup. */
-const dataDir = path.join(path.dirname(fileURLToPath(import.meta.url)), 'data')
-fs.mkdirSync(dataDir, { recursive: true })
-const dbPath = process.env.TIENDA_DB_PATH || path.join(dataDir, 'tienda.db')
+/** Postgres access for the routes and the money logic. Each table mirrors a Dexie table: a
+ * primary-key column plus `data` (jsonb) holding the row exactly as its client type defines it,
+ * while triggers keep the key inside `data` and stamp `updated_at` (supabase/migrations). So the
+ * code only ever reads and writes whole objects, like it did with SQLite. */
+export interface Sql {
+  query<R = Record<string, unknown>>(text: string, params?: unknown[]): Promise<R[]>
+}
 
-export const db = new Database(dbPath)
-db.pragma('journal_mode = WAL')
+export interface Db extends Sql {
+  /** Runs `fn` in one transaction: everything commits or nothing does. Each transaction first
+   * takes the same app-wide lock, so writes run one at a time — the guarantee the synchronous
+   * SQLite server gave for free. A stock or balance check can't be invalidated by another request
+   * between the check and the write, even with several Function instances running. */
+  tx<T>(fn: (q: Sql) => Promise<T>): Promise<T>
+  end(): Promise<void>
+}
 
-db.exec(`
-  CREATE TABLE IF NOT EXISTS products (code TEXT PRIMARY KEY, json TEXT NOT NULL);
-  CREATE TABLE IF NOT EXISTS sales (id INTEGER PRIMARY KEY AUTOINCREMENT, json TEXT NOT NULL);
-  CREATE TABLE IF NOT EXISTS customers (id TEXT PRIMARY KEY, cedula TEXT, json TEXT NOT NULL);
-  CREATE TABLE IF NOT EXISTS cierres (id INTEGER PRIMARY KEY AUTOINCREMENT, json TEXT NOT NULL);
-  CREATE TABLE IF NOT EXISTS auditLog (id INTEGER PRIMARY KEY AUTOINCREMENT, json TEXT NOT NULL);
-  CREATE TABLE IF NOT EXISTS entradas (id INTEGER PRIMARY KEY AUTOINCREMENT, json TEXT NOT NULL);
-  CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, json TEXT NOT NULL);
-  CREATE TABLE IF NOT EXISTS usuarios (id TEXT PRIMARY KEY, json TEXT NOT NULL);
-  CREATE TABLE IF NOT EXISTS cashMovements (id INTEGER PRIMARY KEY AUTOINCREMENT, json TEXT NOT NULL);
-  CREATE TABLE IF NOT EXISTS cashSessions (id INTEGER PRIMARY KEY AUTOINCREMENT, json TEXT NOT NULL);
-  CREATE TABLE IF NOT EXISTS suppliers (id TEXT PRIMARY KEY, json TEXT NOT NULL);
-  CREATE TABLE IF NOT EXISTS purchaseOrders (id INTEGER PRIMARY KEY AUTOINCREMENT, json TEXT NOT NULL);
-  CREATE TABLE IF NOT EXISTS payables (id INTEGER PRIMARY KEY AUTOINCREMENT, json TEXT NOT NULL);
-  CREATE INDEX IF NOT EXISTS idx_cashmov_caja ON cashMovements(json_extract(json, '$.caja'));
-  CREATE INDEX IF NOT EXISTS idx_cashsess_status ON cashSessions(json_extract(json, '$.status'));
-  CREATE INDEX IF NOT EXISTS idx_orders_supplier ON purchaseOrders(json_extract(json, '$.supplierId'));
-  CREATE INDEX IF NOT EXISTS idx_customers_cedula ON customers(cedula);
-`)
+/** Arbitrary app-wide key for pg_advisory_xact_lock, released by the commit or rollback itself. */
+const WRITE_LOCK = 4207
 
-// Seed the single 'main' settings row the first time the server ever runs — mirrors the
-// defaults in src/db/repositories/settings.ts's getSettings() exactly (same default PIN
-// "1234", same SHA-256 hash) so a client that reads its local Dexie fallback before the first
-// sync pull lands never disagrees with what the server ends up serving.
-const hasSettings = db.prepare('SELECT 1 FROM settings WHERE key = ?').get('main')
-if (!hasSettings) {
-  const defaults: Settings = {
-    key: 'main',
-    storeName: 'Mi Tienda',
-    pinHash: createHash('sha256').update('1234').digest('hex'),
-    pinLength: 4,
-    theme: 'light',
-    hidScannerEnabled: true,
+/** Supabase through its connection pooler. The certificate is checked against Supabase's root CA
+ * (not in Node's default store), so the connection is verified, not just encrypted. The URL must
+ * not carry `sslmode`, which would override this. */
+export function pgDb(connectionString: string, maxConnections = 3): Db {
+  const pool = new pg.Pool({ connectionString, max: maxConnections, idleTimeoutMillis: 30_000, ssl: { ca: SUPABASE_CA, rejectUnauthorized: true } })
+  const wrap = (c: pg.Pool | pg.PoolClient): Sql => ({
+    async query<R>(text: string, params?: unknown[]) {
+      return (await c.query(text, params)).rows as R[]
+    },
+  })
+  return {
+    ...wrap(pool),
+    async tx<T>(fn: (q: Sql) => Promise<T>) {
+      const client = await pool.connect()
+      try {
+        await client.query('begin')
+        await client.query('select pg_advisory_xact_lock($1)', [WRITE_LOCK])
+        const result = await fn(wrap(client))
+        await client.query('commit')
+        return result
+      } catch (err) {
+        await client.query('rollback').catch(() => {})
+        throw err
+      } finally {
+        client.release()
+      }
+    },
+    end: () => pool.end(),
   }
-  db.prepare('INSERT INTO settings (key, json) VALUES (?, ?)').run('main', JSON.stringify(defaults))
+}
+
+interface LiteQueryable {
+  query<R>(text: string, params?: unknown[]): Promise<{ rows: R[] }>
+}
+
+/** In-memory Postgres for the money self-check (npm run check:cash): the same SQL and triggers,
+ * no network, never the real data. PGlite has a single connection, so no lock is needed. */
+export function pgliteDb(lite: PGlite): Db {
+  const wrap = (c: LiteQueryable): Sql => ({
+    async query<R>(text: string, params?: unknown[]) {
+      return (await c.query<R>(text, params)).rows
+    },
+  })
+  return {
+    ...wrap(lite),
+    tx: (fn) => lite.transaction((t) => fn(wrap(t))),
+    end: () => lite.close(),
+  }
 }

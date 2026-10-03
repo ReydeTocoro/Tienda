@@ -1,0 +1,15 @@
+{
+  "name": "tienda-api",
+  "private": true,
+  "description": "Firebase Function serving /api. The code is server/ (TypeScript) in the project root, bundled into lib/server.js by `npm run build:functions`.",
+  "main": "index.js",
+  "engines": {
+    "node": "22"
+  },
+  "dependencies": {
+    "express": "^4.21.2",
+    "firebase-admin": "^14.5.0",
+    "firebase-functions": "^7.4.0",
+    "pg": "^8.23.1"
+  }
+}

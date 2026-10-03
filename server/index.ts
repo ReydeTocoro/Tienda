@@ -1,47 +1,21 @@
 import express from 'express'
-import { createServer } from 'node:http'
-import { WebSocketServer } from 'ws'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { db } from './db'
-import { addClient } from './broadcast'
-import { productsRouter } from './routes/products'
-import { customersRouter } from './routes/customers'
-import { salesRouter } from './routes/sales'
-import { cierresRouter } from './routes/cierres'
-import { auditLogRouter } from './routes/auditLog'
-import { entradasRouter } from './routes/entradas'
-import { settingsRouter } from './routes/settings'
-import { inventoryOpsRouter } from './routes/inventoryOps'
-import { usuariosRouter } from './routes/usuarios'
-import { cashRouter } from './routes/cash'
-import { listRouter } from './routes/listRouter'
-import { suppliersRouter } from './routes/suppliers'
-import { purchaseOrdersRouter } from './routes/purchaseOrders'
-import { payablesRouter } from './routes/payables'
+import { loadEnv, requireEnv } from './env'
+import { createServerApp } from './serverApp'
 
-const app = express()
-app.use(express.json())
+/** Local API for development (`npm run server`), against the same Supabase database the deployed
+ * app uses; Vite proxies /api here (vite.config.ts). It also serves the built app (`npm run
+ * build`) for a production-like check. The real deployment is Firebase: Hosting serves the app
+ * and a Function runs this same API (`npm run deploy`). */
+loadEnv()
 
-app.use('/api/products', productsRouter(db))
-app.use('/api/customers', customersRouter(db))
-app.use('/api/sales', salesRouter(db))
-app.use('/api/cierres', cierresRouter(db))
-app.use('/api/auditLog', auditLogRouter(db))
-app.use('/api/entradas', entradasRouter(db))
-app.use('/api/settings', settingsRouter(db))
-app.use('/api/inventory', inventoryOpsRouter(db))
-app.use('/api/usuarios', usuariosRouter(db))
-app.use('/api/cash', cashRouter(db))
-app.use('/api/cashMovements', listRouter(db, 'cashMovements'))
-app.use('/api/cashSessions', listRouter(db, 'cashSessions'))
-app.use('/api/suppliers', suppliersRouter(db))
-app.use('/api/purchaseOrders', purchaseOrdersRouter(db))
-app.use('/api/payables', payablesRouter(db))
+const app = createServerApp({
+  dbUrl: requireEnv('SUPABASE_DB_URL'),
+  supabaseUrl: requireEnv('VITE_SUPABASE_URL'),
+  publishableKey: requireEnv('VITE_SUPABASE_PUBLISHABLE_KEY'),
+})
 
-// Serve the Vite production build (npm run build) so the PC and any phone on the same WiFi hit
-// this one server for both the app shell and the API — no separate dev server needed for the
-// real multi-device test.
 const distDir = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'dist')
 app.use(express.static(distDir))
 app.use((req, res, next) => {
@@ -50,10 +24,6 @@ app.use((req, res, next) => {
 })
 
 const port = Number(process.env.PORT) || 3001
-const server = createServer(app)
-const wss = new WebSocketServer({ server, path: '/ws' })
-wss.on('connection', (ws) => addClient(ws))
-
-server.listen(port, '0.0.0.0', () => {
-  console.log(`Tienda server escuchando en http://0.0.0.0:${port} (LAN + localhost)`)
+app.listen(port, '0.0.0.0', () => {
+  console.log(`API de la tienda en http://localhost:${port} (base de datos: Supabase)`)
 })

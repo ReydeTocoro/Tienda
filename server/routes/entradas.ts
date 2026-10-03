@@ -1,73 +1,55 @@
 import { Router } from 'express'
-import type Database from 'better-sqlite3'
 import type { Product } from '../../src/types/product'
 import type { EntradaRecord } from '../../src/types/entrada'
-import { getRow, putRow, insertAutoRow, errorMessage, roundQty } from './generic'
-import { broadcast, type BroadcastMsg } from '../broadcast'
+import type { Db } from '../db'
+import { getRow, putRow, insertAutoRow, roundQty } from './generic'
+import { handle } from './http'
 
 const TABLE = 'entradas'
 
 /** legacy confirmarEntrada()/msFinalize() (repositories/entradas.ts). */
-export function entradasRouter(db: Database.Database) {
+export function entradasRouter(db: Db) {
   const router = Router()
 
-  router.get('/', (req, res) => {
-    const limit = Number(req.query.limit) || 50
-    const rows = db.prepare(`SELECT json FROM ${TABLE} ORDER BY id DESC LIMIT ?`).all(limit) as { json: string }[]
-    res.json(rows.map((r) => JSON.parse(r.json) as EntradaRecord))
-  })
-
   /** Single-item restock. */
-  router.post('/', (req, res) => {
-    const { code, qty, source } = req.body as { code: string; qty: number; source?: string }
-    try {
-      const { saved, broadcasts } = db.transaction(() => {
-        const p = getRow<Product>(db, 'products', 'code', code)
+  router.post(
+    '/',
+    handle(async (req) => {
+      const { code, qty, source } = req.body as { code: string; qty: number; source?: string }
+      return db.tx(async (q) => {
+        const p = await getRow<Product>(q, 'products', 'code', code)
         if (!p) throw new Error('Producto no encontrado')
         const stockAntes = p.stock || 0
         const stockDespues = roundQty(stockAntes + qty)
-        const updatedP: Product = { ...p, stock: stockDespues }
-        putRow(db, 'products', 'code', code, {}, updatedP)
+        await putRow(q, 'products', 'code', code, { ...p, stock: stockDespues })
         const record: EntradaRecord = { code, name: p.name, qty, stockAntes, stockDespues, date: new Date().toISOString(), source }
-        const saved = insertAutoRow(db, TABLE, record)
-        const broadcasts: BroadcastMsg[] = [
-          { table: 'products', op: 'put', data: updatedP },
-          { table: TABLE, op: 'put', data: saved },
-        ]
-        return { saved, broadcasts }
-      })()
-      broadcasts.forEach(broadcast)
-      res.status(201).json(saved)
-    } catch (err) {
-      res.status(400).json({ error: errorMessage(err) })
-    }
-  })
+        return insertAutoRow(q, TABLE, record)
+      })
+    }, 201),
+  )
 
   /** Bulk restock from "escaneo masivo" — legacy msFinalize(). Silently skips unknown codes,
    * same as the original (repositories/entradas.ts L24). */
-  router.post('/bulk', (req, res) => {
-    const { entries, source } = req.body as { entries: Array<{ code: string; qty: number }>; source?: string }
-    const { totalUnidades, broadcasts } = db.transaction(() => {
-      let totalUnidades = 0
-      const broadcasts: BroadcastMsg[] = []
-      for (const e of entries) {
-        const p = getRow<Product>(db, 'products', 'code', e.code)
-        if (!p) continue
-        const stockAntes = p.stock || 0
-        const stockDespues = roundQty(stockAntes + e.qty)
-        const updatedP: Product = { ...p, stock: stockDespues }
-        putRow(db, 'products', 'code', e.code, {}, updatedP)
-        broadcasts.push({ table: 'products', op: 'put', data: updatedP })
-        const record: EntradaRecord = { code: e.code, name: p.name, qty: e.qty, stockAntes, stockDespues, date: new Date().toISOString(), source: source ?? 'masivo' }
-        const saved = insertAutoRow(db, TABLE, record)
-        broadcasts.push({ table: TABLE, op: 'put', data: saved })
-        totalUnidades += e.qty
-      }
-      return { totalUnidades, broadcasts }
-    })()
-    broadcasts.forEach(broadcast)
-    res.json({ totalUnidades })
-  })
+  router.post(
+    '/bulk',
+    handle(async (req) => {
+      const { entries, source } = req.body as { entries: Array<{ code: string; qty: number }>; source?: string }
+      return db.tx(async (q) => {
+        let totalUnidades = 0
+        for (const e of entries) {
+          const p = await getRow<Product>(q, 'products', 'code', e.code)
+          if (!p) continue
+          const stockAntes = p.stock || 0
+          const stockDespues = roundQty(stockAntes + e.qty)
+          await putRow(q, 'products', 'code', e.code, { ...p, stock: stockDespues })
+          const record: EntradaRecord = { code: e.code, name: p.name, qty: e.qty, stockAntes, stockDespues, date: new Date().toISOString(), source: source ?? 'masivo' }
+          await insertAutoRow(q, TABLE, record)
+          totalUnidades += e.qty
+        }
+        return { totalUnidades }
+      })
+    }),
+  )
 
   return router
 }

@@ -1,11 +1,11 @@
 import { Router } from 'express'
-import type Database from 'better-sqlite3'
 import type { Sale, PayMethod, FiadoPago } from '../../src/types/sale'
 import type { CartItem } from '../../src/types/cartItem'
 import type { Product } from '../../src/types/product'
 import type { CorrectionAuditEntry, SaleSnapshot } from '../../src/types/auditLog'
-import { listAll, getRow, putRow, insertAutoRow, errorMessage, roundQty } from './generic'
-import { broadcast, type BroadcastMsg } from '../broadcast'
+import type { Db } from '../db'
+import { getRow, putRow, insertAutoRow, roundQty } from './generic'
+import { handle } from './http'
 import { recordFiadoCollection, recordSaleCorrection, recordSaleReceipt, type CollectMethod } from '../domain/cash'
 import { dayKeyOf } from '../../src/shared/lib/currency'
 
@@ -31,26 +31,22 @@ function fiadoDebt(sale: Sale): number {
   return Math.max(0, sale.total - paid)
 }
 
-export function salesRouter(db: Database.Database) {
+export function salesRouter(db: Db) {
   const router = Router()
-
-  router.get('/', (_req, res) => {
-    res.json(listAll<Sale>(db, TABLE))
-  })
 
   /** Insert the sale AND decrement stock atomically. Free items never touch stock. Legacy
    * finalizeSale() (repositories/sales.ts L23-66). */
-  router.post('/finalize', (req, res) => {
-    const input = req.body as FinalizeSaleInput
-    try {
-      const { sale, broadcasts } = db.transaction(() => {
+  router.post(
+    '/finalize',
+    handle(async (req) => {
+      const input = req.body as FinalizeSaleInput
+      return db.tx(async (q) => {
         // Checked here (not just client-side) because this is the one place two devices selling
-        // the same product at once can't race each other — better-sqlite3 transactions run fully
-        // synchronously, so no other request's handler can interleave between this check and the
-        // stock writes below.
+        // the same product at once can't race each other: db.tx serializes writes, so no other
+        // sale can slip in between this check and the stock writes below.
         for (const item of input.items) {
           if (item.isFree) continue
-          const p = getRow<Product>(db, 'products', 'code', item.code)
+          const p = await getRow<Product>(q, 'products', 'code', item.code)
           if (p && item.qty > (p.stock || 0)) {
             throw new Error(`Stock insuficiente de "${p.name}" (quedan ${p.stock})`)
           }
@@ -65,7 +61,7 @@ export function salesRouter(db: Database.Database) {
             ganancia += item.price * item.qty
             continue
           }
-          const p = getRow<Product>(db, 'products', 'code', item.code)
+          const p = await getRow<Product>(q, 'products', 'code', item.code)
           const cost = p?.cost ?? item.cost ?? 0
           ganancia += (item.price - cost) * item.qty
         }
@@ -87,136 +83,108 @@ export function salesRouter(db: Database.Database) {
           dayKey,
           notes: input.notes,
         }
-        const sale = insertAutoRow(db, TABLE, saleData)
-        const broadcasts: BroadcastMsg[] = [{ table: TABLE, op: 'put', data: sale }]
-        recordSaleReceipt(db, broadcasts, sale)
+        const sale = await insertAutoRow(q, TABLE, saleData)
+        await recordSaleReceipt(q, sale)
 
         for (const item of input.items) {
           if (item.isFree) continue
-          const p = getRow<Product>(db, 'products', 'code', item.code)
-          if (p) {
-            const u: Product = { ...p, stock: roundQty(Math.max(0, (p.stock || 0) - item.qty)) }
-            putRow(db, 'products', 'code', item.code, {}, u)
-            broadcasts.push({ table: 'products', op: 'put', data: u })
-          }
+          const p = await getRow<Product>(q, 'products', 'code', item.code)
+          if (p) await putRow(q, 'products', 'code', item.code, { ...p, stock: roundQty(Math.max(0, (p.stock || 0) - item.qty)) })
         }
 
-        return { sale, broadcasts }
-      })()
-
-      broadcasts.forEach(broadcast)
-      res.status(201).json(sale)
-    } catch (err) {
-      res.status(400).json({ error: errorMessage(err) })
-    }
-  })
+        return sale
+      })
+    }, 201),
+  )
 
   /** legacy pagarFiado()/condonarFiado() (repositories/sales.ts L93-103) — both use this same
    * mechanic; `condone` marks the forgiven case, which closes the debt without any cash coming in.
    * A real payment is cash into the Caja Menor. */
-  router.post('/:id/pagar-completo', (req, res) => {
-    const saleId = Number(req.params.id)
-    const note = (req.body?.note as string) || 'Pago completo'
-    const condone = req.body?.condone === true
-    const method: CollectMethod = req.body?.method === 'transferencia' ? 'transferencia' : 'efectivo'
-    try {
-      const { debt, broadcasts } = db.transaction(() => {
-        const s = getRow<Sale>(db, TABLE, 'id', saleId)
+  router.post(
+    '/:id/pagar-completo',
+    handle(async (req) => {
+      const saleId = Number(req.params.id)
+      const note = (req.body?.note as string) || 'Pago completo'
+      const condone = req.body?.condone === true
+      const method: CollectMethod = req.body?.method === 'transferencia' ? 'transferencia' : 'efectivo'
+      return db.tx(async (q) => {
+        const s = await getRow<Sale>(q, TABLE, 'id', saleId)
         if (!s) throw new Error('Venta no encontrada')
         const debt = fiadoDebt(s)
-        const broadcasts: BroadcastMsg[] = []
-        if (debt <= 0) return { debt: 0, broadcasts }
+        if (debt <= 0) return { debt: 0 }
         const pago: FiadoPago = { amount: debt, date: new Date().toISOString(), note, ...(condone ? { condonado: true } : { method }) }
         const u: Sale = { ...s, fiadoPagos: [...(s.fiadoPagos || []), pago] }
-        putRow(db, TABLE, 'id', saleId, {}, u)
-        broadcasts.push({ table: TABLE, op: 'put', data: u })
-        if (!condone) recordFiadoCollection(db, broadcasts, { ...u, id: saleId }, debt, method)
-        return { debt, broadcasts }
-      })()
-      broadcasts.forEach(broadcast)
-      res.json({ debt })
-    } catch (err) {
-      res.status(400).json({ error: errorMessage(err) })
-    }
-  })
+        await putRow(q, TABLE, 'id', saleId, u)
+        if (!condone) await recordFiadoCollection(q, { ...u, id: saleId }, debt, method)
+        return { debt }
+      })
+    }),
+  )
 
   /** legacy pagarTodosLosFiados()/condonarTodosLosFiados() (repositories/sales.ts L106-120). */
-  router.post('/pagar-todos', (req, res) => {
-    const { saleIds, note, condone, method: rawMethod } = req.body as { saleIds: number[]; note: string; condone?: boolean; method?: CollectMethod }
-    const method: CollectMethod = rawMethod === 'transferencia' ? 'transferencia' : 'efectivo'
-    const { total, broadcasts } = db.transaction(() => {
-      let total = 0
-      const broadcasts: BroadcastMsg[] = []
-      for (const id of saleIds) {
-        const s = getRow<Sale>(db, TABLE, 'id', id)
-        if (!s) continue
-        const debt = fiadoDebt(s)
-        if (debt <= 0) continue
-        total += debt
-        const pago: FiadoPago = { amount: debt, date: new Date().toISOString(), note, ...(condone === true ? { condonado: true } : { method }) }
-        const u: Sale = { ...s, fiadoPagos: [...(s.fiadoPagos || []), pago] }
-        putRow(db, TABLE, 'id', id, {}, u)
-        broadcasts.push({ table: TABLE, op: 'put', data: u })
-        if (condone !== true) recordFiadoCollection(db, broadcasts, { ...u, id }, debt, method)
-      }
-      return { total, broadcasts }
-    })()
-    broadcasts.forEach(broadcast)
-    res.json({ total })
-  })
+  router.post(
+    '/pagar-todos',
+    handle(async (req) => {
+      const { saleIds, note, condone, method: rawMethod } = req.body as { saleIds: number[]; note: string; condone?: boolean; method?: CollectMethod }
+      const method: CollectMethod = rawMethod === 'transferencia' ? 'transferencia' : 'efectivo'
+      return db.tx(async (q) => {
+        let total = 0
+        for (const id of saleIds) {
+          const s = await getRow<Sale>(q, TABLE, 'id', id)
+          if (!s) continue
+          const debt = fiadoDebt(s)
+          if (debt <= 0) continue
+          total += debt
+          const pago: FiadoPago = { amount: debt, date: new Date().toISOString(), note, ...(condone === true ? { condonado: true } : { method }) }
+          const u: Sale = { ...s, fiadoPagos: [...(s.fiadoPagos || []), pago] }
+          await putRow(q, TABLE, 'id', id, u)
+          if (condone !== true) await recordFiadoCollection(q, { ...u, id }, debt, method)
+        }
+        return { total }
+      })
+    }),
+  )
 
-  router.post('/:id/pagos', (req, res) => {
-    const saleId = Number(req.params.id)
-    const pago = req.body as FiadoPago
-    try {
-      const { updated, broadcasts } = db.transaction(() => {
-        const s = getRow<Sale>(db, TABLE, 'id', saleId)
+  router.post(
+    '/:id/pagos',
+    handle(async (req) => {
+      const saleId = Number(req.params.id)
+      const pago = req.body as FiadoPago
+      return db.tx(async (q) => {
+        const s = await getRow<Sale>(q, TABLE, 'id', saleId)
         if (!s) throw new Error('Venta no encontrada')
         const u: Sale = { ...s, fiadoPagos: [...(s.fiadoPagos || []), pago] }
-        putRow(db, TABLE, 'id', saleId, {}, u)
-        const broadcasts: BroadcastMsg[] = [{ table: TABLE, op: 'put', data: u }]
-        if (!pago.condonado) recordFiadoCollection(db, broadcasts, { ...u, id: saleId }, pago.amount, pago.method === 'transferencia' ? 'transferencia' : 'efectivo')
-        return { updated: u, broadcasts }
-      })()
-      broadcasts.forEach(broadcast)
-      res.status(201).json(updated)
-    } catch (err) {
-      res.status(400).json({ error: errorMessage(err) })
-    }
-  })
+        await putRow(q, TABLE, 'id', saleId, u)
+        if (!pago.condonado) await recordFiadoCollection(q, { ...u, id: saleId }, pago.amount, pago.method === 'transferencia' ? 'transferencia' : 'efectivo')
+        return u
+      })
+    }, 201),
+  )
 
   /** Post-hoc edit of an already-finalized sale — restores the original items' stock, applies
    * the new items' stock, recalculates totals and logs a correccion_venta audit entry. Legacy
    * confirmarCorreccion() (repositories/sales.ts L125-188). */
-  router.put('/:id/correct', (req, res) => {
-    const saleId = Number(req.params.id)
-    const { newItems, reason } = req.body as { newItems: CartItem[]; reason: string }
-    try {
-      const { sale, broadcasts } = db.transaction(() => {
-        const s = getRow<Sale>(db, TABLE, 'id', saleId)
+  router.put(
+    '/:id/correct',
+    handle(async (req) => {
+      const saleId = Number(req.params.id)
+      const { newItems, reason } = req.body as { newItems: CartItem[]; reason: string }
+      return db.tx(async (q) => {
+        const s = await getRow<Sale>(q, TABLE, 'id', saleId)
         if (!s) throw new Error('Venta no encontrada')
 
         const before: SaleSnapshot = { items: s.items, subtotal: s.subtotal, total: s.total, discount: s.discount || 0 }
         const isTracked = (ci: CartItem) => !ci.isFree && ci.code !== 'CORR' && !ci.code.startsWith('FREE_')
-        const broadcasts: BroadcastMsg[] = []
 
         for (const ci of s.items) {
           if (!isTracked(ci)) continue
-          const p = getRow<Product>(db, 'products', 'code', ci.code)
-          if (p) {
-            const u: Product = { ...p, stock: roundQty(p.stock + ci.qty) }
-            putRow(db, 'products', 'code', ci.code, {}, u)
-            broadcasts.push({ table: 'products', op: 'put', data: u })
-          }
+          const p = await getRow<Product>(q, 'products', 'code', ci.code)
+          if (p) await putRow(q, 'products', 'code', ci.code, { ...p, stock: roundQty(p.stock + ci.qty) })
         }
         for (const ci of newItems) {
           if (!isTracked(ci)) continue
-          const p = getRow<Product>(db, 'products', 'code', ci.code)
-          if (p) {
-            const u: Product = { ...p, stock: roundQty(Math.max(0, p.stock - ci.qty)) }
-            putRow(db, 'products', 'code', ci.code, {}, u)
-            broadcasts.push({ table: 'products', op: 'put', data: u })
-          }
+          const p = await getRow<Product>(q, 'products', 'code', ci.code)
+          if (p) await putRow(q, 'products', 'code', ci.code, { ...p, stock: roundQty(Math.max(0, p.stock - ci.qty)) })
         }
 
         const newSub = newItems.reduce((sum, i) => sum + i.price * i.qty, 0)
@@ -228,7 +196,7 @@ export function salesRouter(db: Database.Database) {
             newGanancia += ci.price * ci.qty
             continue
           }
-          const p = getRow<Product>(db, 'products', 'code', ci.code)
+          const p = await getRow<Product>(q, 'products', 'code', ci.code)
           const cost = p?.cost ?? 0
           newGanancia += (ci.price - cost) * ci.qty
         }
@@ -243,8 +211,7 @@ export function salesRouter(db: Database.Database) {
           after,
           totalDiff: newTotal - before.total,
         }
-        const savedEntry = insertAutoRow(db, 'auditLog', auditEntry)
-        broadcasts.push({ table: 'auditLog', op: 'put', data: savedEntry })
+        await insertAutoRow(q, 'auditLog', auditEntry)
 
         const patch = {
           items: newItems,
@@ -256,19 +223,12 @@ export function salesRouter(db: Database.Database) {
           correctionReason: reason,
         }
         const updatedSale: Sale = { ...s, ...patch }
-        putRow(db, TABLE, 'id', saleId, {}, updatedSale)
-        broadcasts.push({ table: TABLE, op: 'put', data: updatedSale })
-        recordSaleCorrection(db, broadcasts, { ...updatedSale, id: saleId }, newTotal - before.total)
-
-        return { sale: updatedSale, broadcasts }
-      })()
-
-      broadcasts.forEach(broadcast)
-      res.json(sale)
-    } catch (err) {
-      res.status(400).json({ error: errorMessage(err) })
-    }
-  })
+        await putRow(q, TABLE, 'id', saleId, updatedSale)
+        await recordSaleCorrection(q, { ...updatedSale, id: saleId }, newTotal - before.total)
+        return updatedSale
+      })
+    }),
+  )
 
   return router
 }

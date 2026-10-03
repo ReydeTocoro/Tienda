@@ -1,9 +1,9 @@
 import { Router } from 'express'
-import type Database from 'better-sqlite3'
 import { randomUUID } from 'node:crypto'
 import type { Customer } from '../../src/types/customer'
-import { listAll, getRow, putRow, deleteRow } from './generic'
-import { broadcast } from '../broadcast'
+import type { Db, Sql } from '../db'
+import { getRow, putRow, deleteRow } from './generic'
+import { HttpError, handle } from './http'
 
 const TABLE = 'customers'
 
@@ -16,69 +16,74 @@ interface CustomerInput {
   birthday?: string
 }
 
-function findByCedula(db: Database.Database, cedula: string): Customer | undefined {
-  const row = db.prepare(`SELECT json FROM ${TABLE} WHERE cedula = ?`).get(cedula) as { json: string } | undefined
-  return row ? (JSON.parse(row.json) as Customer) : undefined
+async function findByCedula(q: Sql, cedula: string): Promise<Customer | undefined> {
+  const [row] = await q.query<{ data: Customer }>(`select data from ${TABLE} where data ->> 'cedula' = $1 limit 1`, [cedula])
+  return row?.data
 }
 
 /** legacy saveClient()'s cedula-duplicate check (repositories/customers.ts L22-41). */
-export function customersRouter(db: Database.Database) {
+export function customersRouter(db: Db) {
   const router = Router()
 
-  router.get('/', (_req, res) => {
-    res.json(listAll<Customer>(db, TABLE))
-  })
+  router.post(
+    '/',
+    handle(async (req) => {
+      const input = req.body as CustomerInput
+      const cedula = input.cedula?.trim() || undefined
+      return db.tx(async (q) => {
+        if (cedula) {
+          const dup = await findByCedula(q, cedula)
+          if (dup) throw new HttpError(409, 'Esa cédula ya existe: ' + dup.name)
+        }
+        const customer: Customer = {
+          id: randomUUID(),
+          name: input.name.trim(),
+          cedula,
+          phone: input.phone?.trim(),
+          email: input.email?.trim(),
+          notes: input.notes?.trim(),
+          birthday: input.birthday,
+          createdAt: new Date().toISOString(),
+        }
+        await putRow(q, TABLE, 'id', customer.id, customer)
+        return customer
+      })
+    }, 201),
+  )
 
-  router.post('/', (req, res) => {
-    const input = req.body as CustomerInput
-    const cedula = input.cedula?.trim() || undefined
-    if (cedula) {
-      const dup = findByCedula(db, cedula)
-      if (dup) return res.status(409).json({ error: 'Esa cédula ya existe: ' + dup.name })
-    }
-    const customer: Customer = {
-      id: randomUUID(),
-      name: input.name.trim(),
-      cedula,
-      phone: input.phone?.trim(),
-      email: input.email?.trim(),
-      notes: input.notes?.trim(),
-      birthday: input.birthday,
-      createdAt: new Date().toISOString(),
-    }
-    putRow(db, TABLE, 'id', customer.id, { cedula: cedula ?? null }, customer)
-    broadcast({ table: TABLE, op: 'put', data: customer })
-    res.status(201).json(customer)
-  })
+  router.put(
+    '/:id',
+    handle(async (req) => {
+      const input = req.body as CustomerInput
+      return db.tx(async (q) => {
+        const existing = await getRow<Customer>(q, TABLE, 'id', req.params.id)
+        if (!existing) throw new HttpError(404, 'Cliente no encontrado')
+        const cedula = input.cedula?.trim() || undefined
+        if (cedula) {
+          const dup = await findByCedula(q, cedula)
+          if (dup && dup.id !== req.params.id) throw new HttpError(409, 'Esa cédula ya existe: ' + dup.name)
+        }
+        const updated: Customer = {
+          ...existing,
+          name: input.name.trim(),
+          cedula,
+          phone: input.phone?.trim(),
+          email: input.email?.trim(),
+          notes: input.notes?.trim(),
+          birthday: input.birthday,
+        }
+        await putRow(q, TABLE, 'id', req.params.id, updated)
+        return updated
+      })
+    }),
+  )
 
-  router.put('/:id', (req, res) => {
-    const input = req.body as CustomerInput
-    const existing = getRow<Customer>(db, TABLE, 'id', req.params.id)
-    if (!existing) return res.status(404).json({ error: 'Cliente no encontrado' })
-    const cedula = input.cedula?.trim() || undefined
-    if (cedula) {
-      const dup = findByCedula(db, cedula)
-      if (dup && dup.id !== req.params.id) return res.status(409).json({ error: 'Esa cédula ya existe: ' + dup.name })
-    }
-    const updated: Customer = {
-      ...existing,
-      name: input.name.trim(),
-      cedula,
-      phone: input.phone?.trim(),
-      email: input.email?.trim(),
-      notes: input.notes?.trim(),
-      birthday: input.birthday,
-    }
-    putRow(db, TABLE, 'id', req.params.id, { cedula: cedula ?? null }, updated)
-    broadcast({ table: TABLE, op: 'put', data: updated })
-    res.json(updated)
-  })
-
-  router.delete('/:id', (req, res) => {
-    deleteRow(db, TABLE, 'id', req.params.id)
-    broadcast({ table: TABLE, op: 'delete', data: req.params.id })
-    res.status(204).end()
-  })
+  router.delete(
+    '/:id',
+    handle(async (req) => {
+      await db.tx((q) => deleteRow(q, TABLE, 'id', req.params.id))
+    }),
+  )
 
   return router
 }

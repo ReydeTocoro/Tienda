@@ -7,6 +7,7 @@ import { useScannerStore } from '../../store/useScannerStore'
 import { toast } from '../../store/useToastStore'
 import { formatDateTime } from '../../shared/lib/currency'
 import { UsuariosSection } from './components/UsuariosSection'
+import { SessionSection } from '../auth/SessionSection'
 
 /** Dedicated settings hub — PIN security, barcode scanner, and keyboard shortcuts. Split out of
  * the Reporte page (which used to mix cash-register reports with device/security config) so
@@ -78,7 +79,7 @@ export function ConfiguracionPage() {
       <p className="mb-3.5 font-display text-[21px] font-bold md:text-[26px]">Configuración</p>
 
       <p className="mb-2 field-label">Nombre de la tienda</p>
-      <div className="mb-3.5 flex gap-2 rounded-xl border border-br2 bg-s2 p-3.5 md:max-w-md">
+      <div className="mb-3.5 flex gap-2 rounded-xl border border-br bg-s1 p-3.5 shadow-xs md:max-w-md">
         <input
           className="input"
           value={storeName}
@@ -86,7 +87,7 @@ export function ConfiguracionPage() {
           onKeyDown={(e) => e.key === 'Enter' && saveStoreName()}
           placeholder="Mi Tienda Pro"
         />
-        <button onClick={saveStoreName} className="flex-shrink-0 rounded-[10px] bg-lime px-4 py-2 text-[13px] font-bold text-black transition-opacity hover:opacity-90">
+        <button onClick={saveStoreName} className="flex-shrink-0 rounded-[10px] bg-lime px-4 py-2 text-[13px] font-bold text-on-solid transition-opacity hover:opacity-90">
           Guardar
         </button>
       </div>
@@ -94,7 +95,7 @@ export function ConfiguracionPage() {
       <div className="md:grid md:grid-cols-2 md:items-start md:gap-6">
         <div>
           <p className="mb-2 field-label">Seguridad — PIN</p>
-          <div className="mb-3.5 rounded-xl border border-br2 bg-s2 p-3.5">
+          <div className="mb-3.5 rounded-xl border border-br bg-s1 p-3.5 shadow-xs">
             <div className="mb-3 text-[13px] text-txt2">
               El PIN protege: agregar/quitar stock, cierre de caja, pago de fiados y corrección de facturas. Máximo <b className="text-red">5 intentos</b> antes de bloqueo temporal.
             </div>
@@ -148,7 +149,7 @@ export function ConfiguracionPage() {
               </div>
             </div>
 
-            <button onClick={savePin} className="mt-1 w-full rounded-[10px] bg-lime py-2.5 text-[14px] font-bold text-black transition-opacity hover:opacity-90">
+            <button onClick={savePin} className="mt-1 w-full rounded-[10px] bg-lime py-2.5 text-[14px] font-bold text-on-solid transition-opacity hover:opacity-90">
               Guardar PIN
             </button>
             {status && <div className={`mt-1.5 text-center text-[11px] ${status.ok ? 'text-green' : 'text-red'}`}>{status.text}</div>}
@@ -163,7 +164,7 @@ export function ConfiguracionPage() {
 
         <div>
           <p className="mb-2 field-label">Lector de Código de Barras</p>
-          <div className="mb-3.5 rounded-xl border border-br2 bg-s2 p-3.5">
+          <div className="mb-3.5 rounded-xl border border-br bg-s1 p-3.5 shadow-xs">
             <div className="mb-3 flex items-center justify-between">
               <div>
                 <div className="text-[13px] font-bold">Estado del lector</div>
@@ -182,7 +183,7 @@ export function ConfiguracionPage() {
           </div>
 
           <p className="mb-2 field-label">Atajos de Teclado</p>
-          <div className="mb-3.5 rounded-xl border border-br2 bg-s2 p-3.5 text-[12px] leading-loose">
+          <div className="mb-3.5 rounded-xl border border-br bg-s1 p-3.5 shadow-xs text-[12px] leading-loose">
             <div className="grid grid-cols-[auto_1fr] items-center gap-x-3.5 gap-y-1">
               <Kbd>F1–F6</Kbd>
               <span className="text-txt2">Navegar entre páginas (Venta, Stock, Clientes…)</span>
@@ -202,6 +203,7 @@ export function ConfiguracionPage() {
       </div>
 
       <UsuariosSection />
+      <SessionSection />
     </div>
   )
 }

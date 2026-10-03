@@ -5,3 +5,6 @@ dist-ssr
 server/data
 .DS_Store
 MIOS/
+.firebase/
+firebase-debug.log*
+supabase/.temp/

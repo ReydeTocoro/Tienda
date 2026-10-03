@@ -5,12 +5,10 @@ import { VitePWA } from 'vite-plugin-pwa'
 // https://vite.dev/config/
 export default defineConfig({
   server: {
-    // Dev-time equivalent of production's same-origin server (server/index.ts) — keeps
-    // `npm run dev` working against the new server without the app needing to know the
-    // difference. Run the server separately: `npm run server`.
+    // Dev-time stand-in for Firebase Hosting's /api rewrite to the Function: run the same API
+    // locally with `npm run server` (it talks to the Supabase database).
     proxy: {
       '/api': 'http://localhost:3001',
-      '/ws': { target: 'ws://localhost:3001', ws: true },
     },
   },
   plugins: [
@@ -24,8 +22,8 @@ export default defineConfig({
         description: 'Sistema de caja registradora',
         start_url: '/',
         display: 'standalone',
-        background_color: '#edede8',
-        theme_color: '#3e6b4c',
+        background_color: '#f2f4f3',
+        theme_color: '#0c7a50',
         orientation: 'any',
         scope: '/',
         lang: 'es',
@@ -36,6 +34,8 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,png,svg,ico}'],
+        // The API must always hit the network, never the app-shell fallback.
+        navigateFallbackDenylist: [/^\/api\//],
       },
     }),
   ],

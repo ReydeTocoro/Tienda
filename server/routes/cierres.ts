@@ -1,24 +1,15 @@
 import { Router } from 'express'
-import type Database from 'better-sqlite3'
-import type { Cierre } from '../../src/types/cierre'
-import { listAll, errorMessage } from './generic'
-import { runAndBroadcast } from '../domain/tx'
+import type { Db } from '../db'
+import { handle } from './http'
 import { confirmCierre, type ConfirmCierreInput } from '../domain/cierre'
 
-export function cierresRouter(db: Database.Database) {
+export function cierresRouter(db: Db) {
   const router = Router()
 
-  router.get('/', (_req, res) => {
-    res.json(listAll<Cierre>(db, 'cierres'))
-  })
-
-  router.post('/', (req, res) => {
-    try {
-      res.status(201).json(runAndBroadcast(db, (out) => confirmCierre(db, out, req.body as ConfirmCierreInput)))
-    } catch (err) {
-      res.status(400).json({ error: errorMessage(err) })
-    }
-  })
+  router.post(
+    '/',
+    handle(async (req) => db.tx((q) => confirmCierre(q, req.body as ConfirmCierreInput)), 201),
+  )
 
   return router
 }

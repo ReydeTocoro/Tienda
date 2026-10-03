@@ -1,29 +1,27 @@
 import { Router } from 'express'
-import type Database from 'better-sqlite3'
 import type { Settings } from '../../src/types/settings'
-import { listAll, getRow, putRow } from './generic'
-import { broadcast } from '../broadcast'
+import type { Db } from '../db'
+import { getRow, putRow } from './generic'
+import { handle } from './http'
 
 const TABLE = 'settings'
 
-/** Single 'main' row, seeded at db.ts init. GET returns an array (with that one row) so the
- * client's generic initial-pull loop (GET /api/<table> -> bulkPut) works the same for every
- * table without a special case for this one. */
-export function settingsRouter(db: Database.Database) {
+/** The single 'main' row (seeded by the first migration): a PUT merges a partial patch into it. */
+export function settingsRouter(db: Db) {
   const router = Router()
 
-  router.get('/', (_req, res) => {
-    res.json(listAll<Settings>(db, TABLE))
-  })
-
-  router.put('/', (req, res) => {
-    const patch = req.body as Partial<Omit<Settings, 'key'>>
-    const current = getRow<Settings>(db, TABLE, 'key', 'main')
-    const updated: Settings = { ...(current as Settings), ...patch, key: 'main' }
-    putRow(db, TABLE, 'key', 'main', {}, updated)
-    broadcast({ table: TABLE, op: 'put', data: updated })
-    res.json(updated)
-  })
+  router.put(
+    '/',
+    handle(async (req) => {
+      const patch = req.body as Partial<Omit<Settings, 'key'>>
+      return db.tx(async (q) => {
+        const current = await getRow<Settings>(q, TABLE, 'key', 'main')
+        const updated: Settings = { ...(current as Settings), ...patch, key: 'main' }
+        await putRow(q, TABLE, 'key', 'main', updated)
+        return updated
+      })
+    }),
+  )
 
   return router
 }

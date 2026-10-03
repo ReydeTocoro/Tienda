@@ -1,13 +1,21 @@
-/** Thin fetch wrapper for the local-network server (see server/index.ts). Callers pass the full
- * `/api/...` path. In dev, Vite's proxy (vite.config.ts) forwards `/api` to the server; in
- * production the server serves the built app itself, so `/api` is always same-origin. */
+import { supabase } from './supabase'
 
+/** Thin fetch wrapper for the write API (server/, deployed as a Firebase Function that Hosting
+ * serves at /api; in dev, Vite proxies /api to `npm run server`). Every call carries the signed-in
+ * session, which the API checks against the staff list. Reads don't come through here: src/sync
+ * keeps the local mirror up to date from Supabase directly. */
 async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
-  const res = await fetch(path, {
-    method,
-    headers: body === undefined ? undefined : { 'Content-Type': 'application/json' },
-    body: body === undefined ? undefined : JSON.stringify(body),
-  })
+  const { data } = await supabase.auth.getSession()
+  const headers: Record<string, string> = {}
+  if (data.session) headers.Authorization = `Bearer ${data.session.access_token}`
+  if (body !== undefined) headers['Content-Type'] = 'application/json'
+
+  let res: Response
+  try {
+    res = await fetch(path, { method, headers, body: body === undefined ? undefined : JSON.stringify(body) })
+  } catch {
+    throw new Error('Sin conexión con el servidor: revisa el internet e inténtalo de nuevo')
+  }
   if (!res.ok) {
     const text = await res.text()
     let message = text
@@ -24,7 +32,12 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
   return (text ? JSON.parse(text) : undefined) as T
 }
 
-export const apiGet = <T>(path: string): Promise<T> => request<T>('GET', path)
 export const apiPost = <T>(path: string, body?: unknown): Promise<T> => request<T>('POST', path, body)
 export const apiPut = <T>(path: string, body?: unknown): Promise<T> => request<T>('PUT', path, body)
 export const apiDelete = <T = void>(path: string): Promise<T> => request<T>('DELETE', path)
+
+/** Wakes the API up when the app opens: a Function that sat idle starts cold, and it's better to
+ * pay that second now than on the first sale. */
+export function warmUpApi(): void {
+  fetch('/api/health').catch(() => {})
+}

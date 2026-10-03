@@ -1,50 +1,39 @@
-import type Database from 'better-sqlite3'
+import type { Sql } from '../db'
 
-/** Tiny generic helpers shared by every route file — table names are always our own hardcoded
- * literals (never user input), so string-building the SQL is safe here. Kept deliberately thin:
- * most entities still need their own POST/PUT logic (dup checks, computed fields, cascades), so
- * a one-size-fits-all CRUD router would fight more than it'd save. */
+/** Tiny generic helpers shared by every route file — table and column names are always our own
+ * hardcoded literals (never user input), so string-building the SQL is safe here. Names are
+ * quoted because several tables keep the client's camelCase ("cashMovements"). Kept deliberately
+ * thin: most entities still need their own POST/PUT logic (dup checks, computed fields, cascades),
+ * so a one-size-fits-all CRUD router would fight more than it'd save. */
+const ident = (name: string) => `"${name}"`
 
-export function listAll<T>(db: Database.Database, table: string): T[] {
-  const rows = db.prepare(`SELECT json FROM ${table}`).all() as { json: string }[]
-  return rows.map((r) => JSON.parse(r.json) as T)
+export async function listAll<T>(sql: Sql, table: string): Promise<T[]> {
+  const rows = await sql.query<{ data: T }>(`select data from ${ident(table)}`)
+  return rows.map((r) => r.data)
 }
 
-export function getRow<T>(db: Database.Database, table: string, pkCol: string, pk: unknown): T | undefined {
-  const row = db.prepare(`SELECT json FROM ${table} WHERE ${pkCol} = ?`).get(pk) as { json: string } | undefined
-  return row ? (JSON.parse(row.json) as T) : undefined
+export async function getRow<T>(sql: Sql, table: string, pkCol: string, pk: unknown): Promise<T | undefined> {
+  const rows = await sql.query<{ data: T }>(`select data from ${ident(table)} where ${ident(pkCol)} = $1`, [pk])
+  return rows[0]?.data
 }
 
-/** Insert-or-replace by primary key. `extraCols` are additional indexed columns to keep in sync
- * with the JSON blob (e.g. customers.cedula) — empty for most tables. */
-export function putRow(db: Database.Database, table: string, pkCol: string, pk: unknown, extraCols: Record<string, unknown>, obj: unknown): void {
-  const cols = [pkCol, ...Object.keys(extraCols), 'json']
-  const placeholders = cols.map(() => '?').join(', ')
-  const updates = cols
-    .filter((c) => c !== pkCol)
-    .map((c) => `${c} = excluded.${c}`)
-    .join(', ')
-  const values = [pk, ...Object.values(extraCols), JSON.stringify(obj)]
-  db.prepare(`INSERT INTO ${table} (${cols.join(', ')}) VALUES (${placeholders}) ON CONFLICT(${pkCol}) DO UPDATE SET ${updates}`).run(...values)
+/** Insert-or-replace by primary key (the trigger keeps the key inside `data` in step). */
+export async function putRow(sql: Sql, table: string, pkCol: string, pk: unknown, obj: unknown): Promise<void> {
+  await sql.query(`insert into ${ident(table)} (${ident(pkCol)}, data) values ($1, $2::jsonb) on conflict (${ident(pkCol)}) do update set data = excluded.data`, [pk, JSON.stringify(obj)])
 }
 
-export function deleteRow(db: Database.Database, table: string, pkCol: string, pk: unknown): boolean {
-  const info = db.prepare(`DELETE FROM ${table} WHERE ${pkCol} = ?`).run(pk)
-  return info.changes > 0
+export async function deleteRow(sql: Sql, table: string, pkCol: string, pk: unknown): Promise<boolean> {
+  const rows = await sql.query(`delete from ${ident(table)} where ${ident(pkCol)} = $1 returning 1`, [pk])
+  return rows.length > 0
 }
 
-/** Insert into an `id INTEGER PRIMARY KEY AUTOINCREMENT` table, then stamp the generated id back
- * into the stored JSON so the row that comes back (and gets broadcast) carries its own id —
- * mirrors Dexie's `table.add(obj)` returning the new key. AUTOINCREMENT (not bare INTEGER
- * PRIMARY KEY) is what guarantees ids are never reused even after a row is deleted — SQLite
- * tracks the high-water mark in `sqlite_sequence` instead of reusing the max rowid, matching the
- * "stable ids" guarantee the app's design already relies on for Dexie's auto-increment keys. */
-export function insertAutoRow<T extends object>(db: Database.Database, table: string, obj: T): T & { id: number } {
-  const info = db.prepare(`INSERT INTO ${table} (json) VALUES (?)`).run(JSON.stringify(obj))
-  const id = Number(info.lastInsertRowid)
-  const withId = { ...obj, id }
-  db.prepare(`UPDATE ${table} SET json = ? WHERE id = ?`).run(JSON.stringify(withId), id)
-  return withId
+/** Insert into an identity-keyed table. The trigger copies the generated id into `data`, so the
+ * row that comes back carries its own id — mirrors Dexie's `table.add(obj)` returning the new key.
+ * Identity sequences never hand out an id twice, even after a delete: the "stable ids" guarantee
+ * the app relies on for Dexie's auto-increment keys. */
+export async function insertAutoRow<T extends object>(sql: Sql, table: string, obj: T): Promise<T & { id: number }> {
+  const rows = await sql.query<{ data: T & { id: number } }>(`insert into ${ident(table)} (data) values ($1::jsonb) returning data`, [JSON.stringify(obj)])
+  return rows[0].data
 }
 
 export function errorMessage(err: unknown): string {

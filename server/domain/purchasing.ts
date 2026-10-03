@@ -1,4 +1,3 @@
-import type Database from 'better-sqlite3'
 import { randomUUID } from 'node:crypto'
 import type { Product } from '../../src/types/product'
 import type { EntradaRecord } from '../../src/types/entrada'
@@ -8,13 +7,13 @@ import type { OrderLine, OrderPayment, Payable, PurchaseOrder } from '../../src/
 import { dueDateFrom, payableBalance, round2 } from '../../src/shared/lib/cash'
 import { formatMoney } from '../../src/shared/lib/currency'
 import { formatOrderId } from '../../src/shared/lib/id'
+import type { Sql } from '../db'
 import { deleteRow, getRow, insertAutoRow, listAll, putRow, roundQty } from '../routes/generic'
-import { insertMovement, isCaja, requireFunds, type Out } from './cash'
+import { insertMovement, isCaja, requireFunds } from './cash'
 
 /** Suppliers, purchase orders and accounts payable. Same contract as `./cash`: runs inside the
- * caller's transaction, reports touched rows through `out`. Stock only ever changes in
- * `receiveOrder`, in the same transaction that books the payment or the debt — so "received"
- * can never exist without its money trail. */
+ * caller's transaction. Stock only ever changes in `receiveOrder`, in the same transaction that
+ * books the payment or the debt — so "received" can never exist without its money trail. */
 
 const SUPPLIERS = 'suppliers'
 const ORDERS = 'purchaseOrders'
@@ -50,15 +49,15 @@ function normalizeTerms(t: unknown): PaymentTerms {
   throw new Error('Elige si el pago es de contado o a crédito')
 }
 
-function nameTaken(db: Database.Database, name: string, exceptId?: string): boolean {
+async function nameTaken(sql: Sql, name: string, exceptId?: string): Promise<boolean> {
   const lower = name.toLowerCase()
-  return listAll<Supplier>(db, SUPPLIERS).some((s) => s.id !== exceptId && s.name.toLowerCase() === lower)
+  return (await listAll<Supplier>(sql, SUPPLIERS)).some((s) => s.id !== exceptId && s.name.toLowerCase() === lower)
 }
 
-export function createSupplier(db: Database.Database, out: Out, input: SupplierInput): Supplier {
+export async function createSupplier(sql: Sql, input: SupplierInput): Promise<Supplier> {
   const name = cleanText(input.name)
   if (!name) throw new Error('Escribe el nombre del proveedor')
-  if (nameTaken(db, name)) throw new Error('Ya existe un proveedor con ese nombre')
+  if (await nameTaken(sql, name)) throw new Error('Ya existe un proveedor con ese nombre')
   const supplier: Supplier = {
     id: randomUUID(),
     name,
@@ -72,17 +71,16 @@ export function createSupplier(db: Database.Database, out: Out, input: SupplierI
     active: true,
     createdAt: new Date().toISOString(),
   }
-  putRow(db, SUPPLIERS, 'id', supplier.id, {}, supplier)
-  out.push({ table: SUPPLIERS, op: 'put', data: supplier })
+  await putRow(sql, SUPPLIERS, 'id', supplier.id, supplier)
   return supplier
 }
 
-export function updateSupplier(db: Database.Database, out: Out, id: string, input: SupplierInput): Supplier {
-  const current = getRow<Supplier>(db, SUPPLIERS, 'id', id)
+export async function updateSupplier(sql: Sql, id: string, input: SupplierInput): Promise<Supplier> {
+  const current = await getRow<Supplier>(sql, SUPPLIERS, 'id', id)
   if (!current) throw new Error('Proveedor no encontrado')
   const name = cleanText(input.name)
   if (!name) throw new Error('Escribe el nombre del proveedor')
-  if (nameTaken(db, name, id)) throw new Error('Ya existe un proveedor con ese nombre')
+  if (await nameTaken(sql, name, id)) throw new Error('Ya existe un proveedor con ese nombre')
   const updated: Supplier = {
     ...current,
     name,
@@ -95,17 +93,15 @@ export function updateSupplier(db: Database.Database, out: Out, id: string, inpu
     paymentTerms: normalizeTerms(input.paymentTerms),
     active: input.active ?? current.active,
   }
-  putRow(db, SUPPLIERS, 'id', id, {}, updated)
-  out.push({ table: SUPPLIERS, op: 'put', data: updated })
+  await putRow(sql, SUPPLIERS, 'id', id, updated)
   return updated
 }
 
-export function deleteSupplier(db: Database.Database, out: Out, id: string): void {
-  if (!getRow<Supplier>(db, SUPPLIERS, 'id', id)) throw new Error('Proveedor no encontrado')
-  const used = db.prepare(`SELECT 1 FROM ${ORDERS} WHERE json_extract(json, '$.supplierId') = ? LIMIT 1`).get(id)
-  if (used) throw new Error('Este proveedor tiene pedidos registrados: desactívalo en vez de eliminarlo')
-  deleteRow(db, SUPPLIERS, 'id', id)
-  out.push({ table: SUPPLIERS, op: 'delete', data: id })
+export async function deleteSupplier(sql: Sql, id: string): Promise<void> {
+  if (!(await getRow<Supplier>(sql, SUPPLIERS, 'id', id))) throw new Error('Proveedor no encontrado')
+  const used = await sql.query(`select 1 from "${ORDERS}" where data ->> 'supplierId' = $1 limit 1`, [id])
+  if (used.length) throw new Error('Este proveedor tiene pedidos registrados: desactívalo en vez de eliminarlo')
+  await deleteRow(sql, SUPPLIERS, 'id', id)
 }
 
 // ------------------------------------------------------------------- orders
@@ -124,11 +120,12 @@ export interface OrderInput {
   send?: boolean
 }
 
-function buildLines(db: Database.Database, lines: OrderLineInput[]): OrderLine[] {
+async function buildLines(sql: Sql, lines: OrderLineInput[]): Promise<OrderLine[]> {
   if (!Array.isArray(lines) || lines.length === 0) throw new Error('Agrega al menos un producto al pedido')
   const seen = new Set<string>()
-  return lines.map((l) => {
-    const p = getRow<Product>(db, 'products', 'code', l.code)
+  const out: OrderLine[] = []
+  for (const l of lines) {
+    const p = await getRow<Product>(sql, 'products', 'code', l.code)
     if (!p) throw new Error(`El producto ${l.code} no existe en el inventario`)
     if (seen.has(p.code)) throw new Error(`"${p.name}" está repetido en el pedido`)
     seen.add(p.code)
@@ -136,34 +133,34 @@ function buildLines(db: Database.Database, lines: OrderLineInput[]): OrderLine[]
     const unitCost = round2(Number(l.unitCost))
     if (!(qty > 0)) throw new Error(`Indica la cantidad de "${p.name}"`)
     if (!Number.isFinite(unitCost) || unitCost < 0) throw new Error(`El costo de "${p.name}" no es válido`)
-    return { code: p.code, name: p.name, qty, unitCost }
-  })
+    out.push({ code: p.code, name: p.name, qty, unitCost })
+  }
+  return out
 }
 
 const orderTotal = (lines: OrderLine[]) => round2(lines.reduce((t, l) => t + l.qty * l.unitCost, 0))
 
-function activeSupplier(db: Database.Database, id: string): Supplier {
-  const s = getRow<Supplier>(db, SUPPLIERS, 'id', id)
+async function activeSupplier(sql: Sql, id: string): Promise<Supplier> {
+  const s = await getRow<Supplier>(sql, SUPPLIERS, 'id', id)
   if (!s) throw new Error('Elige un proveedor')
   if (!s.active) throw new Error(`El proveedor "${s.name}" está inactivo`)
   return s
 }
 
-function getOrder(db: Database.Database, id: number): PurchaseOrder & { id: number } {
-  const o = getRow<PurchaseOrder & { id: number }>(db, ORDERS, 'id', id)
+async function getOrder(sql: Sql, id: number): Promise<PurchaseOrder & { id: number }> {
+  const o = await getRow<PurchaseOrder & { id: number }>(sql, ORDERS, 'id', id)
   if (!o) throw new Error('Pedido no encontrado')
   return o
 }
 
-function saveOrder(db: Database.Database, out: Out, o: PurchaseOrder & { id: number }): PurchaseOrder {
-  putRow(db, ORDERS, 'id', o.id, {}, o)
-  out.push({ table: ORDERS, op: 'put', data: o })
+async function saveOrder(sql: Sql, o: PurchaseOrder & { id: number }): Promise<PurchaseOrder> {
+  await putRow(sql, ORDERS, 'id', o.id, o)
   return o
 }
 
-export function createOrder(db: Database.Database, out: Out, input: OrderInput): PurchaseOrder {
-  const supplier = activeSupplier(db, input.supplierId)
-  const lines = buildLines(db, input.lines)
+export async function createOrder(sql: Sql, input: OrderInput): Promise<PurchaseOrder> {
+  const supplier = await activeSupplier(sql, input.supplierId)
+  const lines = await buildLines(sql, input.lines)
   const now = new Date().toISOString()
   const base: Omit<PurchaseOrder, 'id'> = {
     supplierId: supplier.id,
@@ -176,19 +173,17 @@ export function createOrder(db: Database.Database, out: Out, input: OrderInput):
     createdAt: now,
     orderedAt: input.send ? now : undefined,
   }
-  const saved = insertAutoRow(db, ORDERS, base)
-  out.push({ table: ORDERS, op: 'put', data: saved })
-  return saved
+  return insertAutoRow(sql, ORDERS, base)
 }
 
 /** Drafts can be edited freely; once sent, an order is only received or cancelled. */
-export function updateOrder(db: Database.Database, out: Out, id: number, input: OrderInput): PurchaseOrder {
-  const o = getOrder(db, id)
+export async function updateOrder(sql: Sql, id: number, input: OrderInput): Promise<PurchaseOrder> {
+  const o = await getOrder(sql, id)
   if (o.status !== 'borrador') throw new Error('Solo se pueden editar los pedidos en borrador')
-  const supplier = activeSupplier(db, input.supplierId)
-  const lines = buildLines(db, input.lines)
+  const supplier = await activeSupplier(sql, input.supplierId)
+  const lines = await buildLines(sql, input.lines)
   const now = new Date().toISOString()
-  return saveOrder(db, out, {
+  return saveOrder(sql, {
     ...o,
     supplierId: supplier.id,
     supplierName: supplier.name,
@@ -201,17 +196,17 @@ export function updateOrder(db: Database.Database, out: Out, id: number, input: 
   })
 }
 
-export function sendOrder(db: Database.Database, out: Out, id: number): PurchaseOrder {
-  const o = getOrder(db, id)
+export async function sendOrder(sql: Sql, id: number): Promise<PurchaseOrder> {
+  const o = await getOrder(sql, id)
   if (o.status !== 'borrador') throw new Error('Solo se puede enviar un pedido en borrador')
-  activeSupplier(db, o.supplierId)
-  return saveOrder(db, out, { ...o, status: 'pedido', orderedAt: new Date().toISOString() })
+  await activeSupplier(sql, o.supplierId)
+  return saveOrder(sql, { ...o, status: 'pedido', orderedAt: new Date().toISOString() })
 }
 
-export function cancelOrder(db: Database.Database, out: Out, id: number): PurchaseOrder {
-  const o = getOrder(db, id)
+export async function cancelOrder(sql: Sql, id: number): Promise<PurchaseOrder> {
+  const o = await getOrder(sql, id)
   if (o.status !== 'borrador' && o.status !== 'pedido') throw new Error(o.status === 'recibido' ? 'Un pedido recibido no se puede cancelar' : 'El pedido ya está cancelado')
-  return saveOrder(db, out, { ...o, status: 'cancelado', cancelledAt: new Date().toISOString() })
+  return saveOrder(sql, { ...o, status: 'cancelado', cancelledAt: new Date().toISOString() })
 }
 
 export interface ReceiveInput {
@@ -224,8 +219,8 @@ export interface ReceiveInput {
 /** The only place stock grows from a purchase. One transaction: stock + entrada records + the
  * payment (cash out of the chosen caja) or the account payable — if any step fails, nothing
  * happens, and a second attempt on the same order is rejected. */
-export function receiveOrder(db: Database.Database, out: Out, id: number, input: ReceiveInput): PurchaseOrder {
-  const o = getOrder(db, id)
+export async function receiveOrder(sql: Sql, id: number, input: ReceiveInput): Promise<PurchaseOrder> {
+  const o = await getOrder(sql, id)
   if (o.status !== 'pedido') throw new Error(o.status === 'recibido' ? 'Este pedido ya fue recibido' : 'Solo se puede recibir un pedido que ya fue enviado')
 
   const overrides = new Map((input.lines ?? []).map((l) => [l.code, l]))
@@ -247,15 +242,14 @@ export function receiveOrder(db: Database.Database, out: Out, id: number, input:
   for (const l of lines) {
     const qty = l.qtyReceived ?? 0
     if (qty <= 0) continue
-    const p = getRow<Product>(db, 'products', 'code', l.code)
+    const p = await getRow<Product>(sql, 'products', 'code', l.code)
     if (!p) throw new Error(`El producto "${l.name}" ya no existe en el inventario`)
     const stockAntes = p.stock || 0
     const stockDespues = roundQty(stockAntes + qty)
     const updated: Product = { ...p, stock: stockDespues, cost: l.unitCost > 0 ? l.unitCost : p.cost }
-    putRow(db, 'products', 'code', p.code, {}, updated)
-    out.push({ table: 'products', op: 'put', data: updated })
+    await putRow(sql, 'products', 'code', p.code, updated)
     const record: Omit<EntradaRecord, 'id'> = { code: p.code, name: p.name, qty, stockAntes, stockDespues, date: new Date().toISOString(), source }
-    out.push({ table: 'entradas', op: 'put', data: insertAutoRow(db, 'entradas', record) })
+    await insertAutoRow(sql, 'entradas', record)
   }
 
   let payment: OrderPayment = { mode: 'ninguno' }
@@ -264,8 +258,8 @@ export function receiveOrder(db: Database.Database, out: Out, id: number, input:
     const pay = input.payment as { mode?: string; caja?: unknown } | undefined
     if (pay?.mode === 'contado') {
       if (!isCaja(pay.caja)) throw new Error('Elige de qué caja sale el dinero')
-      requireFunds(db, pay.caja, receivedTotal)
-      const mv = insertMovement(db, out, {
+      await requireFunds(sql, pay.caja, receivedTotal)
+      const mv = await insertMovement(sql, {
         caja: pay.caja,
         direction: 'out',
         type: 'pago_proveedor',
@@ -290,15 +284,14 @@ export function receiveOrder(db: Database.Database, out: Out, id: number, input:
         dueDate: dueDateFrom(now, o.paymentTerms.days),
         payments: [],
       }
-      const payable = insertAutoRow(db, PAYABLES, base)
-      out.push({ table: PAYABLES, op: 'put', data: payable })
+      const payable = await insertAutoRow(sql, PAYABLES, base)
       payment = { mode: 'credito', payableId: payable.id }
     } else {
       throw new Error('Indica cómo se paga el pedido: de contado o a crédito')
     }
   }
 
-  return saveOrder(db, out, { ...o, status: 'recibido', lines, receivedTotal, receivedAt: new Date().toISOString(), receivedBy: by, payment })
+  return saveOrder(sql, { ...o, status: 'recibido', lines, receivedTotal, receivedAt: new Date().toISOString(), receivedBy: by, payment })
 }
 
 // ----------------------------------------------------------------- payables
@@ -310,8 +303,8 @@ export interface PayInput {
 }
 
 /** A (partial or full) payment of a supplier debt, taken out of a caja — usually the Mayor. */
-export function payPayable(db: Database.Database, out: Out, id: number, input: PayInput): Payable {
-  const p = getRow<Payable & { id: number }>(db, PAYABLES, 'id', id)
+export async function payPayable(sql: Sql, id: number, input: PayInput): Promise<Payable> {
+  const p = await getRow<Payable & { id: number }>(sql, PAYABLES, 'id', id)
   if (!p) throw new Error('Cuenta por pagar no encontrada')
   const balance = payableBalance(p)
   if (balance <= 0) throw new Error('Esta cuenta ya está pagada')
@@ -319,9 +312,9 @@ export function payPayable(db: Database.Database, out: Out, id: number, input: P
   const amount = round2(input.amount)
   if (!(amount > 0)) throw new Error('El monto del pago debe ser mayor a 0')
   if (amount > balance + 0.001) throw new Error(`El pago supera el saldo pendiente (${formatMoney(balance)})`)
-  requireFunds(db, input.caja, amount)
+  await requireFunds(sql, input.caja, amount)
   const by = input.by?.trim() || undefined
-  const mv = insertMovement(db, out, {
+  const mv = await insertMovement(sql, {
     caja: input.caja,
     direction: 'out',
     type: 'pago_proveedor',
@@ -333,7 +326,6 @@ export function payPayable(db: Database.Database, out: Out, id: number, input: P
     by,
   })
   const updated: Payable = { ...p, paid: round2(p.paid + amount), payments: [...p.payments, { date: new Date().toISOString(), amount, caja: input.caja, movementId: mv.id, by }] }
-  putRow(db, PAYABLES, 'id', id, {}, updated)
-  out.push({ table: PAYABLES, op: 'put', data: updated })
+  await putRow(sql, PAYABLES, 'id', id, updated)
   return updated
 }
