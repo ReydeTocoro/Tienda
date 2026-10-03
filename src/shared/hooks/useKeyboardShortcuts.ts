@@ -4,7 +4,7 @@ import { useScannerStore } from '../../store/useScannerStore'
 import { usePinStore } from '../../store/usePinStore'
 import { toast } from '../../store/useToastStore'
 
-const FMAP: Record<string, string> = { F1: '/', F2: '/inventario', F3: '/clientes', F4: '/fiados', F5: '/historial', F6: '/reporte' }
+const FMAP: Record<string, string> = { F1: '/', F2: '/inventario', F3: '/clientes', F4: '/fiados', F5: '/facturas', F6: '/reporte' }
 
 /** Global keyboard shortcuts — legacy's desktop shortcut handler (index.html L2284-2349):
  * F1-F6 navigate, F7/`/` focuses the Venta search bar, F8 toggles the HID scanner. */

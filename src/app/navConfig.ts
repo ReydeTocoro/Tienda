@@ -1,5 +1,5 @@
 import { useLiveQuery } from 'dexie-react-hooks'
-import { ShoppingCart, Package, Users, ClipboardList, Archive, BarChart3, Settings, Wallet, Truck } from 'lucide-react'
+import { ShoppingCart, Package, Users, ClipboardList, Receipt, BarChart3, Settings, Wallet, Truck } from 'lucide-react'
 import type { ComponentType } from 'react'
 import { db } from '../db/index'
 import { groupFiados, groupTotals } from '../features/fiados/lib/fiadoGrouping'
@@ -28,7 +28,7 @@ export const NAV_ITEMS: NavItem[] = [
   { to: '/inventario', label: 'Stock', icon: Package, badgeKey: 'lowStock', requiresAdmin: true, gateSubtitle: 'Esta sección requiere PIN de administrador' },
   { to: '/clientes', label: 'Clientes', icon: Users },
   { to: '/fiados', label: 'Fiados', icon: ClipboardList, badgeKey: 'fiados' },
-  { to: '/historial', label: 'Historial', icon: Archive },
+  { to: '/facturas', label: 'Facturas', icon: Receipt },
   { to: '/cajas', label: 'Cajas', icon: Wallet, requiresAdmin: true, gateSubtitle: 'Las cajas requieren PIN de administrador' },
   { to: '/proveedores', label: 'Proveedores', shortLabel: 'Proveed.', icon: Truck, badgeKey: 'payables', requiresAdmin: true, gateSubtitle: 'Proveedores y compras requieren PIN de administrador' },
   { to: '/reporte', label: 'Reporte', icon: BarChart3, requiresAdmin: true, gateSubtitle: 'Los reportes requieren PIN de administrador' },

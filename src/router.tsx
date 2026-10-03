@@ -1,10 +1,10 @@
-import { createBrowserRouter } from 'react-router-dom'
+import { createBrowserRouter, Navigate } from 'react-router-dom'
 import { AppShell } from './app/AppShell'
 import { VentaPage } from './features/pos/VentaPage'
 import { InventarioPage } from './features/inventory/InventarioPage'
 import { ClientesPage } from './features/customers/ClientesPage'
 import { FiadosPage } from './features/fiados/FiadosPage'
-import { HistorialPage } from './features/history/HistorialPage'
+import { FacturasPage } from './features/invoices/FacturasPage'
 import { ReportePage } from './features/reports/ReportePage'
 import { ConfiguracionPage } from './features/settings/ConfiguracionPage'
 import { CajasPage } from './features/cash/CajasPage'
@@ -26,7 +26,9 @@ export const router = createBrowserRouter([
       },
       { path: '/clientes', element: <ClientesPage /> },
       { path: '/fiados', element: <FiadosPage /> },
-      { path: '/historial', element: <HistorialPage /> },
+      { path: '/facturas', element: <FacturasPage /> },
+      // The module used to be called Historial: keep old bookmarks and the installed app's shortcut working.
+      { path: '/historial', element: <Navigate to="/facturas" replace /> },
       {
         path: '/cajas',
         element: (

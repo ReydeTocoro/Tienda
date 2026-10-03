@@ -4,8 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Branches
 
-- `main` — the old single-file HTML/JS/CSS POS app (`legacy/`). Untouched, kept for reference only.
-- `react-rewrite` (current work happens here) — full React 19 + TypeScript + Vite + Tailwind 4 + Zustand rewrite, now with a Node/SQLite server. Always work on this branch unless told otherwise.
+GitHub only has `main`, and it carries the whole app (React 19 + TypeScript + Vite + Tailwind 4 + Zustand client, Node/SQLite server); the old single-file HTML/JS/CSS app survives only as `legacy/`. Day-to-day work happens on the local `react-rewrite` branch and is published with `git push origin HEAD:main` (merge `origin/main` into it first if it moved). Commit and push only when the user asks; `MIOS/` (their real Excel with costs and suppliers) is git-ignored and must never be committed.
 
 ## Commands
 
@@ -45,9 +44,9 @@ Remote access (from outside the local network) goes through Tailscale (`tailscal
 ### Frontend structure
 
 - `src/app/` — shell chrome: `AppShell.tsx` (layout + mounts global effects: sync, theme, scanner, keyboard shortcuts), `Header`/`Sidebar`/`BottomNav` (mobile gets `BottomNav`, `md:`+ swaps in `Sidebar` — one breakpoint switch, pages don't special-case it), `navConfig.ts` (single source of nav items + live badge counts, shared by both chromes).
-- `src/features/<name>/` — one folder per route/domain (`pos`, `inventory`, `customers`, `fiados`, `history`, `reports`, `pin`), each with its own `components/`, `hooks/`, and sometimes `lib/` for pure logic (e.g. `features/fiados/lib/fiadoGrouping.ts`, shared by nav badges and the Fiados page).
+- `src/features/<name>/` — one folder per route/domain (`pos`, `inventory`, `customers`, `fiados`, `invoices`, `reports`, `pin`), each with its own `components/`, `hooks/`, and sometimes `lib/` for pure logic (e.g. `features/fiados/lib/fiadoGrouping.ts`, shared by nav badges and the Fiados page).
 - `src/store/` — Zustand stores for ephemeral UI/client state (cart draft, toasts, confirm dialog, PIN session, scanner on/off). Persisted business data goes through `src/db/`, not a store.
-- `src/shared/` — cross-feature `components/` (e.g. `ToastHost`, `ConfirmDialog` — both driven by their Zustand stores and rendered once from `AppShell`), `hooks/`, `lib/`.
+- `src/shared/` — cross-feature `components/` (e.g. `ToastHost`, `ConfirmDialog` — both driven by their Zustand stores and rendered once from `AppShell`), `hooks/`, `lib/`. Stock, Clientes, Fiados and Facturas are spreadsheet-style lists on the shared virtualized `DataTable` (with `SearchInput`, `AddFab`, `Chip` and `lib/sortRows`): build any new list that way rather than as a card grid.
 - Native `<dialog>` is the standard modal primitive (backdrop, Escape, focus trap, top-layer stacking all come free) — don't hand-roll a new overlay/portal for a modal.
 - Admin-gated actions (Inventario, Reporte, etc.) go through `usePermission().requireAdmin()` (`src/features/pin/usePermission.ts`), the single permission mechanism — it resolves immediately if already unlocked this session, otherwise prompts `PinModal`. Don't invent a second gating mechanism.
 

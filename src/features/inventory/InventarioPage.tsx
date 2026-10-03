@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type ComponentType } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { ClipboardCheck, Download, EyeOff, FileSpreadsheet, FileText, Lock, PackagePlus, Plus, ScrollText, Search, Upload } from 'lucide-react'
+import { ClipboardCheck, Download, EyeOff, FileSpreadsheet, FileText, Lock, PackagePlus, ScrollText, Upload } from 'lucide-react'
 import { db } from '../../db/index'
 import type { Product } from '../../types/product'
 import { adjustStock, deleteProduct } from '../../db/repositories/products'
@@ -13,6 +13,10 @@ import { ImportPreviewModal } from './components/ImportPreviewModal'
 import { CyclicCountModal } from './components/CyclicCountModal'
 import { AuditLogModal } from './components/AuditLogModal'
 import { BottomSheet } from '../../shared/components/BottomSheet'
+import { AddFab } from '../../shared/components/AddFab'
+import { Chip } from '../../shared/components/Chip'
+import { SearchInput } from '../../shared/components/SearchInput'
+import { nextSort } from '../../shared/lib/sortRows'
 import { useConfirm } from '../../store/useConfirmStore'
 import { toast } from '../../store/useToastStore'
 import { formatMoney, formatQty } from '../../shared/lib/currency'
@@ -158,7 +162,7 @@ export function InventarioPage() {
   }, [listed, search, activeCat, sort])
 
   function handleSort(key: SortKey) {
-    setSort((s) => (s.key === key ? { key, dir: s.dir === 'asc' ? 'desc' : 'asc' } : { key, dir: 'asc' }))
+    setSort((s) => nextSort(s, key))
   }
 
   async function toggleCosts() {
@@ -233,11 +237,11 @@ export function InventarioPage() {
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
           <h1 className="font-display text-[21px] font-bold md:text-[22px]">Inventario</h1>
           <div className="flex flex-wrap items-center gap-1.5 text-[11.5px]">
-            <span className="rounded-full border border-br2 bg-s2 px-2.5 py-0.5 text-txt2">
+            <Chip>
               {listed.length} producto{listed.length !== 1 ? 's' : ''}
-            </span>
-            {summary.outStock > 0 && <span className="rounded-full border border-red/30 bg-red/10 px-2.5 py-0.5 text-red">{summary.outStock} sin stock</span>}
-            {summary.lowStock > 0 && <span className="rounded-full border border-orange/30 bg-orange/10 px-2.5 py-0.5 text-orange">{summary.lowStock} stock bajo</span>}
+            </Chip>
+            {summary.outStock > 0 && <Chip tone="red">{summary.outStock} sin stock</Chip>}
+            {summary.lowStock > 0 && <Chip tone="orange">{summary.lowStock} stock bajo</Chip>}
           </div>
           <button
             onClick={toggleCosts}
@@ -258,15 +262,7 @@ export function InventarioPage() {
         )}
 
         <div className="flex flex-wrap items-center gap-2">
-          <div className="relative min-w-[200px] flex-1">
-            <Search size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted" />
-            <input
-              className="input py-2 pl-9"
-              placeholder="Buscar nombre, código, marca..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
-          </div>
+          <SearchInput value={search} onChange={setSearch} placeholder="Buscar nombre, código, marca..." />
           <select value={activeCat} onChange={(e) => setCat(e.target.value)} aria-label="Filtrar por categoría" className="input w-auto min-w-[190px] py-2">
             <option value={ALL}>Todas las categorías ({listed.length})</option>
             {categories.map((c) => (
@@ -296,6 +292,7 @@ export function InventarioPage() {
             products={rows}
             byCode={byCode}
             showCosts={showCosts}
+            onRevealCosts={toggleCosts}
             sort={sort}
             onSort={handleSort}
             resetKey={`${search}|${activeCat}|${sort.key}|${sort.dir}`}
@@ -307,15 +304,7 @@ export function InventarioPage() {
         )}
       </div>
 
-      <button
-        type="button"
-        onClick={openCreate}
-        title="Agregar producto"
-        aria-label="Agregar producto"
-        className="absolute bottom-5 right-5 z-20 flex h-14 w-14 items-center justify-center rounded-full bg-lime text-bg shadow-lg transition-transform hover:scale-105 active:scale-95 md:bottom-6 md:right-6"
-      >
-        <Plus size={26} strokeWidth={2.5} />
-      </button>
+      <AddFab label="Agregar producto" onClick={openCreate} />
 
       <BottomSheet open={formOpen} onClose={closeForm} maxWidthClass="max-w-[640px]">
         <ProductForm product={editing} onSaved={closeForm} onCancel={closeForm} scanSeed={formSeed} onOpenCamera={openFormCamera} />

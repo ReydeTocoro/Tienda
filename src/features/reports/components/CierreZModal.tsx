@@ -162,7 +162,7 @@ function CierreZForm({ dayKey, onClose, onClosed }: Omit<CierreZModalProps, 'ope
       <textarea rows={2} value={notas} onChange={(e) => setNotas(e.target.value)} placeholder="Ej: $20 de faltante por cambio dado sin registrar..." className="input mb-4 resize-none" />
 
       <div className="mb-4 rounded-[10px] border border-red/20 bg-red/10 px-3 py-2.5 text-[12px] text-txt2">
-        El Reporte Z es definitivo. Las ventas de este día quedan marcadas como cerradas (siguen visibles en Historial/Reporte para siempre) y la caja se cierra.
+        El Reporte Z es definitivo. Las ventas de este día quedan marcadas como cerradas (siguen visibles en Facturas/Reporte para siempre) y la caja se cierra.
       </div>
 
       <div className="flex gap-2">
