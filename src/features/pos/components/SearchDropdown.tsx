@@ -14,7 +14,7 @@ export function SearchDropdown({ matches, query, focusIndex, onHover, onSelect }
   if (!query.trim()) return null
 
   return (
-    <div className="absolute left-0 right-0 top-[calc(100%+4px)] z-[300] max-h-[300px] overflow-y-auto rounded-xl border border-br2 bg-s1 shadow-[var(--shadow-md)]">
+    <div className="absolute left-0 right-0 top-[calc(100%+4px)] z-[300] max-h-[300px] overflow-y-auto rounded-xl border border-br bg-s1 shadow-md">
       {!matches.length ? (
         <div className="p-4 text-center text-[13px] text-muted">
           Sin resultados para "<b>{query}</b>"

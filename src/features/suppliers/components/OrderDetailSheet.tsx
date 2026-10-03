@@ -85,13 +85,13 @@ export function OrderDetailSheet({ order, onClose, onEditDraft, onReceive }: Ord
                 <button onClick={() => onEditDraft(order)} className="flex-1 rounded-[10px] border border-br2 py-2.5 text-[13px] font-semibold text-txt2 hover:bg-s2">
                   Editar
                 </button>
-                <button onClick={() => act(() => sendOrder(order.id!), 'Pedido enviado')} className="flex-[1.5] rounded-[10px] bg-lime py-2.5 text-[14px] font-bold text-bg">
+                <button onClick={() => act(() => sendOrder(order.id!), 'Pedido enviado')} className="flex-[1.5] rounded-[10px] bg-lime py-2.5 text-[14px] font-bold text-on-solid">
                   Enviar pedido
                 </button>
               </>
             )}
             {order.status === 'pedido' && (
-              <button onClick={() => onReceive(order)} className="flex-[2] rounded-[10px] bg-lime py-2.5 text-[14px] font-bold text-bg">
+              <button onClick={() => onReceive(order)} className="flex-[2] rounded-[10px] bg-lime py-2.5 text-[14px] font-bold text-on-solid">
                 Marcar como recibido
               </button>
             )}

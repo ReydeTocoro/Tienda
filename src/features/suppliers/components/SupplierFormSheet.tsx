@@ -147,7 +147,7 @@ function SupplierForm({ supplier, onClose }: { supplier: Supplier | null; onClos
         <button onClick={onClose} className="flex-1 rounded-[10px] border border-br2 py-2.5 text-[13px] text-txt2">
           Cancelar
         </button>
-        <button disabled={busy} onClick={save} className="flex-[2] rounded-[10px] bg-lime py-2.5 text-[14px] font-bold text-bg disabled:opacity-60">
+        <button disabled={busy} onClick={save} className="flex-[2] rounded-[10px] bg-lime py-2.5 text-[14px] font-bold text-on-solid disabled:opacity-60">
           {supplier ? 'Guardar cambios' : 'Crear proveedor'}
         </button>
       </div>

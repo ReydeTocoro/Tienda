@@ -55,7 +55,7 @@ export function PayablesList() {
             const info = dueInfo(p, today)
             const balance = payableBalance(p)
             return (
-              <div key={p.id} className="rounded-xl border border-br bg-s1 p-3.5">
+              <div key={p.id} className="rounded-xl border border-br bg-s1 p-3.5 shadow-xs">
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
                     <div className="truncate text-[14px] font-bold">{p.supplierName}</div>
@@ -77,7 +77,7 @@ export function PayablesList() {
                   </div>
                 </div>
                 {balance > 0 && (
-                  <button onClick={() => setPaying(p.id ?? null)} className="mt-3 w-full rounded-[10px] bg-lime py-2 text-[13px] font-bold text-bg">
+                  <button onClick={() => setPaying(p.id ?? null)} className="mt-3 w-full rounded-[10px] bg-lime py-2 text-[13px] font-bold text-on-solid">
                     Pagar
                   </button>
                 )}
@@ -100,7 +100,7 @@ export function PayablesList() {
 
 function Stat({ label, value, color }: { label: string; value: string; color: string }) {
   return (
-    <div className="rounded-xl border border-br bg-s1 px-3.5 py-3 text-center">
+    <div className="rounded-xl border border-br bg-s1 px-3.5 py-3 text-center shadow-xs">
       <div className="field-label">{label}</div>
       <div className={`font-mono text-[17px] font-bold ${color}`}>{value}</div>
     </div>

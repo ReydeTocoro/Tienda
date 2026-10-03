@@ -152,7 +152,7 @@ export function CajasPage() {
 
 function CajaCard({ title, subtitle, balance, accent, children }: { title: string; subtitle: string; balance: number; accent: string; children: ReactNode }) {
   return (
-    <section className="rounded-[14px] border border-br bg-s1 p-4">
+    <section className="rounded-[14px] border border-br bg-s1 p-4 shadow-xs">
       <div className="mb-3 flex items-start justify-between gap-3">
         <div>
           <div className="text-[15px] font-bold">{title}</div>

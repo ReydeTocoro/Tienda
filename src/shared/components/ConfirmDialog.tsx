@@ -22,8 +22,8 @@ export function ConfirmDialog() {
               {request.cancelLabel || 'Cancelar'}
             </button>
             <button
-              className={`flex-[2] rounded-[10px] px-4 py-2.5 text-[13px] font-bold text-black active:scale-[0.96] ${
-                request.danger ? 'bg-red text-white' : 'bg-lime'
+              className={`flex-[2] rounded-[10px] px-4 py-2.5 text-[13px] font-bold text-on-solid active:scale-[0.96] ${
+                request.danger ? 'bg-red' : 'bg-lime'
               }`}
               onClick={() => settle(true)}
             >

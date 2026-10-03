@@ -185,7 +185,7 @@ export function CyclicCountModal({ open, onClose, products }: CyclicCountModalPr
           Cerrar
         </button>
         {diffs.length > 0 && (
-          <button disabled={busy} onClick={apply} className="flex-[2] rounded-[10px] bg-orange py-2.5 text-[14px] font-extrabold text-black disabled:opacity-60">
+          <button disabled={busy} onClick={apply} className="flex-[2] rounded-[10px] bg-orange py-2.5 text-[14px] font-extrabold text-on-solid disabled:opacity-60">
             Aplicar {diffs.length} ajuste{diffs.length !== 1 ? 's' : ''} de inventario
           </button>
         )}

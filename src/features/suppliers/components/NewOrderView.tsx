@@ -92,7 +92,7 @@ export function NewOrderView({ editing, onDone }: NewOrderViewProps) {
             {mode === 'bajo' && !search ? 'Nada por pedir: ningún producto está bajo su mínimo.' : 'Sin resultados.'}
           </div>
         ) : (
-          <div className="max-h-[60vh] overflow-y-auto rounded-xl border border-br bg-s1">
+          <div className="max-h-[60vh] overflow-y-auto rounded-xl border border-br bg-s1 shadow-xs">
             {candidates.slice(0, MAX_ROWS).map((p) => {
               const isSel = selected.has(p.code)
               return (
@@ -101,7 +101,7 @@ export function NewOrderView({ editing, onDone }: NewOrderViewProps) {
                   onClick={() => dispatch({ type: 'toggle', line: lineFromProduct(p) })}
                   className={`flex w-full items-center gap-3 border-b border-br px-3 py-2 text-left last:border-b-0 hover:bg-s2 ${isSel ? 'bg-lime/10' : ''}`}
                 >
-                  <span className={`flex h-5 w-5 flex-shrink-0 items-center justify-center rounded border ${isSel ? 'border-lime bg-lime text-bg' : 'border-br2'}`}>{isSel && <Check size={13} strokeWidth={3} />}</span>
+                  <span className={`flex h-5 w-5 flex-shrink-0 items-center justify-center rounded border ${isSel ? 'border-lime bg-lime text-on-solid' : 'border-br2'}`}>{isSel && <Check size={13} strokeWidth={3} />}</span>
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-[13px] font-semibold">{p.name}</span>
                     <span className="block truncate font-mono text-[11px] text-muted">
@@ -121,7 +121,7 @@ export function NewOrderView({ editing, onDone }: NewOrderViewProps) {
         )}
       </section>
 
-      <section className="rounded-[14px] border border-br bg-s1 p-3.5 md:sticky md:top-4">
+      <section className="rounded-[14px] border border-br bg-s1 p-3.5 shadow-xs md:sticky md:top-4">
         <div className="mb-3 text-[15px] font-bold">{editing ? 'Editando borrador' : 'Pedido nuevo'}</div>
 
         <label className="mb-1 block field-label">Proveedor *</label>
@@ -177,7 +177,7 @@ export function NewOrderView({ editing, onDone }: NewOrderViewProps) {
           <button disabled={busy} onClick={() => save(false)} className="flex-1 rounded-[10px] border border-br2 py-2.5 text-[13px] font-semibold text-txt2 hover:bg-s2 disabled:opacity-60">
             Guardar borrador
           </button>
-          <button disabled={busy} onClick={() => save(true)} className="flex-[1.4] rounded-[10px] bg-lime py-2.5 text-[14px] font-bold text-bg disabled:opacity-60">
+          <button disabled={busy} onClick={() => save(true)} className="flex-[1.4] rounded-[10px] bg-lime py-2.5 text-[14px] font-bold text-on-solid disabled:opacity-60">
             Enviar pedido
           </button>
         </div>

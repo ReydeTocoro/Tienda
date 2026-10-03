@@ -33,9 +33,9 @@ export function ProveedoresPage() {
   }
 
   const tabs: Array<{ key: Tab; label: string; badge?: number; badgeCls?: string }> = [
-    { key: 'pedidos', label: 'Pedidos', badge: toReceive, badgeCls: 'bg-orange text-black' },
+    { key: 'pedidos', label: 'Pedidos', badge: toReceive, badgeCls: 'bg-orange text-on-solid' },
     { key: 'nuevo', label: 'Nuevo pedido' },
-    { key: 'porpagar', label: 'Por pagar', badge: overdue, badgeCls: 'bg-red text-white' },
+    { key: 'porpagar', label: 'Por pagar', badge: overdue, badgeCls: 'bg-red text-on-solid' },
     { key: 'proveedores', label: 'Proveedores' },
   ]
 

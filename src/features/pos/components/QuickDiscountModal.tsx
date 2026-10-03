@@ -45,7 +45,7 @@ export function QuickDiscountModal({ open, onClose }: QuickDiscountModalProps) {
           onChange={(e) => setCustom(e.target.value)}
           className="input flex-1 border-lime font-mono text-lime"
         />
-        <button onClick={() => apply(parseFloat(custom) || 0)} className="rounded-[10px] bg-lime px-4.5 py-2.5 text-[15px] font-extrabold text-black">
+        <button onClick={() => apply(parseFloat(custom) || 0)} className="rounded-[10px] bg-lime px-4.5 py-2.5 text-[15px] font-extrabold text-on-solid">
  
         </button>
       </div>

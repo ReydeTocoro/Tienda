@@ -53,7 +53,7 @@ function PayForm({ payable, onClose }: { payable: Payable; onClose: () => void }
     }
   }
 
-  const choice = (is: boolean) => `flex-1 rounded-xl border-2 p-2.5 text-left transition-colors ${is ? 'border-lime bg-lime/10' : 'border-br2 hover:bg-s2'}`
+  const choice = (is: boolean) => `flex-1 rounded-xl border-2 p-2.5 text-left transition-colors ${is ? 'border-lime bg-lime/10' : 'border-br hover:border-br2 hover:bg-s2'}`
 
   return (
     <>
@@ -104,7 +104,7 @@ function PayForm({ payable, onClose }: { payable: Payable; onClose: () => void }
         <button onClick={onClose} className="flex-1 rounded-[10px] border border-br2 py-2.5 text-[13px] text-txt2">
           Cancelar
         </button>
-        <button disabled={busy || over || insufficient} onClick={submit} className="flex-[2] rounded-[10px] bg-lime py-2.5 text-[14px] font-bold text-bg disabled:opacity-50">
+        <button disabled={busy || over || insufficient} onClick={submit} className="flex-[2] rounded-[10px] bg-lime py-2.5 text-[14px] font-bold text-on-solid disabled:opacity-50">
           Registrar pago
         </button>
       </div>

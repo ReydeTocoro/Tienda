@@ -7,7 +7,7 @@ export function MovementList({ movements, showCaja }: { movements: CashMovement[
     return <div className="rounded-xl border border-dashed border-br2 p-8 text-center text-[13px] text-muted">Sin movimientos con estos filtros.</div>
   }
   return (
-    <div className="overflow-hidden rounded-xl border border-br bg-s1">
+    <div className="overflow-hidden rounded-xl border border-br bg-s1 shadow-xs">
       {movements.map((m) => {
         const incoming = m.direction === 'in'
         return (

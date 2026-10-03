@@ -54,7 +54,7 @@ export function OrderList({ onEditDraft }: OrderListProps) {
       ) : (
         <div className="grid gap-2.5 md:grid-cols-2 xl:grid-cols-3">
           {shown.map((o) => (
-            <button key={o.id} onClick={() => setDetailId(o.id ?? null)} className="rounded-xl border border-br bg-s1 p-3.5 text-left transition-colors hover:border-br2 hover:bg-s2">
+            <button key={o.id} onClick={() => setDetailId(o.id ?? null)} className="rounded-xl border border-br bg-s1 p-3.5 text-left shadow-xs transition-colors hover:border-br2 hover:bg-s2">
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
                   <div className="font-mono text-[12px] text-lime">{formatOrderId(o.id)}</div>

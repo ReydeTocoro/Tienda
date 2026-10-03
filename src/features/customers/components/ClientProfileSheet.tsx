@@ -121,7 +121,7 @@ export function ClientProfileSheet({ customer, onClose, onEdit, onSell }: Client
           <button onClick={onEdit} className="flex-1 rounded-[10px] border border-br2 py-2.5 text-[13px] text-txt2">
             Editar
           </button>
-          <button onClick={onSell} className="flex-1 rounded-[10px] bg-lime py-2.5 text-[13px] font-bold text-black">
+          <button onClick={onSell} className="flex-1 rounded-[10px] bg-lime py-2.5 text-[13px] font-bold text-on-solid">
             Vender
           </button>
         </div>

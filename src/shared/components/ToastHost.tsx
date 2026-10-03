@@ -33,7 +33,7 @@ export function ToastHost() {
       ref={(el) => {
         if (el && !el.matches(':popover-open')) el.showPopover()
       }}
-      className={`pointer-events-none fixed inset-auto bottom-[76px] left-1/2 max-w-[90vw] -translate-x-1/2 overflow-hidden text-ellipsis whitespace-nowrap rounded-[30px] border bg-s2 px-5 py-2.5 text-[13px] font-semibold shadow-[var(--shadow-md)] md:bottom-6 ${COLOR_CLASSES[color]}`}
+      className={`pointer-events-none fixed inset-auto bottom-[76px] left-1/2 max-w-[90vw] -translate-x-1/2 overflow-hidden text-ellipsis whitespace-nowrap rounded-[30px] border bg-s1 px-5 py-2.5 text-[13px] font-semibold shadow-lg md:bottom-6 ${COLOR_CLASSES[color]}`}
     >
       {message}
     </div>

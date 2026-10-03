@@ -28,7 +28,7 @@ export function BottomSheet({ open, onClose, children, maxWidthClass = 'max-w-[5
       onClick={(e) => {
         if (e.target === ref.current) ref.current?.close()
       }}
-      className={`mx-auto mt-auto mb-0 w-full ${maxWidthClass} max-h-[90vh] overflow-y-auto rounded-t-[22px] border border-br2 bg-s1 p-[18px] text-txt backdrop:bg-black/80 open:animate-[sheetUp_0.22s_ease] md:mb-auto md:rounded-[22px] md:p-6 md:open:animate-[dialogIn_0.18s_ease]`}
+      className={`mx-auto mt-auto mb-0 w-full ${maxWidthClass} max-h-[90vh] overflow-y-auto rounded-t-[22px] border border-br bg-s1 p-[18px] text-txt shadow-lg backdrop:bg-black/50 backdrop:backdrop-blur-[2px] open:animate-[sheetUp_0.22s_ease] md:mb-auto md:rounded-[22px] md:p-6 md:open:animate-[dialogIn_0.18s_ease]`}
     >
       {open && (
         <>

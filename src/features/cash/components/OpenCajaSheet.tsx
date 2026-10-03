@@ -90,7 +90,7 @@ function OpenCajaForm({ onClose }: { onClose: () => void }) {
         <button onClick={onClose} className="flex-1 rounded-[10px] border border-br2 py-2.5 text-[13px] text-txt2">
           Cancelar
         </button>
-        <button disabled={busy} onClick={submit} className="flex-[2] rounded-[10px] bg-lime py-2.5 text-[14px] font-bold text-bg disabled:opacity-60">
+        <button disabled={busy} onClick={submit} className="flex-[2] rounded-[10px] bg-lime py-2.5 text-[14px] font-bold text-on-solid disabled:opacity-60">
           {firstOpening ? 'Iniciar cajas' : 'Abrir caja'}
         </button>
       </div>

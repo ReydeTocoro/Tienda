@@ -11,9 +11,9 @@ export interface Tier {
 
 /** Ported 1:1 from legacy `tier()` (index.html L2358-2363). */
 export function tier(spent: number): Tier {
-  if (spent >= 5000) return { key: 'oro', label: 'Oro', badgeClass: 'border-[#ffd70045] bg-[#ffd70018] text-[#ffd700]', avatarClass: 'border-[#ffd70035] bg-[#ffd70012] text-[#ffd700]' }
-  if (spent >= 1000) return { key: 'plata', label: 'Plata', badgeClass: 'border-[#c0c0c045] bg-[#c0c0c018] text-[#c0c0c0]', avatarClass: 'border-[#c0c0c035] bg-[#c0c0c012] text-[#c0c0c0]' }
-  if (spent >= 200) return { key: 'bronce', label: 'Bronce', badgeClass: 'border-[#cd7f3245] bg-[#cd7f3218] text-[#cd7f32]', avatarClass: 'border-[#cd7f3235] bg-[#cd7f3212] text-[#cd7f32]' }
+  if (spent >= 5000) return { key: 'oro', label: 'Oro', badgeClass: 'border-gold/30 bg-gold/10 text-gold', avatarClass: 'border-gold/35 bg-gold/10 text-gold' }
+  if (spent >= 1000) return { key: 'plata', label: 'Plata', badgeClass: 'border-silver/30 bg-silver/10 text-silver', avatarClass: 'border-silver/35 bg-silver/10 text-silver' }
+  if (spent >= 200) return { key: 'bronce', label: 'Bronce', badgeClass: 'border-bronze/30 bg-bronze/10 text-bronze', avatarClass: 'border-bronze/35 bg-bronze/10 text-bronze' }
   return { key: 'nuevo', label: 'Nuevo', badgeClass: 'border-blue/30 bg-blue/10 text-blue', avatarClass: 'border-blue/35 bg-blue/10 text-blue' }
 }
 

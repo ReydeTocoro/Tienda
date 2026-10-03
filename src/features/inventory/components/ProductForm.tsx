@@ -398,7 +398,7 @@ export function ProductForm({ product, onSaved, onCancel, scanSeed, onOpenCamera
         >
           Cancelar
         </button>
-        <button type="submit" className="flex-1 rounded-[10px] bg-lime py-3 text-[15px] font-bold text-black">
+        <button type="submit" className="flex-1 rounded-[10px] bg-lime py-3 text-[15px] font-bold text-on-solid">
           {editing ? 'Actualizar Producto' : 'Guardar Producto'}
         </button>
       </div>

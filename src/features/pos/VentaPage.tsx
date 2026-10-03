@@ -176,14 +176,14 @@ export function VentaPage() {
             <button
               onClick={() => setCameraOpen(true)}
               title="Escanear código"
-              className="flex h-[42px] w-11 flex-shrink-0 items-center justify-center rounded-[10px] border border-br2 bg-s2 text-lime transition-colors hover:border-lime/40 hover:bg-s3"
+              className="flex h-[42px] w-11 flex-shrink-0 items-center justify-center rounded-[10px] border border-br2 bg-s1 text-lime transition-colors hover:border-lime/40 hover:bg-s2"
             >
               <Camera size={19} />
             </button>
             <button
               onClick={() => setCalcOpen((o) => !o)}
               title="Calculadora"
-              className="flex h-[42px] w-11 flex-shrink-0 items-center justify-center rounded-[10px] border border-br2 bg-s2 text-blue transition-colors hover:border-blue/40 hover:bg-s3"
+              className="flex h-[42px] w-11 flex-shrink-0 items-center justify-center rounded-[10px] border border-br2 bg-s1 text-blue transition-colors hover:border-blue/40 hover:bg-s2"
             >
               <Calculator size={19} />
             </button>

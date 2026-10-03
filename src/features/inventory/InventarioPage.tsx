@@ -245,7 +245,7 @@ export function InventarioPage() {
           </div>
           <button
             onClick={toggleCosts}
-            className="ml-auto flex items-center gap-1.5 rounded-[10px] border border-br2 bg-s2 px-3 py-1.5 text-[12px] font-semibold text-txt2 transition-colors hover:bg-s3 hover:text-txt"
+            className="ml-auto flex items-center gap-1.5 rounded-[10px] border border-br2 bg-s1 px-3 py-1.5 text-[12px] font-semibold text-txt2 transition-colors hover:bg-s3 hover:text-txt"
           >
             {showCosts ? <EyeOff size={15} /> : <Lock size={15} />}
             {showCosts ? 'Ocultar costos' : 'Ver costos e inversión'}
@@ -272,13 +272,13 @@ export function InventarioPage() {
             ))}
           </select>
           <div className="flex w-full items-center gap-2 overflow-x-auto [scrollbar-width:none] md:w-auto md:flex-wrap md:overflow-visible">
-            <ToolButton icon={PackagePlus} label="Entrada de mercancía" onClick={() => setEntradaOpen(true)} className="border-green/40 bg-green/15 text-green hover:bg-green/25" />
-            <ToolButton icon={FileSpreadsheet} label="Excel" onClick={() => exportExcel(products, storeName)} className="border-green/25 bg-green/10 text-green hover:bg-green/15" />
-            <ToolButton icon={FileText} label="CSV" onClick={() => exportCSV(products, storeName)} className="border-blue/25 bg-blue/10 text-blue hover:bg-blue/15" />
-            <ToolButton icon={Download} label="Plantilla" onClick={() => downloadImportTemplate(products, storeName)} className="border-br2 bg-s2 text-txt2 hover:bg-s3" />
-            <ToolButton icon={Upload} label="Importar" onClick={() => fileInputRef.current?.click()} className="border-purple/25 bg-purple/10 text-purple hover:bg-purple/15" />
-            <ToolButton icon={ClipboardCheck} label="Conteo cíclico" onClick={() => setCyclicOpen(true)} className="border-orange/25 bg-orange/10 text-orange hover:bg-orange/15" />
-            <ToolButton icon={ScrollText} label="Auditoría" onClick={() => setAuditOpen(true)} className="border-br2 bg-s2 text-txt2 hover:bg-s3" />
+            <ToolButton icon={PackagePlus} label="Entrada de mercancía" onClick={() => setEntradaOpen(true)} className="border-lime/30 bg-lime/10 text-lime hover:bg-lime/15" />
+            <ToolButton icon={FileSpreadsheet} label="Excel" onClick={() => exportExcel(products, storeName)} iconClassName="text-green" />
+            <ToolButton icon={FileText} label="CSV" onClick={() => exportCSV(products, storeName)} iconClassName="text-blue" />
+            <ToolButton icon={Download} label="Plantilla" onClick={() => downloadImportTemplate(products, storeName)} />
+            <ToolButton icon={Upload} label="Importar" onClick={() => fileInputRef.current?.click()} iconClassName="text-purple" />
+            <ToolButton icon={ClipboardCheck} label="Conteo cíclico" onClick={() => setCyclicOpen(true)} iconClassName="text-orange" />
+            <ToolButton icon={ScrollText} label="Auditoría" onClick={() => setAuditOpen(true)} />
           </div>
           <input ref={fileInputRef} type="file" accept=".xlsx,.xls,.csv,.txt,.json" className="hidden" onChange={handleFileSelected} />
         </div>
@@ -387,10 +387,25 @@ function Stat({ label, value, color }: { label: string; value: string; color: st
   )
 }
 
-function ToolButton({ icon: Icon, label, onClick, className }: { icon: ComponentType<{ size?: number }>; label: string; onClick: () => void; className: string }) {
+/** The toolbar's secondary buttons share one neutral look; only the icon carries the tool's color. */
+const TOOL_NEUTRAL = 'border-br2 bg-s1 text-txt2 hover:bg-s3 hover:text-txt'
+
+function ToolButton({
+  icon: Icon,
+  label,
+  onClick,
+  className = TOOL_NEUTRAL,
+  iconClassName,
+}: {
+  icon: ComponentType<{ size?: number; className?: string }>
+  label: string
+  onClick: () => void
+  className?: string
+  iconClassName?: string
+}) {
   return (
     <button onClick={onClick} className={`flex flex-shrink-0 items-center gap-1.5 whitespace-nowrap rounded-[10px] border px-3 py-2 text-[12px] font-semibold transition-colors ${className}`}>
-      <Icon size={15} />
+      <Icon size={15} className={iconClassName} />
       {label}
     </button>
   )

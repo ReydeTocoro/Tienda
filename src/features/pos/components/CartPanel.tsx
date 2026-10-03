@@ -112,7 +112,7 @@ export function CartPanel({ products, onEditMeasured, onOpenDiscount, onCheckout
         <button
           onClick={startCheckout}
           aria-disabled={!items.length}
-          className={`flex w-full items-center justify-between gap-2 rounded-[10px] bg-green px-3 py-3 text-black transition active:scale-[0.98] sm:px-4 ${items.length ? 'hover:brightness-110' : 'opacity-50'}`}
+          className={`flex w-full items-center justify-between gap-2 rounded-[10px] bg-lime px-3 py-3 text-on-solid transition active:scale-[0.98] sm:px-4 ${items.length ? 'hover:brightness-110' : 'opacity-50'}`}
         >
           <span className="text-[13px] font-bold sm:text-[14px]">Cobrar</span>
           <span className="font-mono text-[14px] font-bold sm:text-[17px]">{formatMoney(chargeAmount)}</span>
@@ -202,7 +202,7 @@ export function CartPanel({ products, onEditMeasured, onOpenDiscount, onCheckout
               key={m.key}
               onClick={() => setPayMethod(m.key)}
               className={`rounded-xl border-2 py-2.5 text-center transition-colors ${
-                payMethod === m.key ? 'border-lime bg-lime/15 text-lime' : 'border-br2 bg-s2 text-txt2 hover:border-br2 hover:bg-s3 hover:text-txt'
+                payMethod === m.key ? 'border-lime bg-lime/15 text-lime' : 'border-br bg-s1 text-txt2 hover:border-br2 hover:bg-s2 hover:text-txt'
               }`}
             >
               <m.icon size={20} className="mx-auto mb-1" />
@@ -243,7 +243,7 @@ export function CartPanel({ products, onEditMeasured, onOpenDiscount, onCheckout
             onClick={confirmCheckout}
             disabled={insufficientCash}
             className={`flex-1 rounded-[10px] py-2.5 text-[14px] font-bold transition-transform active:scale-[0.98] ${
-              insufficientCash ? 'cursor-not-allowed bg-br2 text-muted' : 'bg-green text-black hover:brightness-110'
+              insufficientCash ? 'cursor-not-allowed bg-br2 text-muted' : 'bg-lime text-on-solid hover:brightness-110'
             }`}
           >
             {insufficientCash ? `Falta ${formatMoney(-change)}` : 'Confirmar cobro'}

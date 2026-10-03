@@ -88,7 +88,7 @@ export function ClientFormSheet({ open, customer, onClose, onSaved }: ClientForm
         <button onClick={onClose} className="flex-1 rounded-[10px] border border-br2 py-2.5 text-[13px] text-txt2">
           Cancelar
         </button>
-        <button onClick={save} className="flex-[2] rounded-[10px] bg-lime py-2.5 text-[14px] font-bold text-black">
+        <button onClick={save} className="flex-[2] rounded-[10px] bg-lime py-2.5 text-[14px] font-bold text-on-solid">
           Guardar Cliente
         </button>
       </div>

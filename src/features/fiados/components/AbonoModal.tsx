@@ -50,7 +50,7 @@ export function AbonoModal({ open, maxDebt, method, onClose, onConfirm }: AbonoM
         <button onClick={onClose} className="flex-1 rounded-[10px] border border-br2 py-2.5 text-[13px] text-txt2">
           Cancelar
         </button>
-        <button onClick={confirm} className="flex-[2] rounded-[10px] bg-green py-2.5 text-[14px] font-bold text-black">
+        <button onClick={confirm} className="flex-[2] rounded-[10px] bg-lime py-2.5 text-[14px] font-bold text-on-solid">
           Registrar Abono
         </button>
       </div>

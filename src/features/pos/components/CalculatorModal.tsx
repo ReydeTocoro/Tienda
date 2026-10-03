@@ -83,7 +83,7 @@ export function CalculatorModal({ open, onClose, onUseAsPrice }: CalculatorModal
 
   return (
     <div className="fixed bottom-[70px] right-3.5 z-[3000] animate-[sheetUp_0.2s_ease] md:bottom-6 md:right-6" onClick={(e) => e.stopPropagation()}>
-      <div className="w-[240px] overflow-hidden rounded-[20px] border border-br2 bg-s1 shadow-[var(--shadow-md)]">
+      <div className="w-[240px] overflow-hidden rounded-[20px] border border-br bg-s1 shadow-lg">
         <div className="flex items-center justify-between border-b border-br bg-s1 px-3 py-1.5">
           <span className="text-[11px] font-semibold text-txt2">Calculadora</span>
           <button onClick={onClose} className="text-muted">

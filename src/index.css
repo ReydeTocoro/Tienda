@@ -1,10 +1,12 @@
 @import 'tailwindcss';
 @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap');
 
-/* Identidad "mostrador de tienda": papel de recibo + libreta de fiados, no dashboard oscuro
- * generico. El papel claro es la base (@theme); ".dark" es el modo mostrador nocturno, no al
- * reves como antes. Los 6 acentos semanticos mantienen su rol (lime->bottle, orange->ochre,
- * blue->ledger, purple->plum, red->brick, green->leaf) en tonos terrosos, no neon. */
+/* Identidad "mostrador moderno": tarjetas blancas sobre un lienzo gris salvia (un gris con un
+ * toque del verde de la marca), un solo verde para las acciones principales y los demás colores
+ * reservados para estados (rojo = deuda/peligro, naranja = atención, azul = información, morado =
+ * fidelidad). Las zonas se separan con filetes finos (`br`) y se elevan con sombras suaves, no con
+ * bordes gruesos; `br2` queda para el contorno de los controles (inputs, botones secundarios).
+ * Todos los pares texto/fondo cumplen WCAG AA (≥ 4.5:1) en claro y en oscuro. */
 @theme {
   /* One family for text and headings (weight carries the hierarchy, no serif/sans pairing) —
    * IBM Plex is built for technical/business software, not editorial branding, and its Mono
@@ -13,44 +15,73 @@
   --font-display: 'IBM Plex Sans', sans-serif;
   --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
 
-  --color-bg: #edede8;
-  --color-s1: #f7f7f2;
-  --color-s2: #f0f0e9;
-  --color-s3: #e6e6dd;
-  --color-br: #d6d8cc;
-  --color-br2: #c3c6b6;
-  --color-lime: #3e6b4c;
-  --color-orange: #b9822c;
-  --color-blue: #48628a;
-  --color-purple: #7a5570;
-  --color-red: #a8503f;
-  --color-green: #5c8a57;
-  --color-txt: #26271f;
-  --color-txt2: #6b6d5f;
-  --color-muted: #91937f;
+  /* Superficies, de abajo hacia arriba: lienzo → tarjeta → zona interna → hover/encabezado. */
+  --color-bg: #f2f4f3;
+  --color-s1: #ffffff;
+  --color-s2: #f6f8f7;
+  --color-s3: #ecefee;
+  /* Líneas: `br` es el filete que separa zonas; `br2` el contorno de un control. */
+  --color-br: #e2e7e4;
+  --color-br2: #cfd6d2;
+  --color-txt: #121a16;
+  --color-txt2: #4b5650;
+  --color-muted: #69746e;
+  /* `lime` es el verde de la marca (acciones principales, activo); el resto son estados. */
+  --color-lime: #0c7a50;
+  --color-green: #25803c;
+  --color-red: #c73a32;
+  --color-orange: #b25600;
+  --color-blue: #2560c8;
+  --color-purple: #7044c4;
+  /* Texto sobre cualquiera de los colores sólidos de arriba (botón principal, insignia). */
+  --color-on-solid: #ffffff;
+  /* Niveles de fidelidad del cliente. */
+  --color-gold: #946300;
+  --color-silver: #5d6973;
+  --color-bronze: #9c4f2a;
 
   --radius-sm: 8px;
   --radius-md: 12px;
   --radius-lg: 16px;
+
+  /* Soft, layered shadows. Tailwind inlines these values into the `shadow-*` utilities, so the
+   * color comes from `--shadow-rgb`, which each theme sets, instead of a literal. */
+  --shadow-xs: 0 1px 2px 0 rgb(var(--shadow-rgb) / 0.05);
+  --shadow-sm: 0 1px 3px 0 rgb(var(--shadow-rgb) / 0.07), 0 1px 2px -1px rgb(var(--shadow-rgb) / 0.05);
+  --shadow-md: 0 8px 20px -6px rgb(var(--shadow-rgb) / 0.14), 0 2px 6px -2px rgb(var(--shadow-rgb) / 0.06);
+  --shadow-lg: 0 20px 44px -12px rgb(var(--shadow-rgb) / 0.24), 0 6px 14px -6px rgb(var(--shadow-rgb) / 0.1);
 }
 
-/* Modo mostrador nocturno (activado con la clase `.dark` en <body>). */
+:root {
+  --shadow-rgb: 18 32 25;
+  color-scheme: light;
+}
+
+/* Modo mostrador nocturno (activado con la clase `.dark` en <body>): la elevación se lee por el
+ * aclarado de cada superficie y los filetes, porque una sombra apenas se ve sobre fondo oscuro. */
 .dark {
-  --color-bg: #1c1d17;
-  --color-s1: #242519;
-  --color-s2: #2c2d20;
-  --color-s3: #343528;
-  --color-br: #3a3b2d;
-  --color-br2: #474836;
-  --color-txt: #edebe0;
-  --color-txt2: #a6a493;
-  --color-muted: #6e6c5e;
-  --color-lime: #7fb37e;
-  --color-orange: #d9a54a;
-  --color-blue: #7195c4;
-  --color-purple: #a67f9c;
-  --color-red: #d97e6e;
-  --color-green: #82b87a;
+  --color-bg: #0b0e0d;
+  --color-s1: #121715;
+  --color-s2: #171d1a;
+  --color-s3: #1e2522;
+  --color-br: #232b27;
+  --color-br2: #303a35;
+  --color-txt: #e7ecea;
+  --color-txt2: #a0aba6;
+  --color-muted: #7d8984;
+  --color-lime: #3fcf8e;
+  --color-green: #6fd07c;
+  --color-red: #f47c72;
+  --color-orange: #f2a93b;
+  --color-blue: #6aa6f8;
+  --color-purple: #ad94fb;
+  --color-on-solid: #0b0e0d;
+  --color-gold: #e3b341;
+  --color-silver: #b8c2cc;
+  --color-bronze: #dd915f;
+  --shadow-rgb: 0 0 0;
+  /* Native controls (select popups, date pickers, scrollbars) follow the theme too. */
+  color-scheme: dark;
 }
 
 * {
@@ -69,6 +100,21 @@ body {
   background: var(--color-bg);
   color: var(--color-txt);
   font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+::selection {
+  background: color-mix(in oklab, var(--color-lime) 22%, transparent);
+}
+
+@layer base {
+  /* One keyboard focus ring for every control, in the brand color. Utilities still win (e.g. the
+   * PIN dialog's `outline-none`, the table rows' own inset ring). */
+  :where(button, a, select, summary, [role='button'], [tabindex]:not([tabindex='-1'])):focus-visible {
+    outline: 2px solid var(--color-lime);
+    outline-offset: 2px;
+  }
 }
 
 @keyframes sheetUp {
@@ -117,38 +163,43 @@ body {
 }
 
 @layer components {
-  .input {
+  /* Outlined field: white on any surface, a soft outline, and a brand-colored ring on focus. */
+  .input,
+  .search-input {
     width: 100%;
-    background: var(--color-s2);
+    background: var(--color-s1);
     border: 1px solid var(--color-br2);
     border-radius: 10px;
-    padding: 10px 13px;
     color: var(--color-txt);
     font-size: 14px;
     font-family: var(--font-sans);
     outline: none;
-    transition: border-color 0.15s;
+    transition:
+      border-color 0.15s,
+      box-shadow 0.15s;
   }
-  .input:focus {
+  .input {
+    padding: 10px 13px;
+  }
+  .search-input {
+    padding: 10px 14px;
+    margin-bottom: 12px;
+  }
+  .input::placeholder,
+  .search-input::placeholder {
+    color: var(--color-muted);
+  }
+  .input:hover:not(:focus, :disabled),
+  .search-input:hover:not(:focus) {
+    border-color: color-mix(in oklab, var(--color-br2), var(--color-txt2) 35%);
+  }
+  .input:focus,
+  .search-input:focus {
     border-color: var(--color-lime);
+    box-shadow: 0 0 0 3px color-mix(in oklab, var(--color-lime) 18%, transparent);
   }
   .input:disabled {
     opacity: 0.6;
-  }
-  .search-input {
-    width: 100%;
-    background: var(--color-s2);
-    border: 1px solid var(--color-br2);
-    border-radius: 10px;
-    padding: 10px 14px;
-    color: var(--color-txt);
-    font-size: 14px;
-    outline: none;
-    margin-bottom: 12px;
-    transition: border-color 0.15s;
-  }
-  .search-input:focus {
-    border-color: var(--color-lime);
   }
 
   /* Field/section label — replaces the uppercase+tracking-wide(r) treatment used ~85 times

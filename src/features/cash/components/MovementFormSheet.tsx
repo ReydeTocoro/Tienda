@@ -116,7 +116,7 @@ function MovementForm({ onClose, initialCaja, lockCaja, initialDirection }: { on
         <button onClick={onClose} className="flex-1 rounded-[10px] border border-br2 py-2.5 text-[13px] text-txt2">
           Cancelar
         </button>
-        <button disabled={busy || insufficient} onClick={submit} className="flex-[2] rounded-[10px] bg-lime py-2.5 text-[14px] font-bold text-bg disabled:opacity-50">
+        <button disabled={busy || insufficient} onClick={submit} className="flex-[2] rounded-[10px] bg-lime py-2.5 text-[14px] font-bold text-on-solid disabled:opacity-50">
           Registrar
         </button>
       </div>

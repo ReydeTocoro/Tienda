@@ -8,8 +8,8 @@ interface ScanFlashOverlayProps {
 export function ScanFlashOverlay({ show, success = true }: ScanFlashOverlayProps) {
   return (
     <div
-      className="pointer-events-none fixed inset-0 z-[7999] transition-opacity duration-150"
-      style={{ opacity: show ? 1 : 0, background: success ? 'rgba(200,240,96,0.10)' : 'rgba(255,107,107,0.10)' }}
+      className={`pointer-events-none fixed inset-0 z-[7999] transition-opacity duration-150 ${success ? 'bg-lime/15' : 'bg-red/15'}`}
+      style={{ opacity: show ? 1 : 0 }}
     />
   )
 }

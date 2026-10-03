@@ -64,7 +64,7 @@ export function ReportePage() {
         <label className="mb-1 block field-label">Filtrar por fecha</label>
         <div className="flex gap-2">
           <input type="date" value={dayKey} onChange={(e) => setDayKey(e.target.value)} className="input flex-1" />
-          <button onClick={() => setDayKey(todayKey())} className="rounded-[10px] bg-lime px-4 py-2 text-[13px] font-bold text-black transition-opacity hover:opacity-90">
+          <button onClick={() => setDayKey(todayKey())} className="rounded-[10px] bg-lime px-4 py-2 text-[13px] font-bold text-on-solid transition-opacity hover:opacity-90">
             Hoy
           </button>
         </div>
@@ -75,7 +75,7 @@ export function ReportePage() {
         <Kpi label="Ganancia bruta" value={formatMoney(agg.totalGanancia)} color="text-lime" sub={`Margen: ${agg.totalVentas ? ((agg.totalGanancia / agg.totalVentas) * 100).toFixed(1) : 0}%`} />
         <Kpi label="Ticket promedio" value={formatMoney(agg.avgTicket)} color="text-blue" sub={`Desc. dados: ${formatMoney(agg.totalDescuentos)}`} />
         <Kpi label="Egresos de caja" value={formatMoney(agg.totalExOut)} color="text-red" sub={`Otros ingresos: +${formatMoney(agg.totalExIn)}`} />
-        <div className="col-span-2 rounded-[14px] border border-br bg-s1 p-4 text-center md:col-span-4">
+        <div className="col-span-2 rounded-[14px] border border-br bg-s1 p-4 text-center shadow-xs md:col-span-4">
           <div className="field-label">Flujo neto del día</div>
           <div className={`my-1.5 font-mono text-[26px] font-bold ${agg.netDay >= 0 ? 'text-lime' : 'text-red'}`}>{formatMoney(agg.netDay)}</div>
           <div className="text-[11px] text-txt2">
@@ -88,7 +88,7 @@ export function ReportePage() {
       <div className="md:grid md:grid-cols-2 md:items-start md:gap-5">
         <div>
           <p className="mb-2 field-label">Desglose por pago</p>
-          <div className="mb-3.5 rounded-[14px] border border-br bg-s1 p-3.5">
+          <div className="mb-3.5 rounded-[14px] border border-br bg-s1 p-3.5 shadow-xs">
             {(['efectivo', 'transferencia'] as const).map((m) => (
               <div key={m} className="flex justify-between border-b border-br py-2 last:border-b-0">
                 <span className="text-[13px]">{PAY_LABEL[m]}</span>
@@ -137,7 +137,7 @@ export function ReportePage() {
               })
             )}
           </div>
-          <div className="mb-3.5 rounded-xl border border-br bg-s1 p-3.5">
+          <div className="mb-3.5 rounded-xl border border-br bg-s1 p-3.5 shadow-xs">
             <div className="mb-2.5 field-label">Cartera de fiados (todos los tiempos)</div>
             <div className="grid grid-cols-3 gap-2 text-center">
               <div>
@@ -168,7 +168,7 @@ export function ReportePage() {
             <button
               key={s.id}
               onClick={() => setReceiptSale(s)}
-              className="mb-2 block w-full rounded-xl border border-br bg-s1 p-3 text-left transition-colors hover:border-br2 hover:bg-s2 md:mb-0"
+              className="mb-2 block w-full rounded-xl border border-br bg-s1 p-3 text-left shadow-xs transition-colors hover:border-br2 hover:bg-s2 md:mb-0"
             >
               <div className="flex items-start justify-between">
                 <div>
@@ -231,7 +231,7 @@ export function ReportePage() {
 
 function Kpi({ label, value, color, sub }: { label: string; value: string; color: string; sub: string }) {
   return (
-    <div className="rounded-[14px] border border-br bg-s1 p-4 text-center">
+    <div className="rounded-[14px] border border-br bg-s1 p-4 text-center shadow-xs">
       <div className="field-label">{label}</div>
       <div className={`my-1.5 font-mono text-[22px] font-bold ${color}`}>{value}</div>
       <div className="text-[11px] text-txt2">{sub}</div>

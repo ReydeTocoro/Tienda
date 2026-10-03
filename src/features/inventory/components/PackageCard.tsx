@@ -78,7 +78,7 @@ export function PackageCard({ product: p, showCosts = false, onEdit, onDelete }:
           <button onClick={onEdit} className="rounded-[8px] border border-br2 px-2.5 py-1 text-txt2 transition-colors hover:border-lime/40 hover:text-lime">
             <Pencil size={14} />
           </button>
-          <button onClick={onDelete} className="rounded-[8px] bg-red px-2.5 py-1 text-white transition-opacity hover:opacity-85">
+          <button onClick={onDelete} className="rounded-[8px] bg-red px-2.5 py-1 text-on-solid transition-opacity hover:opacity-85">
             <Trash2 size={14} />
           </button>
         </div>

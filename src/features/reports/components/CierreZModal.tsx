@@ -121,8 +121,7 @@ function CierreZForm({ dayKey, onClose, onClosed }: Omit<CierreZModalProps, 'ope
         </div>
         {hasFisico && (
           <div
-            className="mt-2.5 rounded-lg p-2 text-center"
-            style={{ background: diferencia === 0 ? 'rgba(107,255,184,0.1)' : Math.abs(diferencia) < 5 ? 'rgba(240,160,96,0.1)' : 'rgba(255,107,107,0.1)' }}
+            className={`mt-2.5 rounded-lg p-2 text-center ${diferencia === 0 ? 'bg-green/10' : Math.abs(diferencia) < 5 ? 'bg-orange/10' : 'bg-red/10'}`}
           >
             <div className="text-[11px] text-muted">Diferencia</div>
             <div className={`font-mono text-[22px] font-extrabold ${diferencia === 0 ? 'text-green' : diferencia > 0 ? 'text-lime' : 'text-red'}`}>
@@ -169,7 +168,7 @@ function CierreZForm({ dayKey, onClose, onClosed }: Omit<CierreZModalProps, 'ope
         <button onClick={onClose} className="flex-1 rounded-[10px] border border-br2 py-2.5 text-[13px] text-txt2">
           Cancelar
         </button>
-        <button disabled={busy} onClick={confirm} className="flex-[2] rounded-[10px] bg-red py-2.5 text-[14px] font-extrabold text-white disabled:opacity-60">
+        <button disabled={busy} onClick={confirm} className="flex-[2] rounded-[10px] bg-red py-2.5 text-[14px] font-extrabold text-on-solid disabled:opacity-60">
           Confirmar Cierre Z
         </button>
       </div>

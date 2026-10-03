@@ -25,12 +25,12 @@ export const ProductCard = memo(function ProductCard({ product: p, qtyInCart, on
       type="button"
       onClick={onClick}
       disabled={outOfStock}
-      className={`group relative flex flex-col overflow-hidden rounded-xl border text-left transition active:scale-[0.97] ${
-        outOfStock ? 'pointer-events-none opacity-45' : 'hover:-translate-y-0.5 hover:border-lime/40 hover:shadow-lg active:bg-s2'
-      } ${lowStock ? 'border-orange/50' : 'border-br bg-s1'}`}
+      className={`group relative flex flex-col overflow-hidden rounded-xl border bg-s1 text-left shadow-xs transition active:scale-[0.97] ${
+        outOfStock ? 'pointer-events-none opacity-45' : 'hover:-translate-y-0.5 hover:border-lime/40 hover:shadow-md active:bg-s2'
+      } ${lowStock ? 'border-orange/50' : 'border-br'}`}
     >
       {qtyInCart > 0 && (
-        <span className="absolute right-2 top-2 z-10 flex h-5 min-w-[20px] items-center justify-center rounded-full bg-lime px-1 font-mono text-[10px] font-extrabold text-black">
+        <span className="absolute right-2 top-2 z-10 flex h-5 min-w-[20px] items-center justify-center rounded-full bg-lime px-1 font-mono text-[10px] font-extrabold text-on-solid">
           {formatQty(qtyInCart)}
         </span>
       )}
@@ -44,7 +44,7 @@ export const ProductCard = memo(function ProductCard({ product: p, qtyInCart, on
         }`}
       >
         <span className={`text-[10.5px] font-semibold ${outOfStock ? 'text-red' : lowStock ? 'text-orange' : 'text-muted'}`}>{stockLabel}</span>
-        <span className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-md bg-lime text-black transition-transform group-hover:scale-110">
+        <span className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-md bg-lime text-on-solid transition-transform group-hover:scale-110">
           <Plus size={14} strokeWidth={3} />
         </span>
       </div>

@@ -16,7 +16,7 @@ export function CajaBanner() {
           <Lock size={14} className="flex-shrink-0" />
           <span className="truncate">{firstOpening ? 'Cajas sin iniciar — registra tu base inicial para empezar a llevar el control.' : 'Caja cerrada — cuenta el efectivo para abrir el día.'}</span>
         </span>
-        <button onClick={() => setOpenSheet(true)} className="flex-shrink-0 rounded-lg bg-orange px-3 py-1 text-[12px] font-bold text-black">
+        <button onClick={() => setOpenSheet(true)} className="flex-shrink-0 rounded-lg bg-orange px-3 py-1 text-[12px] font-bold text-on-solid">
           {firstOpening ? 'Iniciar cajas' : 'Abrir caja'}
         </button>
       </div>

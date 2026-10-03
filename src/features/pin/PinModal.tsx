@@ -96,9 +96,9 @@ export function PinModal() {
       ref={dialogRef}
       tabIndex={-1}
       onCancel={(e) => e.preventDefault()}
-      className="m-0 flex h-dvh max-h-none w-screen max-w-none items-center justify-center overflow-hidden border-0 bg-transparent p-5 text-txt outline-none backdrop:bg-black/95 backdrop:backdrop-blur-sm"
+      className="m-0 flex h-dvh max-h-none w-screen max-w-none items-center justify-center overflow-hidden border-0 bg-transparent p-5 text-txt outline-none backdrop:bg-black/60 backdrop:backdrop-blur-md"
     >
-      <div className={`w-full max-w-[340px] rounded-[24px] border border-br2 bg-s1 px-[26px] pb-[26px] pt-[30px] text-center shadow-[var(--shadow-md)] ${shake ? 'animate-[pinShake_0.45s_ease]' : ''}`}>
+      <div className={`w-full max-w-[340px] rounded-[24px] border border-br bg-s1 px-[26px] pb-[26px] pt-[30px] text-center shadow-lg ${shake ? 'animate-[pinShake_0.45s_ease]' : ''}`}>
         <div className="mb-3.5 inline-flex items-center gap-1.5 rounded-full border border-lime/30 bg-lime/10 px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-lime">
           Acceso protegido
         </div>
@@ -117,7 +117,7 @@ export function PinModal() {
             <div
               key={i}
               className={`h-[18px] w-[18px] rounded-full border-2 transition-all ${
-                i < buffer.length ? 'scale-110 border-lime bg-lime shadow-[0_0_8px_rgba(200,240,96,0.4)]' : 'border-br2 bg-transparent'
+                i < buffer.length ? 'scale-110 border-lime bg-lime ring-4 ring-lime/15' : 'border-br2 bg-transparent'
               } ${error && !isLocked ? 'border-red bg-red' : ''}`}
             />
           ))}
@@ -139,7 +139,7 @@ export function PinModal() {
               <button
                 key={i}
                 onClick={() => pressKey(k)}
-                className={`rounded-2xl border border-br bg-s2 py-4 font-mono text-[22px] font-bold active:scale-[0.91] active:bg-s3 ${
+                className={`rounded-2xl border border-br bg-s2 py-4 font-mono text-[22px] font-bold transition-colors hover:bg-s3 active:scale-[0.91] active:bg-s3 ${
                   k === '⌫' ? 'text-red' : 'text-txt'
                 }`}
               >

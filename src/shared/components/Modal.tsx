@@ -28,7 +28,7 @@ export function Modal({ open, onClose, children, maxWidthClass = 'max-w-[380px]'
       onClick={(e) => {
         if (e.target === ref.current) ref.current?.close()
       }}
-      className={`m-auto w-full ${maxWidthClass} rounded-[18px] border border-br2 bg-s1 p-[22px] text-txt backdrop:bg-black/80 open:animate-[sheetUp_0.2s_ease]`}
+      className={`m-auto w-full ${maxWidthClass} rounded-[18px] border border-br bg-s1 p-[22px] text-txt shadow-lg backdrop:bg-black/50 backdrop:backdrop-blur-[2px] open:animate-[sheetUp_0.2s_ease]`}
     >
       {open && children}
     </dialog>

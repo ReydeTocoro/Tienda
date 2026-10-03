@@ -5,11 +5,10 @@ import { HeaderTools } from './HeaderTools'
 import { StoreBrand } from './StoreBrand'
 import { usePermission } from '../features/pin/usePermission'
 
-/** Desktop chrome — a horizontal tab strip across the very top of the window, like switching
- * between open browser tabs: the active tab's background matches the page below it (so it
- * reads as "merged" into the content) while inactive tabs sit recessed in the strip. The clock
- * and theme toggle sit in its right corner. Hidden below `md:`, where `BottomNav` is the nav
- * instead (mobile gets the same tools from the slim `Header`). */
+/** Desktop chrome — a horizontal tab bar across the very top of the window. The active section
+ * is marked by a brand-colored underline sitting on the bar's bottom rule; the others light up
+ * on hover. The clock and theme toggle sit in its right corner. Hidden below `md:`, where
+ * `BottomNav` is the nav instead (mobile gets the same tools from the slim `Header`). */
 export function DesktopTabs() {
   const badges = useNavBadges()
   const { requireAdmin } = usePermission()
@@ -24,8 +23,8 @@ export function DesktopTabs() {
   }
 
   return (
-    <nav className="hidden flex-shrink-0 items-end gap-1 bg-s2 px-2 pt-2 md:flex">
-      <div className="mb-1.5 mr-3 flex items-center self-center border-r border-br2 pr-3">
+    <nav className="hidden h-11 flex-shrink-0 items-stretch gap-0.5 border-b border-br bg-s1 px-2 md:flex">
+      <div className="mr-2 flex items-center border-r border-br pl-1 pr-4">
         <StoreBrand />
       </div>
       {NAV_ITEMS.map((item) => {
@@ -39,26 +38,28 @@ export function DesktopTabs() {
             onClick={(e) => handleClick(e, item)}
             title={label}
             className={({ isActive }) =>
-              `group relative flex items-center gap-2 rounded-t-lg border border-b-0 px-4 py-2 text-[13px] font-semibold transition-colors ${
-                isActive ? 'border-br bg-bg text-lime' : 'border-transparent text-txt2 hover:bg-s3 hover:text-txt'
+              `group relative flex items-center text-[13px] font-semibold transition-colors after:absolute after:inset-x-2 after:-bottom-px after:h-0.5 after:rounded-full ${
+                isActive ? 'text-txt after:bg-lime' : 'text-txt2 hover:text-txt'
               }`
             }
           >
-            <Icon size={16} className="flex-shrink-0" />
-            <span className="hidden group-aria-[current=page]:inline lg:inline">{label}</span>
-            {count > 0 && (
-              <span
-                className={`min-w-[18px] rounded-full px-1.5 text-center text-[10px] font-bold leading-[16px] text-black ${
-                  badgeKey === 'fiados' || badgeKey === 'payables' ? 'bg-red text-white' : 'bg-orange'
-                }`}
-              >
-                {count > 99 ? '99+' : count}
-              </span>
-            )}
+            <span className="flex items-center gap-2 rounded-lg px-3 py-1.5 transition-colors group-hover:bg-s3">
+              <Icon size={16} className="flex-shrink-0 group-aria-[current=page]:text-lime" />
+              <span className="hidden group-aria-[current=page]:inline lg:inline">{label}</span>
+              {count > 0 && (
+                <span
+                  className={`min-w-[18px] rounded-full px-1.5 text-center text-[10px] font-bold leading-[16px] text-on-solid ${
+                    badgeKey === 'fiados' || badgeKey === 'payables' ? 'bg-red' : 'bg-orange'
+                  }`}
+                >
+                  {count > 99 ? '99+' : count}
+                </span>
+              )}
+            </span>
           </NavLink>
         )
       })}
-      <div className="ml-auto flex items-center self-center pl-3 pr-2">
+      <div className="ml-auto flex items-center pl-3 pr-2">
         <HeaderTools />
       </div>
     </nav>

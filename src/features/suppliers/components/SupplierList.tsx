@@ -22,7 +22,7 @@ export function SupplierList() {
     <div>
       <div className="mb-3 flex items-center justify-between">
         <div className="text-[13px] text-txt2">{suppliers.length} proveedor{suppliers.length !== 1 ? 'es' : ''}</div>
-        <button onClick={() => openForm(null)} className="flex items-center gap-1.5 rounded-[10px] bg-lime px-3.5 py-2 text-[13px] font-bold text-bg">
+        <button onClick={() => openForm(null)} className="flex items-center gap-1.5 rounded-[10px] bg-lime px-3.5 py-2 text-[13px] font-bold text-on-solid">
           <Plus size={15} /> Nuevo proveedor
         </button>
       </div>
@@ -32,7 +32,7 @@ export function SupplierList() {
       ) : (
         <div className="grid gap-2.5 md:grid-cols-2 xl:grid-cols-3">
           {sorted.map((s) => (
-            <div key={s.id} className={`rounded-xl border border-br bg-s1 p-3.5 ${s.active ? '' : 'opacity-60'}`}>
+            <div key={s.id} className={`rounded-xl border border-br bg-s1 p-3.5 shadow-xs ${s.active ? '' : 'opacity-60'}`}>
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
                   <div className="truncate text-[14px] font-bold">{s.name}</div>

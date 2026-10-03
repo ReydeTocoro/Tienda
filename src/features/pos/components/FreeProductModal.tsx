@@ -60,7 +60,7 @@ export function FreeProductModal({ open, onClose, prefillPrice }: FreeProductMod
         <button onClick={onClose} className="flex-1 rounded-[10px] border border-br2 py-2.5 text-[13px] text-txt2">
           Cancelar
         </button>
-        <button onClick={confirm} className="flex-[2] rounded-[10px] bg-orange py-2.5 text-[14px] font-bold text-black">
+        <button onClick={confirm} className="flex-[2] rounded-[10px] bg-orange py-2.5 text-[14px] font-bold text-on-solid">
           Agregar al carrito
         </button>
       </div>

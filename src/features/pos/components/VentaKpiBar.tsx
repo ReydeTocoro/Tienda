@@ -42,7 +42,7 @@ function Kpi({ label, value, warn, onClick }: { label: string; value: string; wa
       type="button"
       className={`min-w-[84px] flex-1 px-3 py-2 text-center ${onClick ? '' : 'cursor-default'}`}
     >
-      <div className={`font-mono text-[13px] font-bold ${warn ? 'text-orange' : 'text-lime'}`}>{value}</div>
+      <div className={`font-mono text-[13px] font-bold ${warn ? 'text-orange' : 'text-txt'}`}>{value}</div>
       <div className="mt-0.5 field-label">{label}</div>
     </button>
   )

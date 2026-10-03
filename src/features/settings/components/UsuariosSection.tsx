@@ -115,7 +115,7 @@ export function UsuariosSection() {
           Agregar usuario
         </button>
       </div>
-      <div className="mb-3.5 rounded-xl border border-br2 bg-s2 p-3.5">
+      <div className="mb-3.5 rounded-xl border border-br bg-s1 p-3.5 shadow-xs">
         <div className="mb-3 text-[13px] text-txt2">
           Cada persona que te ayuda en el negocio puede tener su propio PIN. Los usuarios con rol <b className="text-txt">Admin</b> pueden desbloquear
           Stock, Reporte y Configuración con su propio PIN; los de rol <b className="text-txt">Cajero</b> quedan identificados pero no pueden entrar ahí.
@@ -157,7 +157,7 @@ export function UsuariosSection() {
       </div>
 
       {formOpen && (
-        <div className="mb-3.5 rounded-xl border border-lime/30 bg-s2 p-3.5">
+        <div className="mb-3.5 rounded-xl border border-lime/30 bg-s1 p-3.5 shadow-xs">
           <p className="mb-3 text-[13px] font-bold">{editing ? `Editando: ${editing.name}` : 'Nuevo usuario'}</p>
           <div className="grid gap-2.5 sm:grid-cols-2">
             <div className="sm:col-span-2">
@@ -218,7 +218,7 @@ export function UsuariosSection() {
             <button onClick={closeForm} className="rounded-[10px] border border-br2 px-4 py-2.5 text-[13px] font-semibold text-txt2">
               Cancelar
             </button>
-            <button disabled={busy} onClick={save} className="flex-1 rounded-[10px] bg-lime py-2.5 text-[14px] font-bold text-black disabled:opacity-60">
+            <button disabled={busy} onClick={save} className="flex-1 rounded-[10px] bg-lime py-2.5 text-[14px] font-bold text-on-solid disabled:opacity-60">
               {editing ? 'Guardar cambios' : 'Crear usuario'}
             </button>
           </div>

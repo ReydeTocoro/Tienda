@@ -128,7 +128,7 @@ export function WeightModal({ product: p, editIndex, onClose }: WeightModalProps
           <button
             onClick={confirm}
             disabled={exceedsStock}
-            className="col-span-2 rounded-[10px] bg-lime py-3 text-[15px] font-bold text-black disabled:cursor-not-allowed disabled:bg-br2 disabled:text-muted"
+            className="col-span-2 rounded-[10px] bg-lime py-3 text-[15px] font-bold text-on-solid disabled:cursor-not-allowed disabled:bg-br2 disabled:text-muted"
           >
             {exceedsStock ? 'Excede el stock' : editIndex !== null ? 'Actualizar' : 'Agregar al carrito'}
           </button>

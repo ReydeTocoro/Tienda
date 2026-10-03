@@ -211,7 +211,7 @@ export function ReceiptSheet({ sale, onClose, onCorrect }: ReceiptSheetProps) {
         <button onClick={onClose} className="rounded-[10px] border border-br2 py-2.5 text-[13px] text-txt2">
           Cerrar
         </button>
-        <button onClick={() => window.print()} className="rounded-[10px] bg-lime py-2.5 text-[13px] font-semibold text-black">
+        <button onClick={() => window.print()} className="rounded-[10px] bg-lime py-2.5 text-[13px] font-semibold text-on-solid">
           Imprimir
         </button>
       </div>

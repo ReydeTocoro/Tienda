@@ -3,8 +3,8 @@ import type { MouseEvent } from 'react'
 import { NAV_ITEMS, useNavBadges, type NavItem } from './navConfig'
 import { usePermission } from '../features/pin/usePermission'
 
-/** Mobile chrome — thumb-friendly bottom tab bar. Hidden at `md:` and up, where `Sidebar`
- * takes over as the desktop nav (see `AppShell`). */
+/** Mobile chrome — thumb-friendly bottom tab bar; the active section's icon sits in a tinted
+ * pill. Hidden at `md:` and up, where `DesktopTabs` takes over as the nav (see `AppShell`). */
 export function BottomNav() {
   const badges = useNavBadges()
   const { requireAdmin } = usePermission()
@@ -30,19 +30,19 @@ export function BottomNav() {
             end={end}
             onClick={(e) => handleClick(e, item)}
             className={({ isActive }) =>
-              `relative flex flex-1 flex-col items-center gap-0.5 py-2.5 pb-1.5 text-[9.5px] transition-colors ${
-                isActive ? 'text-lime' : 'text-muted'
+              `relative flex flex-1 flex-col items-center gap-0.5 pt-0.5 pb-1.5 text-[9.5px] transition-colors ${
+                isActive ? 'font-semibold text-lime' : 'text-muted'
               }`
             }
           >
             {({ isActive }) => (
               <>
-                <span className="relative">
+                <span className={`relative rounded-full px-2.5 py-1 transition-colors ${isActive ? 'bg-lime/12' : ''}`}>
                   <Icon size={19} />
                   {count > 0 && (
                     <span
-                      className={`absolute -right-2 -top-1.5 min-w-[15px] rounded-full px-1 text-center text-[9px] font-bold leading-[14px] text-black ${
-                        badgeKey === 'fiados' || badgeKey === 'payables' ? 'bg-red text-white' : 'bg-orange'
+                      className={`absolute right-0.5 -top-0.5 min-w-[15px] rounded-full px-1 text-center text-[9px] font-bold leading-[14px] text-on-solid ${
+                        badgeKey === 'fiados' || badgeKey === 'payables' ? 'bg-red' : 'bg-orange'
                       }`}
                     >
                       {count > 99 ? '99+' : count}
@@ -50,7 +50,6 @@ export function BottomNav() {
                   )}
                 </span>
                 {shortLabel ?? label}
-                {isActive && <span className="absolute bottom-0 left-1/2 h-0.5 w-5 -translate-x-1/2 rounded-t-sm bg-lime" />}
               </>
             )}
           </NavLink>

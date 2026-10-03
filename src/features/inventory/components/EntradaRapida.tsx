@@ -144,7 +144,7 @@ export const EntradaRapida = forwardRef<EntradaRapidaHandle, EntradaRapidaProps>
                 autoComplete="off"
               />
               {matches.length > 0 && (
-                <div className="absolute left-0 right-0 top-[calc(100%+4px)] z-[300] max-h-[220px] overflow-y-auto rounded-xl border border-br2 bg-s1 shadow-[var(--shadow-md)]">
+                <div className="absolute left-0 right-0 top-[calc(100%+4px)] z-[300] max-h-[220px] overflow-y-auto rounded-xl border border-br bg-s1 shadow-md">
                   {matches.map((p) => (
                     <div key={p.code} onMouseDown={() => selectProduct(p)} className="flex cursor-pointer items-center gap-2.5 border-b border-br px-3.5 py-2.5 last:border-b-0">
                       <div className="flex min-w-[38px] items-center justify-center rounded-[9px] bg-green/10 py-2 font-mono text-[11px] font-bold text-green">{p.stock || 0}</div>
@@ -203,7 +203,7 @@ export const EntradaRapida = forwardRef<EntradaRapidaHandle, EntradaRapidaProps>
                   </div>
                 )}
               </div>
-              <button onClick={confirm} className="w-full rounded-xl bg-green py-3.5 text-[15px] font-extrabold text-black">
+              <button onClick={confirm} className="w-full rounded-xl bg-lime py-3.5 text-[15px] font-extrabold text-on-solid">
                 Confirmar entrada al stock
               </button>
               <button onClick={cancel} className="mt-2 w-full py-1.5 text-[13px] text-muted">
