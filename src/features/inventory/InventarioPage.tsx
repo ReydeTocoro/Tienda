@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type ComponentType } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { ClipboardCheck, Download, EyeOff, FileSpreadsheet, FileText, Lock, PackagePlus, ScrollText, Upload } from 'lucide-react'
+import { ClipboardCheck, Download, EyeOff, FileSpreadsheet, FileText, Lock, PackagePlus, ScrollText, Upload, X } from 'lucide-react'
 import { db } from '../../db/index'
 import type { Product } from '../../types/product'
 import { adjustStock, deleteProduct } from '../../db/repositories/products'
@@ -320,6 +320,7 @@ export function InventarioPage() {
               openEdit(packageProduct)
             }}
             onDelete={() => handleDelete(packageProduct)}
+            onClose={() => setPackageCode(null)}
           />
         )}
       </BottomSheet>
@@ -333,6 +334,9 @@ export function InventarioPage() {
             <div className="text-[15px] font-bold">Entrada de Mercancía</div>
             <div className="text-[11px] text-muted">Escanea o busca para sumar al stock</div>
           </div>
+          <button onClick={() => setEntradaOpen(false)} aria-label="Cerrar" className="ml-auto rounded-lg border border-br2 bg-s2 p-1.5 text-txt2">
+            <X size={16} />
+          </button>
         </div>
         <EntradaRapida
           ref={entradaRef}

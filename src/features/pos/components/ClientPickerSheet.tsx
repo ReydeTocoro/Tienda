@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { X } from 'lucide-react'
 import { BottomSheet } from '../../../shared/components/BottomSheet'
 import { CustomerAvatar } from '../../customers/components/CustomerAvatar'
 import { useCustomersWithSpent } from '../../customers/hooks/useCustomersWithSpent'
@@ -38,7 +39,12 @@ export function ClientPickerSheet({ open, onClose }: ClientPickerSheetProps) {
 
   return (
     <BottomSheet open={open} onClose={onClose}>
-      <p className="mb-3 font-display text-[18px] font-bold">Seleccionar Cliente</p>
+      <div className="mb-3 flex items-center justify-between">
+        <p className="font-display text-[18px] font-bold">Seleccionar Cliente</p>
+        <button onClick={onClose} aria-label="Cerrar" className="rounded-lg border border-br2 bg-s2 p-1.5 text-txt2">
+          <X size={16} />
+        </button>
+      </div>
       <input className="search-input" placeholder="Nombre, cédula o teléfono..." value={q} onChange={(e) => setQ(e.target.value)} autoFocus />
 
       {!filtered.length ? (

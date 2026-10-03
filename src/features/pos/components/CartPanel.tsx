@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { Banknote, Smartphone, Handshake, Trash2, FileText, ShoppingCart } from 'lucide-react'
+import { Banknote, Smartphone, Handshake, Trash2, FileText, ShoppingCart, X } from 'lucide-react'
 import type { Product } from '../../../types/product'
 import { useCartStore } from '../../../store/useCartStore'
 import { toast } from '../../../store/useToastStore'
@@ -122,9 +122,12 @@ export function CartPanel({ products, onEditMeasured, onOpenDiscount, onCheckout
       {/* Payment method, discount/notes shortcuts, and the final confirm all live here — pulled
        * out of the cart column so the product list above never has to compete for space. */}
       <BottomSheet open={checkoutOpen} onClose={() => setCheckoutOpen(false)} maxWidthClass="max-w-[440px]">
-        <div className="mb-3.5 flex items-center justify-between">
+        <div className="mb-3.5 flex items-center gap-3">
           <span className="font-display text-[19px] font-bold">Cobrar</span>
-          <span className="font-mono text-[13px] text-txt2">{totalItems} ítem{totalItems !== 1 ? 's' : ''}</span>
+          <span className="ml-auto font-mono text-[13px] text-txt2">{totalItems} ítem{totalItems !== 1 ? 's' : ''}</span>
+          <button onClick={() => setCheckoutOpen(false)} aria-label="Cerrar" className="rounded-lg border border-br2 bg-s2 p-1.5 text-txt2">
+            <X size={16} />
+          </button>
         </div>
 
         <div className="mb-3.5 rounded-[14px] border border-br bg-s2 px-4 py-3.5">

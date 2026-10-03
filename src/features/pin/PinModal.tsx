@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { useFitHeight } from '../../shared/hooks/useFitHeight'
 import { usePinStore } from '../../store/usePinStore'
 import { usePinGate, PIN_MAX_ATTEMPTS } from './usePinGate'
 
@@ -15,6 +16,9 @@ export function PinModal() {
   const [error, setError] = useState('')
   const [shake, setShake] = useState(false)
   const dialogRef = useRef<HTMLDialogElement>(null)
+  const cardRef = useRef<HTMLDivElement>(null)
+  // This dialog can't scroll, so on a very short screen the pad is allowed to shrink further than a sheet.
+  useFitHeight(dialogRef, cardRef, !!request, 0.5)
 
   // A native modal <dialog>, like every other overlay: it lands in the top layer *above* a sheet
   // that is already open (e.g. "Pagar todo" inside the fiado sheet asks for the PIN). A plain
@@ -98,7 +102,7 @@ export function PinModal() {
       onCancel={(e) => e.preventDefault()}
       className="m-0 flex h-dvh max-h-none w-screen max-w-none items-center justify-center overflow-hidden border-0 bg-transparent p-5 text-txt outline-none backdrop:bg-black/60 backdrop:backdrop-blur-md"
     >
-      <div className={`w-full max-w-[340px] rounded-[24px] border border-br bg-s1 px-[26px] pb-[26px] pt-[30px] text-center shadow-lg ${shake ? 'animate-[pinShake_0.45s_ease]' : ''}`}>
+      <div ref={cardRef} className={`w-full max-w-[340px] rounded-[24px] border border-br bg-s1 px-[26px] pb-[26px] pt-[30px] text-center shadow-lg ${shake ? 'animate-[pinShake_0.45s_ease]' : ''}`}>
         <div className="mb-3.5 inline-flex items-center gap-1.5 rounded-full border border-lime/30 bg-lime/10 px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-lime">
           Acceso protegido
         </div>

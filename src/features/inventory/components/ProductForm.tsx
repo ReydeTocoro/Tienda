@@ -226,8 +226,8 @@ export function ProductForm({ product, onSaved, onCancel, scanSeed, onOpenCamera
     <form onSubmit={handleSubmit}>
       <p className="mb-3.5 font-display text-[18px] font-bold">{editing ? `Editando: ${product!.name}` : 'Nuevo producto'}</p>
 
-      <div className="grid grid-cols-2 gap-2.5">
-        <Field label="Código / Barcode">
+      <div className="grid grid-cols-2 gap-2.5 md:grid-cols-6">
+        <Field label="Código / Barcode" cls="md:col-span-3">
           <div className="flex gap-1.5">
             <input
               className="input flex-1"
@@ -247,14 +247,14 @@ export function ProductForm({ product, onSaved, onCancel, scanSeed, onOpenCamera
             )}
           </div>
         </Field>
-        <Field label="Nombre *">
+        <Field label="Nombre *" cls="md:col-span-3">
           <input className="input" value={f.name} onChange={(e) => set('name', e.target.value)} placeholder="Nombre del producto" />
         </Field>
 
-        <Field label="Marca">
+        <Field label="Marca" cls="md:col-span-2">
           <input className="input" value={f.brand} onChange={(e) => set('brand', e.target.value)} placeholder="Ej: Nestlé, Colgate..." />
         </Field>
-        <Field label="Unidad de venta">
+        <Field label="Unidad de venta" cls="md:col-span-2">
           <select className="input" value={f.unit} onChange={(e) => set('unit', e.target.value)}>
             {UNIT_GROUPS.map((g) => (
               <optgroup key={g.label} label={g.label}>
@@ -267,25 +267,28 @@ export function ProductForm({ product, onSaved, onCancel, scanSeed, onOpenCamera
             ))}
           </select>
         </Field>
+        <Field label="Categoría" span2 cls="md:col-span-2">
+          <input className="input" value={f.cat} onChange={(e) => set('cat', e.target.value)} placeholder="Bebidas, Snacks, Limpieza..." />
+        </Field>
 
-        <div className="col-span-2 rounded-xl border border-br2 bg-s2 p-3">
-          <label className="mb-2 block field-label">{isMeasured ? `Costo y Precio por ${unitLbl}` : 'Precio y Margen'}</label>
-          <div className="grid grid-cols-3 gap-2">
-            <NumField label={isMeasured ? `Costo /${unitLbl}` : 'Precio Compra'} value={f.cost} onChange={(v) => calcFromCost(v, f.margin)} />
-            <NumField label="% Ganancia" value={f.margin} onChange={(v) => calcFromCost(f.cost, v)} accent />
-            <NumField label={isMeasured ? `Venta /${unitLbl}` : 'Precio Venta'} value={f.price} onChange={calcFromPrice} />
-          </div>
-          {cost > 0 && price > 0 && (
-            <div className="mt-2.5 flex items-center justify-between gap-2 rounded-lg bg-s1 px-3 py-2 text-[12px] text-muted">
-              <span>Ganancia por {isMeasured ? unitLbl : 'unidad'}:</span>
-              <div className="flex gap-3">
+        <div className="col-span-2 rounded-xl border border-br2 bg-s2 p-3 md:col-span-6">
+          <div className="mb-2 flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
+            <label className="field-label">{isMeasured ? `Costo y Precio por ${unitLbl}` : 'Precio y Margen'}</label>
+            {cost > 0 && price > 0 && (
+              <div className="flex items-center gap-2 rounded-lg bg-s1 px-2.5 py-1 text-[12px] text-muted">
+                <span>Ganancia{isMeasured ? ` /${unitLbl}` : ''}:</span>
                 <span className={gain >= 0 ? 'font-mono font-bold text-green' : 'font-mono font-bold text-red'}>
                   {gain >= 0 ? '+' : ''}${gain.toFixed(2)}
                 </span>
                 <span className="font-mono font-semibold text-lime">{gainPct.toFixed(1)}%</span>
               </div>
-            </div>
-          )}
+            )}
+          </div>
+          <div className="grid grid-cols-3 gap-2">
+            <NumField label={isMeasured ? `Costo /${unitLbl}` : 'Precio Compra'} value={f.cost} onChange={(v) => calcFromCost(v, f.margin)} />
+            <NumField label="% Ganancia" value={f.margin} onChange={(v) => calcFromCost(f.cost, v)} accent />
+            <NumField label={isMeasured ? `Venta /${unitLbl}` : 'Precio Venta'} value={f.price} onChange={calcFromPrice} />
+          </div>
           <div className="mt-2.5 flex flex-wrap gap-1.5">
             {MARGIN_PRESETS.map((p) => (
               <button
@@ -302,7 +305,7 @@ export function ProductForm({ product, onSaved, onCancel, scanSeed, onOpenCamera
           </div>
         </div>
 
-        <Field label="Stock actual">
+        <Field label="Stock actual" cls="md:col-span-3">
           <div className="flex items-center gap-1.5">
             <input
               className="input flex-1"
@@ -316,7 +319,7 @@ export function ProductForm({ product, onSaved, onCancel, scanSeed, onOpenCamera
             <span className="whitespace-nowrap text-[12px] text-muted">{unitLbl}</span>
           </div>
         </Field>
-        <Field label="Stock mínimo">
+        <Field label="Stock mínimo" cls="md:col-span-3">
           <div className="flex items-center gap-1.5">
             <input
               className="input flex-1"
@@ -331,11 +334,7 @@ export function ProductForm({ product, onSaved, onCancel, scanSeed, onOpenCamera
           </div>
         </Field>
 
-        <Field label="Categoría" span2>
-          <input className="input" value={f.cat} onChange={(e) => set('cat', e.target.value)} placeholder="Bebidas, Snacks, Limpieza..." />
-        </Field>
-
-        <div className="col-span-2 rounded-xl border border-purple/25 bg-purple/10 p-3">
+        <div className="col-span-2 rounded-xl border border-purple/25 bg-purple/10 p-3 md:col-span-6">
           <label className="mb-2.5 flex cursor-pointer items-center gap-2 text-[12px] font-bold text-purple">
             <input type="checkbox" checked={f.esPaquete} onChange={(e) => toggleEsPaquete(e.target.checked)} className="h-4 w-4 accent-purple" />
             Este producto es un paquete que se puede vender por unidades sueltas
@@ -406,9 +405,9 @@ export function ProductForm({ product, onSaved, onCancel, scanSeed, onOpenCamera
   )
 }
 
-function Field({ label, children, span2 }: { label: string; children: React.ReactNode; span2?: boolean }) {
+function Field({ label, children, span2, cls = '' }: { label: string; children: React.ReactNode; span2?: boolean; cls?: string }) {
   return (
-    <div className={`flex flex-col gap-1 ${span2 ? 'col-span-2' : ''}`}>
+    <div className={`flex flex-col gap-1 ${span2 ? 'col-span-2' : ''} ${cls}`}>
       <label className="field-label">{label}</label>
       {children}
     </div>

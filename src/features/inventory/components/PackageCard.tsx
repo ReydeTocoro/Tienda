@@ -1,5 +1,5 @@
 import { useLiveQuery } from 'dexie-react-hooks'
-import { Pencil, Trash2 } from 'lucide-react'
+import { Pencil, Trash2, X } from 'lucide-react'
 import { db } from '../../../db/index'
 import type { Product } from '../../../types/product'
 import { formatMoney, formatQty } from '../../../shared/lib/currency'
@@ -13,13 +13,15 @@ interface PackageCardProps {
   showCosts?: boolean
   onEdit: () => void
   onDelete: () => void
+  /** Closes the sheet that hosts the card — the backdrop no longer does. */
+  onClose: () => void
 }
 
 /** "Vereda-style" dual-counter package card — legacy package section of `renderInventory()`
  * (index.html L3771-3845) plus the direct quick actions (L3976-4043). All three quick
  * actions bypassed PIN entirely in the legacy app (a real bug the plan calls out) — here
  * they all go through `requireAdmin()` first. */
-export function PackageCard({ product: p, showCosts = false, onEdit, onDelete }: PackageCardProps) {
+export function PackageCard({ product: p, showCosts = false, onEdit, onDelete, onClose }: PackageCardProps) {
   const suelta = useLiveQuery(() => (p.codigoSuelta ? db.products.get(p.codigoSuelta) : undefined), [p.codigoSuelta])
   const qSueltas = suelta?.stock ?? 0
   const lowPaq = p.stock <= p.min
@@ -80,6 +82,9 @@ export function PackageCard({ product: p, showCosts = false, onEdit, onDelete }:
           </button>
           <button onClick={onDelete} className="rounded-[8px] bg-red px-2.5 py-1 text-on-solid transition-opacity hover:opacity-85">
             <Trash2 size={14} />
+          </button>
+          <button onClick={onClose} aria-label="Cerrar" className="rounded-[8px] border border-br2 px-2.5 py-1 text-txt2 transition-colors hover:bg-s2">
+            <X size={14} />
           </button>
         </div>
       </div>
