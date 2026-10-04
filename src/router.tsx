@@ -9,6 +9,7 @@ import { ReportePage } from './features/reports/ReportePage'
 import { ConfiguracionPage } from './features/settings/ConfiguracionPage'
 import { CajasPage } from './features/cash/CajasPage'
 import { ProveedoresPage } from './features/suppliers/ProveedoresPage'
+import { RutasPage } from './features/routes/RutasPage'
 import { AdminGate } from './features/pin/AdminGate'
 
 export const router = createBrowserRouter([
@@ -25,6 +26,7 @@ export const router = createBrowserRouter([
         ),
       },
       { path: '/clientes', element: <ClientesPage /> },
+      { path: '/rutas', element: <RutasPage /> },
       { path: '/fiados', element: <FiadosPage /> },
       { path: '/facturas', element: <FacturasPage /> },
       // The module used to be called Historial: keep old bookmarks and the installed app's shortcut working.

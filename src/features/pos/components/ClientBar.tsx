@@ -12,6 +12,7 @@ import { ClientPickerSheet } from './ClientPickerSheet'
  * Legacy `.client-bar`/`#disc-banner` (index.html L972-984, `updateClientBar()` L3542-3559). */
 export function ClientBar() {
   const customerName = useCartStore((s) => s.customerName)
+  const setCustomer = useCartStore((s) => s.setCustomer)
   const { spent, pts, tier } = useSelectedCustomerLoyalty()
   const [open, setOpen] = useState(false)
 
@@ -44,7 +45,7 @@ export function ClientBar() {
         {customerName && <span className="hidden flex-shrink-0 font-mono text-[12px] font-bold text-lime sm:inline">{formatQty(pts)} pts</span>}
         <ChevronRight size={16} className="flex-shrink-0 text-muted" />
       </button>
-      <ClientPickerSheet open={open} onClose={() => setOpen(false)} />
+      <ClientPickerSheet open={open} onClose={() => setOpen(false)} onPick={setCustomer} onClear={() => setCustomer(null, null)} />
     </div>
   )
 }

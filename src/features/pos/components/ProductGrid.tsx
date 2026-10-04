@@ -12,7 +12,8 @@ interface ProductGridProps {
   activeCat: string
   onSetCat: (cat: string) => void
   onPick: (p: Product) => void
-  onOpenFree: () => void
+  /** Absent in contexts with no "producto sin registrar" concept (the Rutas module's draft). */
+  onOpenFree?: () => void
   lowStockOnly?: boolean
 }
 
@@ -131,12 +132,14 @@ export function ProductGrid({ products, cart, search, activeCat, onSetCat, onPic
           </div>
         </div>
       )}
-      <button
-        onClick={onOpenFree}
-        className="m-2 flex flex-shrink-0 items-center justify-center gap-1.5 rounded-[10px] border border-dashed border-br2 p-2 text-[12px] text-txt2 transition-colors hover:border-br2 hover:bg-s1 hover:text-txt md:m-3"
-      >
-        <Tag size={14} /> Producto sin registrar
-      </button>
+      {onOpenFree && (
+        <button
+          onClick={onOpenFree}
+          className="m-2 flex flex-shrink-0 items-center justify-center gap-1.5 rounded-[10px] border border-dashed border-br2 p-2 text-[12px] text-txt2 transition-colors hover:border-br2 hover:bg-s1 hover:text-txt md:m-3"
+        >
+          <Tag size={14} /> Producto sin registrar
+        </button>
+      )}
     </div>
   )
 }

@@ -107,6 +107,20 @@
   color-scheme: dark;
 }
 
+/* Printing (receipts, Reporte X — thermal paper): `#root` holds the whole on-screen app, so
+ * hiding it here is what makes `window.print()` output ONLY a dialog's `PrintPortal` content
+ * (src/shared/components/PrintPortal.tsx), never the page/dialog behind it. `@page` can't be
+ * expressed as a Tailwind utility, hence the one raw rule. */
+@media print {
+  @page {
+    size: 80mm auto;
+    margin: 0;
+  }
+  #root {
+    display: none;
+  }
+}
+
 * {
   box-sizing: border-box;
   -webkit-tap-highlight-color: transparent;

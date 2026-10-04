@@ -11,7 +11,7 @@ import { BottomSheet } from '../../../shared/components/BottomSheet'
 import { MoneyInput } from '../../../shared/components/MoneyInput'
 import { ClientBar } from './ClientBar'
 import { CartLine } from './CartLine'
-import { BILLS } from '../lib/bills'
+import { BILLS } from '../../../shared/lib/bills'
 
 interface CartPanelProps {
   products: Product[]

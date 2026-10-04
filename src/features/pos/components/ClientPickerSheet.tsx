@@ -3,19 +3,24 @@ import { X } from 'lucide-react'
 import { BottomSheet } from '../../../shared/components/BottomSheet'
 import { CustomerAvatar } from '../../customers/components/CustomerAvatar'
 import { useCustomersWithSpent } from '../../customers/hooks/useCustomersWithSpent'
-import { useCartStore } from '../../../store/useCartStore'
 import { formatQty } from '../../../shared/lib/currency'
 
 interface ClientPickerSheetProps {
   open: boolean
   onClose: () => void
+  /** Picking a registered customer. */
+  onPick: (id: string, name: string) => void
+  /** "Sin cliente / Público general". */
+  onClear: () => void
 }
 
-/** Pick a customer for the cart — legacy `openPicker()`/`renderPicker()` (index.html L3508-3541). */
-export function ClientPickerSheet({ open, onClose }: ClientPickerSheetProps) {
+/** Pick a customer — legacy `openPicker()`/`renderPicker()` (index.html L3508-3541). Purely
+ * props-driven (not wired to `useCartStore` itself) so it's reusable wherever a customer needs
+ * picking: the POS cart (`ClientBar`, which wires these callbacks to the cart store) and the
+ * Rutas module's "Tomar pedido" (a local draft, not the global cart). */
+export function ClientPickerSheet({ open, onClose, onPick, onClear }: ClientPickerSheetProps) {
   const [q, setQ] = useState('')
   const list = useCustomersWithSpent()
-  const setCustomer = useCartStore((s) => s.setCustomer)
 
   const filtered = useMemo(() => {
     const query = q.trim().toLowerCase()
@@ -28,12 +33,12 @@ export function ClientPickerSheet({ open, onClose }: ClientPickerSheetProps) {
   }, [list, q])
 
   function pick(id: string, name: string) {
-    setCustomer(id, name)
+    onPick(id, name)
     onClose()
   }
 
   function clear() {
-    setCustomer(null, null)
+    onClear()
     onClose()
   }
 

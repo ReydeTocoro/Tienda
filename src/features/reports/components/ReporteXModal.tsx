@@ -2,6 +2,8 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { getSettings } from '../../../db/repositories/settings'
 import { useDayAggregation } from '../../../shared/hooks/useDayAggregation'
 import { BottomSheet } from '../../../shared/components/BottomSheet'
+import { PrintPortal } from '../../../shared/components/PrintPortal'
+import { PrintHeader } from '../../../shared/components/PrintHeader'
 import { formatMoney } from '../../../shared/lib/currency'
 
 interface ReporteXModalProps {
@@ -58,6 +60,32 @@ export function ReporteXModal({ open, dayKey, onClose }: ReporteXModalProps) {
         Use el Reporte Z para el cierre definitivo.
       </div>
 
+      <PrintPortal>
+        <div className="w-[80mm] p-2 font-mono text-[11px] leading-snug text-black">
+          <PrintHeader storeName={storeName} />
+          <div className="text-center text-[10px]">REPORTE X — Lectura Parcial · {dayKey}</div>
+          <div className="my-1 border-t border-dashed border-black" />
+          <PrintRow label="Transacciones" value={String(agg.numTx)} />
+          <PrintRow label="Ventas brutas" value={formatMoney(agg.totalVentas)} />
+          <PrintRow label="Ganancia bruta" value={formatMoney(agg.totalGanancia)} />
+          <PrintRow label="Ticket promedio" value={formatMoney(agg.avgTicket)} />
+          <div className="my-1 border-t border-dashed border-black" />
+          {(Object.keys(agg.payBreak) as Array<keyof typeof agg.payBreak>).map(
+            (m) => agg.payBreak[m] > 0 && <PrintRow key={m} label={PAY_LABEL[m]} value={formatMoney(agg.payBreak[m])} />,
+          )}
+          <div className="my-1 border-t border-dashed border-black" />
+          <PrintRow label="Cobrado en caja" value={formatMoney(agg.cobradoReal)} bold />
+          {agg.fiadoTotalDay > 0 && <PrintRow label="Fiado (pendiente)" value={formatMoney(agg.fiadoTotalDay)} />}
+          <div className="my-1 border-t border-dashed border-black" />
+          {agg.totalExOut > 0 && <PrintRow label="Egresos de caja" value={'-' + formatMoney(agg.totalExOut)} />}
+          {agg.totalExIn > 0 && <PrintRow label="Otros ingresos (abonos, etc.)" value={'+' + formatMoney(agg.totalExIn)} />}
+          <div className="mt-1 flex justify-between border-t border-black pt-1 text-[13px] font-bold">
+            <span>FLUJO NETO</span>
+            <span>{formatMoney(agg.netDay)}</span>
+          </div>
+        </div>
+      </PrintPortal>
+
       <div className="mt-2 grid grid-cols-2 gap-2">
         <button onClick={onClose} className="rounded-[10px] border border-br2 py-2.5 text-[13px] text-txt2">
           Cerrar
@@ -75,6 +103,16 @@ function Row({ label, value, color, bold }: { label: string; value: string; colo
     <div className={`flex justify-between ${bold ? 'font-bold' : ''}`}>
       <span>{label}</span>
       <span className={color}>{value}</span>
+    </div>
+  )
+}
+
+/** Same as `Row`, minus the brand color — the printed slip is plain black on thermal paper. */
+function PrintRow({ label, value, bold }: { label: string; value: string; bold?: boolean }) {
+  return (
+    <div className={`flex justify-between ${bold ? 'font-bold' : ''}`}>
+      <span>{label}</span>
+      <span>{value}</span>
     </div>
   )
 }
