@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react'
 import { LogIn } from 'lucide-react'
 import { supabase } from '../../api/supabase'
+import logo from '../../assets/logo.png'
 
 const AUTH_ERRORS: Record<string, string> = {
   'Invalid login credentials': 'Correo o contraseña incorrectos',
@@ -27,8 +28,9 @@ export function LoginPage({ notice }: { notice?: string }) {
   return (
     <div className="flex min-h-full items-center justify-center bg-bg p-4">
       <form onSubmit={submit} className="w-full max-w-[360px] rounded-[20px] border border-br bg-s1 p-6 shadow-lg">
-        <h1 className="font-display text-[22px] font-black text-lime">Mi Tienda Pro</h1>
-        <p className="mt-1 text-[13px] text-txt2">Inicia sesión para abrir la tienda en este dispositivo.</p>
+        <img src={logo} alt="Plastimax F.R." width={350} height={240} draggable={false} className="mx-auto h-28 w-auto select-none" />
+        <h1 className="sr-only">Mi Tienda Pro</h1>
+        <p className="mt-3 text-center text-[13px] text-txt2">Inicia sesión para abrir la tienda en este dispositivo.</p>
 
         {notice && <p className="mt-4 rounded-[10px] border border-orange/30 bg-orange/10 px-3 py-2 text-[12px] font-semibold text-orange">{notice}</p>}
 

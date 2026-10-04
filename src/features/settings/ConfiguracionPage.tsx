@@ -79,7 +79,7 @@ export function ConfiguracionPage() {
       <p className="mb-3.5 font-display text-[21px] font-bold md:text-[26px]">Configuración</p>
 
       <p className="mb-2 field-label">Nombre de la tienda</p>
-      <div className="mb-3.5 flex gap-2 rounded-xl border border-br bg-s1 p-3.5 shadow-xs md:max-w-md">
+      <div className="mb-1.5 flex gap-2 rounded-xl border border-br bg-s1 p-3.5 shadow-xs md:max-w-md">
         <input
           className="input"
           value={storeName}
@@ -91,6 +91,7 @@ export function ConfiguracionPage() {
           Guardar
         </button>
       </div>
+      <p className="mb-3.5 text-[11px] text-muted md:max-w-md">Sale en los recibos, el Reporte X y los archivos que exportas. En la barra de arriba se muestra el logo.</p>
 
       <div className="md:grid md:grid-cols-2 md:items-start md:gap-6">
         <div>

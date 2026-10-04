@@ -10,6 +10,7 @@ import { PinModal } from '../features/pin/PinModal'
 import { useKeyboardShortcuts } from '../shared/hooks/useKeyboardShortcuts'
 import { getSettings } from '../db/repositories/settings'
 import { useScannerStore } from '../store/useScannerStore'
+import { useThemeStore } from '../store/useThemeStore'
 import { startSync } from '../sync'
 import { warmUpApi } from '../api/client'
 
@@ -29,10 +30,18 @@ export function AppShell() {
   const setScannerEnabled = useScannerStore((s) => s.setEnabled)
   const scannerHydrated = useRef(false)
 
-  // Applies settings.theme to <body class="dark"> — paper is the default identity now.
+  // The theme is driven by useThemeStore (instant, per-device, offline-safe). This only reflects
+  // the store onto <body class="dark">; the store already applies it on load and on every toggle.
+  const theme = useThemeStore((s) => s.theme)
+  const hydrateThemeFromSettings = useThemeStore((s) => s.hydrateFromSettings)
   useEffect(() => {
-    document.body.classList.toggle('dark', settings?.theme === 'dark')
-  }, [settings?.theme])
+    document.body.classList.toggle('dark', theme === 'dark')
+  }, [theme])
+
+  // On a device with no local choice yet, adopt the theme synced from settings (then it's pinned).
+  useEffect(() => {
+    if (settings?.theme) hydrateThemeFromSettings(settings.theme)
+  }, [settings?.theme, hydrateThemeFromSettings])
 
   // Hydrates useScannerStore.enabled from settings once on load; after that F8/Reporte owns it.
   useEffect(() => {

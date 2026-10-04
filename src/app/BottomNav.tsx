@@ -19,7 +19,7 @@ export function BottomNav() {
   }
 
   return (
-    <nav className="z-50 flex flex-shrink-0 border-t border-br bg-s1 pb-[env(safe-area-inset-bottom,0px)] md:hidden">
+    <nav className="z-50 flex flex-shrink-0 border-t border-nav-line bg-nav pb-[env(safe-area-inset-bottom,0px)] md:hidden">
       {NAV_ITEMS.map((item) => {
         const { to, label, shortLabel, icon: Icon, end, badgeKey } = item
         const count = badgeKey ? badges[badgeKey] : 0
@@ -30,14 +30,14 @@ export function BottomNav() {
             end={end}
             onClick={(e) => handleClick(e, item)}
             className={({ isActive }) =>
-              `relative flex flex-1 flex-col items-center gap-0.5 pt-0.5 pb-1.5 text-[9.5px] transition-colors ${
-                isActive ? 'font-semibold text-lime' : 'text-muted'
+              `relative flex flex-1 flex-col items-center gap-0.5 pt-0.5 pb-1.5 text-[9.5px] transition-colors focus-visible:outline-yellow ${
+                isActive ? 'font-semibold text-nav-fg' : 'text-nav-fg-dim'
               }`
             }
           >
             {({ isActive }) => (
               <>
-                <span className={`relative rounded-full px-2.5 py-1 transition-colors ${isActive ? 'bg-lime/12' : ''}`}>
+                <span className={`relative rounded-full px-2.5 py-1 transition-colors ${isActive ? 'bg-white/15' : ''}`}>
                   <Icon size={19} />
                   {count > 0 && (
                     <span

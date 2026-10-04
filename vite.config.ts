@@ -15,21 +15,23 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['icons/icon-192.png', 'icons/icon-512.png'],
+      includeAssets: ['icons/favicon-32.png', 'icons/apple-touch-icon.png'],
       manifest: {
         name: 'Mi Tienda Pro',
         short_name: 'Tienda Pro',
         description: 'Sistema de caja registradora',
         start_url: '/',
         display: 'standalone',
-        background_color: '#f2f4f3',
-        theme_color: '#0c7a50',
+        background_color: '#f3f5f7',
+        theme_color: '#001c5e',
         orientation: 'any',
         scope: '/',
         lang: 'es',
         icons: [
-          { src: '/icons/icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any maskable' },
-          { src: '/icons/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any maskable' },
+          { src: '/icons/logo-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
+          { src: '/icons/logo-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
+          { src: '/icons/logo-maskable-192.png', sizes: '192x192', type: 'image/png', purpose: 'maskable' },
+          { src: '/icons/logo-maskable-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
         ],
       },
       workbox: {

@@ -1,11 +1,12 @@
 @import 'tailwindcss';
 @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap');
 
-/* Identidad "mostrador moderno": tarjetas blancas sobre un lienzo gris salvia (un gris con un
- * toque del verde de la marca), un solo verde para las acciones principales y los demás colores
- * reservados para estados (rojo = deuda/peligro, naranja = atención, azul = información, morado =
- * fidelidad). Las zonas se separan con filetes finos (`br`) y se elevan con sombras suaves, no con
- * bordes gruesos; `br2` queda para el contorno de los controles (inputs, botones secundarios).
+/* Identidad "Plastimax F.R.": tarjetas blancas sobre un lienzo gris frío, el AZUL de la marca para
+ * las acciones principales y lo activo, y los demás colores reservados para estados (rojo =
+ * alerta/deuda/eliminar, verde = dinero/ingreso, naranja = atención, azul claro = información,
+ * morado = fidelidad). El AMARILLO de la marca es solo un fondo de destacados/promos con texto
+ * oscuro, nunca texto. Las zonas se separan con filetes finos (`br`) y se elevan con sombras suaves,
+ * no con bordes gruesos; `br2` queda para el contorno de los controles (inputs, botones secundarios).
  * Todos los pares texto/fondo cumplen WCAG AA (≥ 4.5:1) en claro y en oscuro. */
 @theme {
   /* One family for text and headings (weight carries the hierarchy, no serif/sans pairing) —
@@ -16,24 +17,40 @@
   --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
 
   /* Superficies, de abajo hacia arriba: lienzo → tarjeta → zona interna → hover/encabezado. */
-  --color-bg: #f2f4f3;
+  --color-bg: #f3f5f7;
   --color-s1: #ffffff;
-  --color-s2: #f6f8f7;
-  --color-s3: #ecefee;
+  --color-s2: #f7f9fc;
+  --color-s3: #eef1f6;
   /* Líneas: `br` es el filete que separa zonas; `br2` el contorno de un control. */
-  --color-br: #e2e7e4;
-  --color-br2: #cfd6d2;
-  --color-txt: #121a16;
-  --color-txt2: #4b5650;
-  --color-muted: #69746e;
-  /* `lime` es el verde de la marca (acciones principales, activo); el resto son estados. */
-  --color-lime: #0c7a50;
+  --color-br: #e4e7ec;
+  --color-br2: #cfd5de;
+  --color-txt: #172033;
+  --color-txt2: #475467;
+  --color-muted: #5f6a79;
+  /* `lime` = azul principal de la marca Plastimax (acciones principales, activo); el resto son
+   * estados. El token conserva el nombre `lime` por historia, pero hoy lleva el azul de marca. */
+  --color-lime: #003d98;
+  /* Azul más oscuro del logo, disponible para chrome o gradientes de marca. */
+  --color-brand-deep: #001c5e;
   --color-green: #25803c;
-  --color-red: #c73a32;
+  --color-red: #cf2016;
   --color-orange: #b25600;
-  --color-blue: #2560c8;
+  --color-blue: #1c6db5;
   --color-purple: #7044c4;
-  /* Texto sobre cualquiera de los colores sólidos de arriba (botón principal, insignia). */
+  /* Amarillo de la marca: SOLO como fondo de destacados/promos, siempre con texto oscuro. */
+  --color-yellow: #fee436;
+  /* Texto sobre el amarillo: oscuro en los DOS temas (no se define en `.dark`, así no se aclara). */
+  --color-on-yellow: #172033;
+  /* Chrome de navegación (barra azul de marca donde están los módulos): azul en los DOS temas; en
+   * oscuro se aclara un poco (en `.dark`) para separarse del lienzo casi negro. `fg` = activo,
+   * `fg-dim` = inactivo, `hover` = fondo al pasar, `line` = filetes/divisores de la barra. */
+  --color-nav: #001c5e;
+  --color-nav-fg: #ffffff;
+  --color-nav-fg-dim: #9fb0dd;
+  --color-nav-hover: #0a2769;
+  --color-nav-line: #163483;
+  /* Texto sobre los colores sólidos de arriba (azul, rojo, verde…). El amarillo es la excepción:
+   * usa texto oscuro (`text-txt`), nunca `on-solid`. */
   --color-on-solid: #ffffff;
   /* Niveles de fidelidad del cliente. */
   --color-gold: #946300;
@@ -53,29 +70,35 @@
 }
 
 :root {
-  --shadow-rgb: 18 32 25;
+  --shadow-rgb: 16 24 40;
   color-scheme: light;
 }
 
 /* Modo mostrador nocturno (activado con la clase `.dark` en <body>): la elevación se lee por el
  * aclarado de cada superficie y los filetes, porque una sombra apenas se ve sobre fondo oscuro. */
 .dark {
-  --color-bg: #0b0e0d;
-  --color-s1: #121715;
-  --color-s2: #171d1a;
-  --color-s3: #1e2522;
-  --color-br: #232b27;
-  --color-br2: #303a35;
-  --color-txt: #e7ecea;
-  --color-txt2: #a0aba6;
-  --color-muted: #7d8984;
-  --color-lime: #3fcf8e;
-  --color-green: #6fd07c;
-  --color-red: #f47c72;
+  --color-bg: #0b0f1a;
+  --color-s1: #121725;
+  --color-s2: #171d2d;
+  --color-s3: #1f2638;
+  --color-br: #262f42;
+  --color-br2: #343e55;
+  --color-txt: #e7ecf3;
+  --color-txt2: #a2adc0;
+  --color-muted: #8894a8;
+  /* Barra de navegación en oscuro: navy un poco más claro + filete más visible. */
+  --color-nav: #15306f;
+  --color-nav-hover: #1e3c80;
+  --color-nav-line: #2b4a94;
+  --color-lime: #5d9bf8;
+  --color-brand-deep: #93b4f7;
+  --color-green: #5fd07c;
+  --color-red: #ff6b63;
   --color-orange: #f2a93b;
-  --color-blue: #6aa6f8;
+  --color-blue: #57b6ea;
   --color-purple: #ad94fb;
-  --color-on-solid: #0b0e0d;
+  --color-yellow: #fee436;
+  --color-on-solid: #0b0f1a;
   --color-gold: #e3b341;
   --color-silver: #b8c2cc;
   --color-bronze: #dd915f;

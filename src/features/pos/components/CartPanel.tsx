@@ -135,8 +135,8 @@ export function CartPanel({ products, onEditMeasured, onOpenDiscount, onCheckout
             <span className="font-mono">{formatMoney(subtotal)}</span>
           </div>
           {discount > 0 && (
-            <div className="mb-1.5 flex items-center justify-between text-[13px] text-txt2">
-              <span>{discLabel}</span>
+            <div className="mb-1.5 flex items-center justify-between text-[13px]">
+              <span className="rounded-md bg-yellow px-1.5 py-0.5 text-[11px] font-semibold text-on-yellow">{discLabel}</span>
               <span className="font-mono text-green">-{formatMoney(discount)}</span>
             </div>
           )}

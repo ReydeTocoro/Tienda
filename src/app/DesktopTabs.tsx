@@ -23,8 +23,8 @@ export function DesktopTabs() {
   }
 
   return (
-    <nav className="hidden h-11 flex-shrink-0 items-stretch gap-0.5 border-b border-br bg-s1 px-2 md:flex">
-      <div className="mr-2 flex items-center border-r border-br pl-1 pr-4">
+    <nav className="hidden h-13 flex-shrink-0 items-stretch gap-0.5 border-b border-nav-line bg-nav px-2 md:flex">
+      <div className="mr-2 flex items-center border-r border-nav-line pl-1 pr-3">
         <StoreBrand />
       </div>
       {NAV_ITEMS.map((item) => {
@@ -38,13 +38,13 @@ export function DesktopTabs() {
             onClick={(e) => handleClick(e, item)}
             title={label}
             className={({ isActive }) =>
-              `group relative flex items-center text-[13px] font-semibold transition-colors after:absolute after:inset-x-2 after:-bottom-px after:h-0.5 after:rounded-full ${
-                isActive ? 'text-txt after:bg-lime' : 'text-txt2 hover:text-txt'
+              `group relative flex items-center text-[13px] font-semibold transition-colors after:absolute after:inset-x-2 after:-bottom-px after:h-0.5 after:rounded-full focus-visible:outline-yellow ${
+                isActive ? 'text-nav-fg after:bg-yellow' : 'text-nav-fg-dim hover:text-nav-fg'
               }`
             }
           >
-            <span className="flex items-center gap-2 rounded-lg px-3 py-1.5 transition-colors group-hover:bg-s3">
-              <Icon size={16} className="flex-shrink-0 group-aria-[current=page]:text-lime" />
+            <span className="flex items-center gap-2 rounded-lg px-3 py-1.5 transition-colors group-hover:bg-nav-hover">
+              <Icon size={16} className="flex-shrink-0" />
               <span className="hidden group-aria-[current=page]:inline lg:inline">{label}</span>
               {count > 0 && (
                 <span
