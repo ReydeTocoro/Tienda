@@ -12,7 +12,7 @@ interface ProductGridProps {
   activeCat: string
   onSetCat: (cat: string) => void
   onPick: (p: Product) => void
-  /** Absent in contexts with no "producto sin registrar" concept (the Rutas module's draft). */
+  /** Absent in contexts with no "producto sin registrar" concept. */
   onOpenFree?: () => void
   lowStockOnly?: boolean
 }

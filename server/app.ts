@@ -9,7 +9,6 @@ import { inventoryOpsRouter } from './routes/inventoryOps'
 import { payablesRouter } from './routes/payables'
 import { productsRouter } from './routes/products'
 import { purchaseOrdersRouter } from './routes/purchaseOrders'
-import { routeOrdersRouter } from './routes/routeOrders'
 import { salesRouter } from './routes/sales'
 import { settingsRouter } from './routes/settings'
 import { suppliersRouter } from './routes/suppliers'
@@ -48,7 +47,6 @@ export function createApp(db: Db, auth: RequestHandler) {
   app.use('/api/suppliers', suppliersRouter(db))
   app.use('/api/purchaseOrders', purchaseOrdersRouter(db))
   app.use('/api/payables', payablesRouter(db))
-  app.use('/api/routeOrders', routeOrdersRouter(db))
   app.use('/api', (_req, res) => {
     res.status(404).json({ error: 'Ruta no encontrada' })
   })

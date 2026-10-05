@@ -10,7 +10,6 @@ import type { Usuario } from '../types/usuario'
 import type { CashMovement, CashSession } from '../types/cash'
 import type { Supplier } from '../types/supplier'
 import type { PurchaseOrder, Payable } from '../types/purchaseOrder'
-import type { RouteOrder } from '../types/routeOrder'
 
 export class TiendaDB extends Dexie {
   products!: EntityTable<Product, 'code'>
@@ -26,7 +25,6 @@ export class TiendaDB extends Dexie {
   suppliers!: EntityTable<Supplier, 'id'>
   purchaseOrders!: EntityTable<PurchaseOrder, 'id'>
   payables!: EntityTable<Payable, 'id'>
-  routeOrders!: EntityTable<RouteOrder, 'id'>
 
   constructor() {
     super('tienda-pro')
@@ -55,9 +53,13 @@ export class TiendaDB extends Dexie {
       purchaseOrders: '++id, supplierId, status',
       payables: '++id, supplierId, orderId, dueDate',
     })
-    // v4: Rutas — pedidos taken on a delivery round (src/types/routeOrder.ts).
+    // v4: Rutas — pedidos taken on a delivery round (removed in v5).
     this.version(4).stores({
       routeOrders: '++id, status, customerId',
+    })
+    // v5: the Rutas module was removed — drop its local mirror.
+    this.version(5).stores({
+      routeOrders: null,
     })
   }
 }

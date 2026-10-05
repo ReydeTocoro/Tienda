@@ -7,7 +7,7 @@ import bill50000 from '../../assets/bills/50000.jpg'
 import bill100000 from '../../assets/bills/100000.jpg'
 
 /** Colombian banknotes, smallest first: the quick "efectivo recibido" buttons of a checkout sheet
- * (POS, and the Rutas module's delivery/charge sheet). The photos are shrunk copies of the
+ * (POS). The photos are shrunk copies of the
  * originals kept outside the repo (MIOS/bills). */
 export const BILLS = [
   { value: 1000, img: bill1000 },

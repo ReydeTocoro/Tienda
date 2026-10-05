@@ -16,8 +16,7 @@ interface ClientPickerSheetProps {
 
 /** Pick a customer — legacy `openPicker()`/`renderPicker()` (index.html L3508-3541). Purely
  * props-driven (not wired to `useCartStore` itself) so it's reusable wherever a customer needs
- * picking: the POS cart (`ClientBar`, which wires these callbacks to the cart store) and the
- * Rutas module's "Tomar pedido" (a local draft, not the global cart). */
+ * picking, e.g. the POS cart (`ClientBar`, which wires these callbacks to the cart store). */
 export function ClientPickerSheet({ open, onClose, onPick, onClear }: ClientPickerSheetProps) {
   const [q, setQ] = useState('')
   const list = useCustomersWithSpent()

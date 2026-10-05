@@ -1,5 +1,5 @@
 import { useLiveQuery } from 'dexie-react-hooks'
-import { ShoppingCart, Package, Users, ClipboardList, Receipt, BarChart3, Settings, Wallet, Truck, Route } from 'lucide-react'
+import { ShoppingCart, Package, Users, ClipboardList, Receipt, BarChart3, Settings, Wallet, Truck } from 'lucide-react'
 import type { ComponentType } from 'react'
 import { db } from '../db/index'
 import { groupFiados, groupTotals } from '../features/fiados/lib/fiadoGrouping'
@@ -13,7 +13,7 @@ export interface NavItem {
   end?: boolean
   /** Label for the cramped mobile bottom bar, when the full one doesn't fit. */
   shortLabel?: string
-  badgeKey?: 'lowStock' | 'fiados' | 'payables' | 'routeOrders'
+  badgeKey?: 'lowStock' | 'fiados' | 'payables'
   requiresAdmin?: boolean
   /** Subtitle shown on the admin-PIN prompt when this route is gated. */
   gateSubtitle?: string
@@ -27,7 +27,6 @@ export const NAV_ITEMS: NavItem[] = [
   { to: '/', label: 'Venta', icon: ShoppingCart, end: true },
   { to: '/inventario', label: 'Stock', icon: Package, badgeKey: 'lowStock', requiresAdmin: true, gateSubtitle: 'Esta sección requiere PIN de administrador' },
   { to: '/clientes', label: 'Clientes', icon: Users },
-  { to: '/rutas', label: 'Rutas', icon: Route, badgeKey: 'routeOrders' },
   { to: '/fiados', label: 'Fiados', icon: ClipboardList, badgeKey: 'fiados' },
   { to: '/facturas', label: 'Facturas', icon: Receipt },
   { to: '/cajas', label: 'Cajas', icon: Wallet, requiresAdmin: true, gateSubtitle: 'Las cajas requieren PIN de administrador' },
@@ -53,7 +52,5 @@ export function useNavBadges() {
     [],
     0,
   )
-  // Pedidos still waiting to go out (taken or packed, not yet delivered/cancelled).
-  const routeOrdersCount = useLiveQuery(() => db.routeOrders.where('status').anyOf('tomado', 'preparado').count(), [], 0)
-  return { lowStock: lowStockCount, fiados: fiadoCount, payables: overdueCount, routeOrders: routeOrdersCount }
+  return { lowStock: lowStockCount, fiados: fiadoCount, payables: overdueCount }
 }

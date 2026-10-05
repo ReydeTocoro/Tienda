@@ -22,7 +22,6 @@ const TABLES = [
   'suppliers',
   'purchaseOrders',
   'payables',
-  'routeOrders',
 ] as const
 type Table = (typeof TABLES)[number]
 
