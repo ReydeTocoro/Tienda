@@ -11,6 +11,7 @@
     "server": "tsx server/index.ts",
     "typecheck:server": "tsc --noEmit -p server/tsconfig.json",
     "check:cash": "tsx server/selfcheck.ts",
+    "check:cart": "tsx server/cartSelfcheck.ts",
     "db:push": "tsx server/scripts/dbPush.ts",
     "db:import": "tsx server/scripts/importSqlite.ts",
     "build:functions": "esbuild server/serverApp.ts --bundle --platform=node --target=node22 --format=cjs --outfile=functions/lib/server.js --external:express --external:pg --external:pg-native --log-level=warning",

@@ -1,17 +1,18 @@
 import { useMemo, useState } from 'react'
 import { Banknote, Smartphone, Handshake, Trash2, FileText, ShoppingCart, X } from 'lucide-react'
 import type { Product } from '../../../types/product'
-import { useCartStore } from '../../../store/useCartStore'
+import { useActiveCart, useCartStore } from '../../../store/useCartStore'
 import { toast } from '../../../store/useToastStore'
 import { useCartTotals } from '../hooks/useFinalizeSale'
 import { useSelectedCustomerLoyalty } from '../hooks/useSelectedCustomerLoyalty'
 import { formatMoney, formatQty } from '../../../shared/lib/currency'
-import { isMeasuredUnit } from '../../../shared/lib/units'
 import { BottomSheet } from '../../../shared/components/BottomSheet'
 import { MoneyInput } from '../../../shared/components/MoneyInput'
+import { CartTabs } from './CartTabs'
 import { ClientBar } from './ClientBar'
 import { CartLine } from './CartLine'
 import { BILLS } from '../../../shared/lib/bills'
+import { countItems } from '../lib/cartCount'
 
 interface CartPanelProps {
   products: Product[]
@@ -27,21 +28,23 @@ const PAY_METHODS: Array<{ key: 'efectivo' | 'transferencia' | 'fiado'; label: s
 ]
 
 export function CartPanel({ products, onEditMeasured, onOpenDiscount, onCheckout }: CartPanelProps) {
-  const items = useCartStore((s) => s.items)
+  const items = useActiveCart((c) => c.items)
   const changeQty = useCartStore((s) => s.changeQty)
   const removeItem = useCartStore((s) => s.removeItem)
   const clear = useCartStore((s) => s.clear)
-  const payMethod = useCartStore((s) => s.payMethod)
+  const payMethod = useActiveCart((c) => c.payMethod)
   const setPayMethod = useCartStore((s) => s.setPayMethod)
-  const fiadoName = useCartStore((s) => s.fiadoName)
+  const fiadoName = useActiveCart((c) => c.fiadoName)
   const setFiadoName = useCartStore((s) => s.setFiadoName)
-  const notes = useCartStore((s) => s.notes)
+  const notes = useActiveCart((c) => c.notes)
   const setNotes = useCartStore((s) => s.setNotes)
-  const manualDiscountPct = useCartStore((s) => s.manualDiscountPct)
-  const customerId = useCartStore((s) => s.customerId)
-  const chargeOverride = useCartStore((s) => s.chargeOverride)
+  const manualDiscountPct = useActiveCart((c) => c.manualDiscountPct)
+  const customerId = useActiveCart((c) => c.customerId)
+  const chargeOverride = useActiveCart((c) => c.chargeOverride)
   const setChargeOverride = useCartStore((s) => s.setChargeOverride)
-  const amountReceived = useCartStore((s) => s.amountReceived)
+  const amountReceived = useActiveCart((c) => c.amountReceived)
+  const cartName = useActiveCart((c) => c.name)
+  const manyCarts = useCartStore((s) => s.carts.length > 1)
   const setAmountReceived = useCartStore((s) => s.setAmountReceived)
 
   const [notesOpen, setNotesOpen] = useState(false)
@@ -50,8 +53,7 @@ export function CartPanel({ products, onEditMeasured, onOpenDiscount, onCheckout
   const { subtotal, discount, discountLabel, total, chargeAmount, roundingAdjustment } = useCartTotals(loyaltyPts)
 
   const stockByCode = useMemo(() => new Map(products.map((p) => [p.code, p.stock])), [products])
-  // A weighed/measured line is one item, however many kg or metres it holds ("16.5 ítems" read like a bug).
-  const totalItems = items.reduce((a, i) => a + (isMeasuredUnit(i.unit) ? 1 : i.qty), 0)
+  const totalItems = countItems(items)
 
   const discLabel = discountLabel === 'manual' ? `Desc. manual (${manualDiscountPct}%)` : discountLabel === 'loyalty' ? `Desc. cliente (${formatQty(loyaltyPts)} pts)` : ''
 
@@ -77,10 +79,7 @@ export function CartPanel({ products, onEditMeasured, onOpenDiscount, onCheckout
     // to it, so nothing reads as page chrome — and it never changes shape: an empty cart keeps the
     // same header, customer row and Cobrar button, there is just nothing to charge yet.
     <div className="@container flex h-full flex-col overflow-hidden rounded-2xl border border-br bg-s1 shadow-sm">
-      <div className="flex flex-shrink-0 items-center justify-between px-3.5 py-2.5">
-        <span className="font-display text-[15px] font-bold">Carrito</span>
-        <span className="font-mono text-[11px] text-lime">{totalItems > 0 ? `${totalItems} ítem${totalItems !== 1 ? 's' : ''}` : ''}</span>
-      </div>
+      <CartTabs />
 
       <ClientBar />
 
@@ -123,7 +122,8 @@ export function CartPanel({ products, onEditMeasured, onOpenDiscount, onCheckout
       <BottomSheet open={checkoutOpen} onClose={() => setCheckoutOpen(false)} maxWidthClass="max-w-[500px]">
         <div className="mb-3.5 flex items-center gap-3">
           <span className="font-display text-[19px] font-bold">Cobrar</span>
-          <span className="ml-auto font-mono text-[13px] text-txt2">{totalItems} ítem{totalItems !== 1 ? 's' : ''}</span>
+          {manyCarts && <span className="min-w-0 truncate text-[13px] font-semibold text-txt2">· {cartName}</span>}
+          <span className="ml-auto flex-shrink-0 font-mono text-[13px] text-txt2">{totalItems} ítem{totalItems !== 1 ? 's' : ''}</span>
           <button onClick={() => setCheckoutOpen(false)} aria-label="Cerrar" className="rounded-lg border border-br2 bg-s2 p-1.5 text-txt2">
             <X size={16} />
           </button>

@@ -1,17 +1,17 @@
 import { useState } from 'react'
 import { ChevronRight, UserRound } from 'lucide-react'
-import { useCartStore } from '../../../store/useCartStore'
+import { useActiveCart, useCartStore } from '../../../store/useCartStore'
 import { useSelectedCustomerLoyalty } from '../hooks/useSelectedCustomerLoyalty'
 import { CustomerAvatar } from '../../customers/components/CustomerAvatar'
 import { formatQty } from '../../../shared/lib/currency'
 import { ClientPickerSheet } from './ClientPickerSheet'
 
-/** Customer row of the cart: the first section under the cart title, so who the sale is for is
+/** Customer row of the cart: the first section under the cart tabs, so who the sale is for is
  * decided inside the cart itself. Shows the picked customer (tier-colored avatar, tier, points
  * and whether the points discount is already available) and opens the picker on tap.
  * Legacy `.client-bar`/`#disc-banner` (index.html L972-984, `updateClientBar()` L3542-3559). */
 export function ClientBar() {
-  const customerName = useCartStore((s) => s.customerName)
+  const customerName = useActiveCart((c) => c.customerName)
   const setCustomer = useCartStore((s) => s.setCustomer)
   const { spent, pts, tier } = useSelectedCustomerLoyalty()
   const [open, setOpen] = useState(false)

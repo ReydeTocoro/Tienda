@@ -1,18 +1,18 @@
 import { db } from '../../../db/index'
-import { useCartStore } from '../../../store/useCartStore'
+import { selectActiveCart, useActiveCart, useCartStore } from '../../../store/useCartStore'
 import { finalizeSale } from '../../../db/repositories/sales'
 import { computeCartDiscount, getPts } from '../../../shared/lib/loyalty'
 import { toast } from '../../../store/useToastStore'
 import type { Sale } from '../../../types/sale'
 
-/** Cart subtotal/discount/total, plus the cash-register charge amount (defaults to `total`,
+/** Active cart's subtotal/discount/total, plus the cash-register charge amount (defaults to `total`,
  * overridden when the cashier types a different "Total a cobrar" — see `chargeOverride`).
  * Pass the selected customer's live points (see `useSelectedCustomerLoyalty`) — 0 when no
  * customer is picked. */
 export function useCartTotals(loyaltyPts = 0) {
-  const items = useCartStore((s) => s.items)
-  const manualDiscountPct = useCartStore((s) => s.manualDiscountPct)
-  const chargeOverride = useCartStore((s) => s.chargeOverride)
+  const items = useActiveCart((c) => c.items)
+  const manualDiscountPct = useActiveCart((c) => c.manualDiscountPct)
+  const chargeOverride = useActiveCart((c) => c.chargeOverride)
   const subtotal = items.reduce((a, i) => a + i.price * i.qty, 0)
   const { amount: discount, label: discountLabel } = computeCartDiscount(subtotal, loyaltyPts, manualDiscountPct)
   const total = subtotal - discount
@@ -25,7 +25,11 @@ export function useCartTotals(loyaltyPts = 0) {
  * `db/repositories/sales.ts`. */
 export function useFinalizeSale() {
   return async function finalize(): Promise<Sale | null> {
-    const cart = useCartStore.getState()
+    // Which cart is being charged is fixed right here, before any await: charging takes a moment
+    // (loyalty lookup, stock check on the server) and the cashier may switch to another customer's
+    // cart meanwhile. Only THIS cart must go when the sale is saved — never "whichever is open".
+    const cartId = useCartStore.getState().activeId
+    const cart = selectActiveCart(useCartStore.getState())
     if (!cart.items.length) {
       toast('Carrito vacío', 'orange')
       return null
@@ -72,7 +76,7 @@ export function useFinalizeSale() {
       return null
     }
 
-    cart.clear()
+    useCartStore.getState().closeCart(cartId)
     toast('Venta registrada', 'green')
     return sale
   }

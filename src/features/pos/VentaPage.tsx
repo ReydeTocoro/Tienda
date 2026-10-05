@@ -5,7 +5,7 @@ import { db } from '../../db/index'
 import type { Product } from '../../types/product'
 import type { Sale } from '../../types/sale'
 import { isMeasuredUnit } from '../../types/unit'
-import { useCartStore } from '../../store/useCartStore'
+import { selectActiveCart, useActiveCart, useCartStore } from '../../store/useCartStore'
 import { useBarcodeScanner } from '../../shared/hooks/useBarcodeScanner'
 import { CameraOverlay } from '../../shared/components/CameraOverlay'
 import { ScanFlashOverlay } from '../../shared/components/ScanFlashOverlay'
@@ -40,7 +40,7 @@ export function VentaPage() {
 
   const searchRef = useRef<HTMLInputElement>(null)
   const dropdownMatches = useMemo(() => searchMatches(products, search), [products, search])
-  const items = useCartStore((s) => s.items)
+  const items = useActiveCart((c) => c.items)
   const addUnitItem = useCartStore((s) => s.addUnitItem)
   const finalize = useFinalizeSale()
 
@@ -134,7 +134,7 @@ export function VentaPage() {
   }
 
   function handleEditMeasured(index: number) {
-    const item = useCartStore.getState().items[index]
+    const item = selectActiveCart(useCartStore.getState()).items[index]
     if (!item) return
     const product = products.find((p) => p.code === item.code)
     if (!product) return

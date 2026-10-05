@@ -5,7 +5,7 @@ import { unitShortLabel } from '../../../shared/lib/units'
 import { formatMoney, formatQty } from '../../../shared/lib/currency'
 import { NumericKeypad } from '../../../shared/components/NumericKeypad'
 import { BottomSheet } from '../../../shared/components/BottomSheet'
-import { useCartStore } from '../../../store/useCartStore'
+import { selectActiveCart, useCartStore } from '../../../store/useCartStore'
 import { toast } from '../../../store/useToastStore'
 
 interface WeightModalProps {
@@ -20,7 +20,7 @@ export function WeightModal({ product: p, editIndex, onClose }: WeightModalProps
   const baseUnit = p.unit || 'kg'
   // Cart always stores measured items' qty in the product's base unit, so editing an existing
   // line starts from that same value/unit rather than a blank "0" the user has to reconstruct.
-  const editingQty = editIndex !== null ? useCartStore.getState().items[editIndex]?.qty : undefined
+  const editingQty = editIndex !== null ? selectActiveCart(useCartStore.getState()).items[editIndex]?.qty : undefined
   const [val, setVal] = useState(editingQty !== undefined ? String(editingQty) : '0')
   const [unit, setUnit] = useState(baseUnit)
   const addWeightedItem = useCartStore((s) => s.addWeightedItem)
