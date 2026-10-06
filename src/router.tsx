@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import { createBrowserRouter, Navigate } from 'react-router-dom'
 import { AppShell } from './app/AppShell'
 import { VentaPage } from './features/pos/VentaPage'
@@ -9,58 +10,36 @@ import { ReportePage } from './features/reports/ReportePage'
 import { ConfiguracionPage } from './features/settings/ConfiguracionPage'
 import { CajasPage } from './features/cash/CajasPage'
 import { ProveedoresPage } from './features/suppliers/ProveedoresPage'
-import { AdminGate } from './features/pin/AdminGate'
+import { ModuleGate } from './features/pin/ModuleGate'
+import { NAV_ITEMS, gateText } from './app/navConfig'
+
+/** A module behind the permission its nav item declares (Venta has none). */
+function gated(to: string, page: ReactNode): ReactNode {
+  const item = NAV_ITEMS.find((i) => i.to === to)
+  if (!item?.need) return page
+  const { title, subtitle } = gateText(item)
+  return (
+    <ModuleGate need={item.need} title={title} subtitle={subtitle}>
+      {page}
+    </ModuleGate>
+  )
+}
 
 export const router = createBrowserRouter([
   {
     element: <AppShell />,
     children: [
       { path: '/', element: <VentaPage /> },
-      {
-        path: '/inventario',
-        element: (
-          <AdminGate title="Acceso restringido" subtitle="Esta sección requiere PIN de administrador">
-            <InventarioPage />
-          </AdminGate>
-        ),
-      },
-      { path: '/clientes', element: <ClientesPage /> },
-      { path: '/fiados', element: <FiadosPage /> },
-      { path: '/facturas', element: <FacturasPage /> },
+      { path: '/inventario', element: gated('/inventario', <InventarioPage />) },
+      { path: '/clientes', element: gated('/clientes', <ClientesPage />) },
+      { path: '/fiados', element: gated('/fiados', <FiadosPage />) },
+      { path: '/facturas', element: gated('/facturas', <FacturasPage />) },
       // The module used to be called Historial: keep old bookmarks and the installed app's shortcut working.
       { path: '/historial', element: <Navigate to="/facturas" replace /> },
-      {
-        path: '/cajas',
-        element: (
-          <AdminGate title="Acceso restringido" subtitle="Las cajas requieren PIN de administrador">
-            <CajasPage />
-          </AdminGate>
-        ),
-      },
-      {
-        path: '/proveedores',
-        element: (
-          <AdminGate title="Acceso restringido" subtitle="Proveedores y compras requieren PIN de administrador">
-            <ProveedoresPage />
-          </AdminGate>
-        ),
-      },
-      {
-        path: '/reporte',
-        element: (
-          <AdminGate title="Acceso restringido" subtitle="Los reportes requieren PIN de administrador">
-            <ReportePage />
-          </AdminGate>
-        ),
-      },
-      {
-        path: '/configuracion',
-        element: (
-          <AdminGate title="Acceso restringido" subtitle="La configuración requiere PIN de administrador">
-            <ConfiguracionPage />
-          </AdminGate>
-        ),
-      },
+      { path: '/cajas', element: gated('/cajas', <CajasPage />) },
+      { path: '/proveedores', element: gated('/proveedores', <ProveedoresPage />) },
+      { path: '/reporte', element: gated('/reporte', <ReportePage />) },
+      { path: '/configuracion', element: gated('/configuracion', <ConfiguracionPage />) },
     ],
   },
 ])

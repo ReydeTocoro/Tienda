@@ -1,6 +1,5 @@
 import { useMemo, useState } from 'react'
-import { useLiveQuery } from 'dexie-react-hooks'
-import { db } from '../../../db/index'
+import { useSecureTable } from '../../../db/secure'
 import { addDaysToKey, daysBetween, formatDayKey, payableBalance, round2 } from '../../../shared/lib/cash'
 import { formatMoney, todayKey } from '../../../shared/lib/currency'
 import { formatOrderId } from '../../../shared/lib/id'
@@ -17,7 +16,7 @@ function dueInfo(p: Payable, today: string): { label: string; cls: string } {
 
 /** Cuentas por pagar: what is owed to suppliers, soonest due first. */
 export function PayablesList() {
-  const payables = useLiveQuery(() => db.payables.toArray(), [], [] as Payable[])
+  const payables = useSecureTable('payables')
   const [showPaid, setShowPaid] = useState(false)
   const [paying, setPaying] = useState<number | null>(null)
   const today = todayKey()

@@ -5,6 +5,7 @@ import { openCaja } from '../../../db/repositories/cash'
 import { formatMoney } from '../../../shared/lib/currency'
 import { toast } from '../../../store/useToastStore'
 import { useActorName, useCaja } from '../hooks/useCaja'
+import { usePermission } from '../../pin/usePermission'
 
 interface OpenCajaSheetProps {
   open: boolean
@@ -25,18 +26,26 @@ export function OpenCajaSheet({ open, onClose }: OpenCajaSheetProps) {
 function OpenCajaForm({ onClose }: { onClose: () => void }) {
   const { menor, firstOpening } = useCaja()
   const actor = useActorName()
+  const { can, operator } = usePermission()
+  // Without "ver el efectivo esperado" the drawer is counted blind: no expected figure, no prefill,
+  // no difference shown — it's still recorded for the administrator.
+  const blind = !firstOpening && !can('caja.verEsperado')
   const [counted, setCounted] = useState<number | null>(null)
   const [mayorInitial, setMayorInitial] = useState(0)
   const [by, setBy] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
 
-  const value = counted ?? menor
-  const who = (by ?? actor).trim()
+  const value = counted ?? (blind ? 0 : menor)
+  const who = (operator?.name ?? by ?? actor).trim()
   const diff = Math.round((value - menor) * 100) / 100
 
   async function submit() {
     if (!who) {
       toast('Indica quién abre la caja', 'orange')
+      return
+    }
+    if (blind && counted === null) {
+      toast('Escribe el efectivo que contaste', 'orange')
       return
     }
     setBusy(true)
@@ -57,10 +66,12 @@ function OpenCajaForm({ onClose }: { onClose: () => void }) {
       <div className="mb-4 text-[12px] text-muted">
         {firstOpening
           ? 'Es el punto de partida de las cajas. Registra el efectivo de hoy; las ventas anteriores a este sistema no se incluyen.'
-          : 'Cuenta el efectivo que hay en la caja antes de empezar a vender.'}
+          : blind
+            ? 'Cuenta billetes y monedas y escribe el total. El sistema lo compara con lo esperado; el resultado lo ve el administrador.'
+            : 'Cuenta el efectivo que hay en la caja antes de empezar a vender.'}
       </div>
 
-      {!firstOpening && (
+      {!firstOpening && !blind && (
         <div className="mb-3 flex items-center justify-between rounded-xl bg-s2 px-3.5 py-2.5 text-[13px]">
           <span className="text-txt2">Según el sistema</span>
           <span className="font-mono font-bold">{formatMoney(menor)}</span>
@@ -68,8 +79,14 @@ function OpenCajaForm({ onClose }: { onClose: () => void }) {
       )}
 
       <label className="mb-1 block field-label">{firstOpening ? 'Efectivo en la caja (base inicial) *' : 'Efectivo contado *'}</label>
-      <MoneyInput className="input mb-2 border-lime text-right font-mono text-[20px] font-bold text-lime" value={value} onChange={(v) => setCounted(v ?? 0)} autoFocus />
-      {diff !== 0 && (!firstOpening || diff < 0) && (
+      <MoneyInput
+        className="input mb-2 border-lime text-right font-mono text-[20px] font-bold text-lime"
+        value={value}
+        onChange={(v) => setCounted(blind ? v : (v ?? 0))}
+        placeholder="0"
+        autoFocus
+      />
+      {!blind && diff !== 0 && (!firstOpening || diff < 0) && (
         <div className={`mb-3 rounded-lg px-3 py-2 text-center text-[12px] font-semibold ${diff > 0 ? 'bg-lime/10 text-lime' : 'bg-red/10 text-red'}`}>
           {diff > 0 ? `Sobrante de ${formatMoney(diff)}` : `Faltante de ${formatMoney(-diff)}`} — queda registrado en la caja
         </div>
@@ -84,7 +101,7 @@ function OpenCajaForm({ onClose }: { onClose: () => void }) {
       )}
 
       <label className="mb-1 mt-2 block field-label">Quién abre *</label>
-      <input className="input mb-4" value={by ?? actor} onChange={(e) => setBy(e.target.value)} placeholder="Nombre" />
+      <input className="input mb-4" value={operator?.name ?? by ?? actor} onChange={(e) => setBy(e.target.value)} readOnly={!!operator} placeholder="Nombre" />
 
       <div className="flex gap-2">
         <button onClick={onClose} className="flex-1 rounded-[10px] border border-br2 py-2.5 text-[13px] text-txt2">

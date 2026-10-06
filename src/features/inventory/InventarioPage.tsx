@@ -27,15 +27,25 @@ import { parseImportFile, buildParsedRows, type ParsedImportRow, type DupAction 
 import { COST_SORT_KEYS, DEFAULT_SORT, sortProducts, type SortKey, type SortState } from './lib/productSort'
 import { applyImport } from '../../db/repositories/inventoryOps'
 import { getSettings } from '../../db/repositories/settings'
-import { usePermission } from '../pin/usePermission'
+import { secureRows, useSecureLoaded, whenSecureLoaded } from '../../db/secure'
+import { useCostMap, withCosts } from '../../shared/hooks/useSecretFigures'
+import { usePermission, type Need } from '../pin/usePermission'
 
 const ALL = '__all__'
 
+/** The purchase prices this device holds right now — for an export that runs right after signing
+ * someone in, before the screen has re-rendered with the costs that just arrived. */
+const freshCosts = () => new Map(secureRows('productCosts').map((r) => [r.code, Number(r.cost) || 0]))
+const EXPORT_NOTE = 'El archivo incluye los precios de compra: requiere permiso.'
+
 export function InventarioPage() {
-  const products = useLiveQuery(() => db.products.toArray(), [], []) as Product[]
+  const stored = useLiveQuery(() => db.products.toArray(), [], []) as Product[]
+  // Purchase prices only reach this device while someone who may see them is signed in here.
+  const costs = useCostMap()
+  const products = useMemo(() => withCosts(stored, costs), [stored, costs])
   const settings = useLiveQuery(() => getSettings())
   const confirm = useConfirm()
-  const { requireAdmin } = usePermission()
+  const { can, signInFor, requirePermission } = usePermission()
 
   // The create/edit form lives in a dialog: opened by the floating "+" or a row's edit action.
   const [formOpen, setFormOpen] = useState(false)
@@ -43,12 +53,19 @@ export function InventarioPage() {
   const [formSeed, setFormSeed] = useState<{ code: string; token: number } | null>(null)
   const [packageCode, setPackageCode] = useState<string | null>(null)
 
-  // List view: search + category filter + column sort. Cost data stays hidden until an admin
-  // re-enters the PIN, and goes back to hidden whenever the page is left.
+  // List view: search + category filter + column sort. Purchase prices stay hidden until someone
+  // allowed to see them asks (a shared screen) — which signs them in, so the server sends the costs
+  // to this device — and go back to hidden whenever the page is left or they sign out. The
+  // inventory's total value is a separate permission (ganancias.ver) on top of that.
   const [search, setSearch] = useState('')
   const [cat, setCat] = useState(ALL)
   const [sort, setSort] = useState<SortState>(DEFAULT_SORT)
   const [showCosts, setShowCosts] = useState(false)
+  // Until the purchase prices have arrived, a form must not show (or send back) a cost of 0.
+  const costsLoaded = useSecureLoaded('productCosts')
+  const canCosts = can('costos.ver') && costsLoaded
+  const costsVisible = showCosts && canCosts
+  const showValue = costsVisible && can('ganancias.ver')
 
   // Entrada rápida + scanning
   const [entradaOpen, setEntradaOpen] = useState(false)
@@ -166,17 +183,35 @@ export function InventarioPage() {
   }
 
   async function toggleCosts() {
-    if (showCosts) {
+    if (costsVisible) {
       setShowCosts(false)
       setSort((s) => (COST_SORT_KEYS.has(s.key) ? DEFAULT_SORT : s))
       return
     }
-    const ok = await requireAdmin('Costos e inversión', 'Ingresa tu PIN de administrador para ver los costos del inventario', { force: true })
-    if (ok) setShowCosts(true)
+    const ok = await signInFor('costos.ver', 'Precios de compra', 'Ver a cómo se compra cada producto requiere permiso. Ingresa el PIN de alguien que pueda verlos: quedará ingresado.')
+    if (!ok) return
+    if (!(await whenSecureLoaded('productCosts'))) toast('Los precios de compra aún no llegan: revisa la conexión', 'orange')
+    setShowCosts(true)
+  }
+
+  /** Exports carry purchase prices, so whoever exports must be signed in here (the costs only reach
+   * this device for them). */
+  async function exportWithCosts(title: string, run: () => void) {
+    if (!(await signInFor('stock.importar', title, EXPORT_NOTE))) return
+    if (!(await whenSecureLoaded('productCosts'))) {
+      toast('Los precios de compra aún no llegan: revisa la conexión e inténtalo de nuevo', 'orange')
+      return
+    }
+    run()
+  }
+
+  /** Runs a toolbar action only if whoever is working may (or someone allowed enters their PIN). */
+  async function guarded(need: Need, title: string, subtitle: string, action: () => void) {
+    if (await requirePermission(need, title, subtitle)) action()
   }
 
   async function quickStock(p: Product, delta: number) {
-    const ok = await requireAdmin('Ajuste de Stock', 'Se requiere PIN para modificar unidades de stock')
+    const ok = await requirePermission('stock.ajustar', 'Ajustar existencias', 'Sumar o restar unidades requiere permiso.')
     if (!ok) return
     if (delta < 0 && p.stock <= 0) {
       toast('Ya está en 0', 'orange')
@@ -187,8 +222,7 @@ export function InventarioPage() {
   }
 
   async function handleDelete(p: Product) {
-    const isAdmin = await requireAdmin('Eliminar Producto', 'Se requiere PIN para eliminar del inventario')
-    if (!isAdmin) return
+    if (!(await requirePermission('stock.eliminar', 'Eliminar producto', 'Borrar productos del inventario requiere permiso.'))) return
     const ok = await confirm({ message: `¿Eliminar ${p.name}?`, danger: true, confirmLabel: 'Eliminar' })
     if (!ok) return
     await deleteProduct(p.code)
@@ -247,12 +281,12 @@ export function InventarioPage() {
             onClick={toggleCosts}
             className="ml-auto flex items-center gap-1.5 rounded-[10px] border border-br2 bg-s1 px-3 py-1.5 text-[12px] font-semibold text-txt2 transition-colors hover:bg-s3 hover:text-txt"
           >
-            {showCosts ? <EyeOff size={15} /> : <Lock size={15} />}
-            {showCosts ? 'Ocultar costos' : 'Ver costos e inversión'}
+            {costsVisible ? <EyeOff size={15} /> : <Lock size={15} />}
+            {costsVisible ? 'Ocultar costos' : can('ganancias.ver') ? 'Ver costos e inversión' : 'Ver precios de compra'}
           </button>
         </div>
 
-        {showCosts && (
+        {showValue && (
           <div className="grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-br bg-br md:grid-cols-4">
             <Stat label="Costo total invertido" value={formatMoney(summary.totalCostValue)} color="text-orange" />
             <Stat label="Valor de venta total" value={formatMoney(summary.totalSaleValue)} color="text-lime" />
@@ -272,11 +306,21 @@ export function InventarioPage() {
             ))}
           </select>
           <div className="flex w-full items-center gap-2 overflow-x-auto [scrollbar-width:none] md:w-auto md:flex-wrap md:overflow-visible">
-            <ToolButton icon={PackagePlus} label="Entrada de mercancía" onClick={() => setEntradaOpen(true)} className="border-lime/30 bg-lime/10 text-lime hover:bg-lime/15" />
-            <ToolButton icon={FileSpreadsheet} label="Excel" onClick={() => exportExcel(products, storeName)} iconClassName="text-green" />
-            <ToolButton icon={FileText} label="CSV" onClick={() => exportCSV(products, storeName)} iconClassName="text-blue" />
-            <ToolButton icon={Download} label="Plantilla" onClick={() => downloadImportTemplate(products, storeName)} />
-            <ToolButton icon={Upload} label="Importar" onClick={() => fileInputRef.current?.click()} iconClassName="text-purple" />
+            <ToolButton
+              icon={PackagePlus}
+              label="Entrada de mercancía"
+              onClick={() => guarded('stock.entradas', 'Entrada de mercancía', 'Registrar mercancía que llega requiere permiso.', () => setEntradaOpen(true))}
+              className="border-lime/30 bg-lime/10 text-lime hover:bg-lime/15"
+            />
+            <ToolButton icon={FileSpreadsheet} label="Excel" onClick={() => exportWithCosts('Exportar a Excel', () => exportExcel(withCosts(stored, freshCosts()), storeName))} iconClassName="text-green" />
+            <ToolButton icon={FileText} label="CSV" onClick={() => exportWithCosts('Exportar a CSV', () => exportCSV(withCosts(stored, freshCosts()), storeName))} iconClassName="text-blue" />
+            <ToolButton icon={Download} label="Plantilla" onClick={() => exportWithCosts('Plantilla de importación', () => downloadImportTemplate(withCosts(stored, freshCosts()), storeName))} />
+            <ToolButton
+              icon={Upload}
+              label="Importar"
+              onClick={() => guarded('stock.importar', 'Importar catálogo', 'Importar productos requiere permiso.', () => fileInputRef.current?.click())}
+              iconClassName="text-purple"
+            />
             <ToolButton icon={ClipboardCheck} label="Conteo cíclico" onClick={() => setCyclicOpen(true)} iconClassName="text-orange" />
             <ToolButton icon={ScrollText} label="Auditoría" onClick={() => setAuditOpen(true)} />
           </div>
@@ -291,7 +335,7 @@ export function InventarioPage() {
           <ProductTable
             products={rows}
             byCode={byCode}
-            showCosts={showCosts}
+            showCosts={costsVisible}
             onRevealCosts={toggleCosts}
             sort={sort}
             onSort={handleSort}
@@ -307,14 +351,14 @@ export function InventarioPage() {
       <AddFab label="Agregar producto" onClick={openCreate} />
 
       <BottomSheet open={formOpen} onClose={closeForm} maxWidthClass="max-w-[640px]">
-        <ProductForm product={editing} onSaved={closeForm} onCancel={closeForm} scanSeed={formSeed} onOpenCamera={openFormCamera} />
+        <ProductForm product={editing} showCosts={canCosts} onSaved={closeForm} onCancel={closeForm} scanSeed={formSeed} onOpenCamera={openFormCamera} />
       </BottomSheet>
 
       <BottomSheet open={!!packageProduct} onClose={() => setPackageCode(null)} maxWidthClass="max-w-[460px]">
         {packageProduct && (
           <PackageCard
             product={packageProduct}
-            showCosts={showCosts}
+            showCosts={costsVisible}
             onEdit={() => {
               setPackageCode(null)
               openEdit(packageProduct)

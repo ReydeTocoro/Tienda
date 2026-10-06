@@ -1,13 +1,12 @@
 import { useState } from 'react'
-import { useLiveQuery } from 'dexie-react-hooks'
 import { Pencil, Phone, Plus } from 'lucide-react'
-import { db } from '../../../db/index'
+import { useSecureTable } from '../../../db/secure'
 import type { Supplier } from '../../../types/supplier'
 import { termsLabel } from '../lib/terms'
 import { SupplierFormSheet } from './SupplierFormSheet'
 
 export function SupplierList() {
-  const suppliers = useLiveQuery(() => db.suppliers.toArray(), [], [] as Supplier[])
+  const suppliers = useSecureTable('suppliers')
   const [editing, setEditing] = useState<Supplier | null>(null)
   const [formOpen, setFormOpen] = useState(false)
 

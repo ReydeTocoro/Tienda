@@ -1,15 +1,12 @@
 import { db } from '../index'
 import type { Settings } from '../../types/settings'
-import { sha256 } from '../../shared/lib/pin'
 import { apiPut } from '../../api/client'
-
-const DEFAULT_PIN = '1234'
 
 /** Read path — unchanged: stays on the local Dexie mirror. The fallback default row created
  * here the first time a client reads before its first sync pull lands is never sent to the
- * server, but it's harmless: the first migration seeds the exact same defaults (same hash of
- * "1234"), and the next sync pull overwrites this local row with the server's authoritative copy
- * anyway. */
+ * server, but it's harmless: the first migration seeds the same defaults, and the next sync pull
+ * overwrites this local row with the server's authoritative copy anyway. (No PIN in it: PINs are
+ * checked by the server only.) */
 export async function getSettings(): Promise<Settings> {
   const existing = await db.settings.get('main')
   if (existing) return existing
@@ -17,14 +14,12 @@ export async function getSettings(): Promise<Settings> {
   const defaults: Settings = {
     key: 'main',
     storeName: 'Mi Tienda',
-    pinHash: await sha256(DEFAULT_PIN),
     pinLength: 4,
     theme: 'light',
     hidScannerEnabled: true,
   }
-  // `add`, not `put`: the sync pull can land while the default hash above is being computed, and a
-  // `put` would then overwrite the server's real settings — the real PIN included — with these
-  // defaults (PIN 1234 accepted on a fresh device until the next reload).
+  // `add`, not `put`: the sync pull may have landed meanwhile, and a `put` would overwrite the
+  // server's real settings with these defaults.
   try {
     await db.settings.add(defaults)
     return defaults
@@ -33,6 +28,10 @@ export async function getSettings(): Promise<Settings> {
   }
 }
 
-export async function updateSettings(patch: Partial<Omit<Settings, 'key'>>): Promise<void> {
+/** What the settings route takes (server/domain/users.ts): the theme from anyone, the rest from the
+ * Administrador. The master PIN, the caja's base and the last cashier have their own routes. */
+export type SettingsPatch = Partial<Pick<Settings, 'theme' | 'storeName' | 'business' | 'roles' | 'access' | 'hidScannerEnabled'>>
+
+export async function updateSettings(patch: SettingsPatch): Promise<void> {
   await apiPut('/api/settings', patch)
 }

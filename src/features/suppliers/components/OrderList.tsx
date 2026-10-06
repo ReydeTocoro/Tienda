@@ -1,6 +1,5 @@
 import { useMemo, useState } from 'react'
-import { useLiveQuery } from 'dexie-react-hooks'
-import { db } from '../../../db/index'
+import { useSecureTable } from '../../../db/secure'
 import { formatDateTime, formatMoney } from '../../../shared/lib/currency'
 import { formatOrderId } from '../../../shared/lib/id'
 import type { OrderStatus, PurchaseOrder } from '../../../types/purchaseOrder'
@@ -21,7 +20,7 @@ interface OrderListProps {
 }
 
 export function OrderList({ onEditDraft }: OrderListProps) {
-  const orders = useLiveQuery(() => db.purchaseOrders.toArray(), [], [] as PurchaseOrder[])
+  const orders = useSecureTable('purchaseOrders')
   const [filter, setFilter] = useState<OrderStatus | 'todos'>('pedido')
   const [detailId, setDetailId] = useState<number | null>(null)
   const [receiving, setReceiving] = useState<PurchaseOrder | null>(null)

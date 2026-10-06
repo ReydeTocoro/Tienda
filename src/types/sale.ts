@@ -18,7 +18,9 @@ export interface Sale {
   subtotal: number
   discount: number
   total: number
-  ganancia: number
+  /** Profit, computed by the server. Never in the synced row — the database files it in "profits"
+   * (`ganancias.ver`); the app merges it in where it may show it. */
+  ganancia?: number
   payMethod: PayMethod
   fiadoName?: string
   customerId?: string
@@ -27,6 +29,9 @@ export interface Sale {
   /** 'YYYY-MM-DD', indexed — derived from `date` at insert time. */
   dayKey: string
   notes?: string
+  /** Who was signed in when the sale was made (absent when the open counter sold with nobody signed in). */
+  sellerId?: string
+  sellerName?: string
   /** Cash-register tender info (cash sales only). `roundingAdjustment` is the signed difference
    * between what was actually charged (`total`) and the raw subtotal-minus-discount — common in
    * cash-only stores that round to the nearest bill/coin. Kept explicit so books stay honest

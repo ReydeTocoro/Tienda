@@ -52,7 +52,7 @@ export function WeightModal({ product: p, editIndex, onClose }: WeightModalProps
     }
     const qtyRounded = parseFloat(qtyInBase.toFixed(4))
     addWeightedItem(
-      { code: p.code, name: p.name, price: pricePer, cost: p.cost, qty: qtyRounded, brand: p.brand, unit: baseUnit, isFree: false },
+      { code: p.code, name: p.name, price: pricePer, qty: qtyRounded, brand: p.brand, unit: baseUnit, isFree: false },
       p.stock,
       editIndex,
     )

@@ -2,29 +2,21 @@ import Dexie, { type EntityTable } from 'dexie'
 import type { Product } from '../types/product'
 import type { Sale } from '../types/sale'
 import type { Customer } from '../types/customer'
-import type { Cierre } from '../types/cierre'
 import type { AuditLogEntry } from '../types/auditLog'
 import type { EntradaRecord } from '../types/entrada'
 import type { Settings } from '../types/settings'
 import type { Usuario } from '../types/usuario'
-import type { CashMovement, CashSession } from '../types/cash'
-import type { Supplier } from '../types/supplier'
-import type { PurchaseOrder, Payable } from '../types/purchaseOrder'
+import type { CajaState } from '../types/secrets'
 
 export class TiendaDB extends Dexie {
   products!: EntityTable<Product, 'code'>
   sales!: EntityTable<Sale, 'id'>
   customers!: EntityTable<Customer, 'id'>
-  cierres!: EntityTable<Cierre, 'id'>
   auditLog!: EntityTable<AuditLogEntry, 'id'>
   entradas!: EntityTable<EntradaRecord, 'id'>
   settings!: EntityTable<Settings, 'key'>
   usuarios!: EntityTable<Usuario, 'id'>
-  cashMovements!: EntityTable<CashMovement, 'id'>
-  cashSessions!: EntityTable<CashSession, 'id'>
-  suppliers!: EntityTable<Supplier, 'id'>
-  purchaseOrders!: EntityTable<PurchaseOrder, 'id'>
-  payables!: EntityTable<Payable, 'id'>
+  cajaState!: EntityTable<CajaState, 'key'>
 
   constructor() {
     super('tienda-pro')
@@ -60,6 +52,19 @@ export class TiendaDB extends Dexie {
     // v5: the Rutas module was removed — drop its local mirror.
     this.version(5).stores({
       routeOrders: null,
+    })
+    // v6: what not everyone may see (the cash ledger, purchasing, cierres; costs and profits are new
+    // tables) never touches the disk any more — it lives in memory only (src/db/secure.ts). Dropping
+    // these also wipes the copies older versions left on the device. "cajaState" (caja open or not,
+    // no amounts) is what everyone gets instead.
+    this.version(6).stores({
+      cashMovements: null,
+      cashSessions: null,
+      cierres: null,
+      suppliers: null,
+      purchaseOrders: null,
+      payables: null,
+      cajaState: '&key',
     })
   }
 }

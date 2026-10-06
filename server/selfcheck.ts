@@ -1,15 +1,14 @@
 /** Self-check for the money logic (cajas, traslados, pedidos, cuentas por pagar, cierre). Runs
- * against a throwaway in-memory Postgres (PGlite) built from the real migration — never the
+ * against a throwaway in-memory Postgres (PGlite) built from the real migrations — never the
  * Supabase data:  npm run check:cash */
 import assert from 'node:assert/strict'
-import fs from 'node:fs'
-import { PGlite } from '@electric-sql/pglite'
 import { pgliteDb, type Sql } from './db'
+import { testDatabase } from './testDb'
+import { costOf } from './domain/secrets'
 import * as cash from './domain/cash'
 import * as buying from './domain/purchasing'
 import { confirmCierre } from './domain/cierre'
 import { getRow, insertAutoRow, putRow, listAll } from './routes/generic'
-import { computeDayAggregate } from '../src/shared/lib/aggregation'
 import { addDaysToKey, dueDateFrom } from '../src/shared/lib/cash'
 import { todayKey } from '../src/shared/lib/currency'
 import type { Product } from '../src/types/product'
@@ -17,8 +16,7 @@ import type { Sale } from '../src/types/sale'
 import type { CashMovement } from '../src/types/cash'
 import type { Payable, PurchaseOrder } from '../src/types/purchaseOrder'
 
-const lite = await PGlite.create()
-await lite.exec(fs.readFileSync(new URL('../supabase/migrations/20261002000000_tables.sql', import.meta.url), 'utf8'))
+const lite = await testDatabase()
 const db = pgliteDb(lite)
 
 /** Same shape as the routes: one transaction per operation, all-or-nothing. Rows a test needs
@@ -128,7 +126,8 @@ assert.equal(received.status, 'recibido')
 assert.equal(await stock('A1'), 18)
 assert.equal(await stock('B2'), 5)
 assert.equal(received.receivedTotal, 8 * 1100 + 5 * 2000)
-assert.equal((await getRow<Product>(db, 'products', 'code', 'A1'))!.cost, 1100)
+assert.equal(await costOf(db, 'A1'), 1100)
+assert.equal('cost' in (await getRow<Product>(db, 'products', 'code', 'A1'))!, false, 'el costo nunca queda en la fila pública del producto')
 const payables = await listAll<Payable>(db, 'payables')
 assert.equal(payables.length, 1)
 assert.equal(payables[0].amount, 18800)
@@ -167,8 +166,7 @@ assert.equal(await stock('A1'), 20)
 ok('proveedor de contado: se elige la caja y se descuenta al recibir')
 
 // --- Cierre Z: arqueo contra el libro, traslado y cierre de sesión ---------------------------
-const agg = computeDayAggregate(todayKey(), await listAll<Sale>(db, 'sales'), await movements(), { onlyOpen: true })
-const cierre = await run((q) => confirmCierre(q, { dayKey: todayKey(), cajero: 'Ana', notas: '', efectivoFisico: 14000, trasladar: 9000, aggregate: agg }))
+const cierre = await run((q) => confirmCierre(q, { dayKey: todayKey(), cajero: 'Ana', notas: '', efectivoFisico: 14000, trasladar: 9000 }))
 assert.equal(cierre.arqueo.efectivoSistema, 15000)
 assert.equal(cierre.arqueo.diferencia, -1000)
 assert.equal(cierre.arqueo.cuadre, 'faltante')
@@ -176,8 +174,13 @@ assert.equal(await bal('menor'), 5000, 'queda lo contado menos lo trasladado')
 assert.equal(await bal('mayor'), MAYOR_BASE + 21200 + 9000)
 assert.equal(cierre.dejadoEnCaja, 5000)
 assert.equal(await cash.openSession(db), undefined, 'el cierre cierra la sesión')
+assert.equal(cierre.totalVentas, (await listAll<Sale>(db, 'sales')).reduce((a, s) => a + s.total, 0), 'el servidor suma las ventas del día por su cuenta')
+assert.equal('totalGanancia' in cierre, false, 'la ganancia del cierre no queda en la fila que lee Reporte')
+assert.equal((await lite.query(`select 1 from profits where key = 'cierre:' || $1`, [cierre.id])).rows.length, 1)
+assert.equal((await listAll<Sale>(db, 'sales')).every((s) => s.closedInCierreId === cierre.id), true, 'las ventas del día quedan marcadas')
+assert.equal((await getRow<{ cajaBase?: number; lastCajero?: string }>(db, 'settings', 'key', 'main'))!.cajaBase, 5000, 'la base queda guardada para el próximo cierre')
 ok('cierre: faltante de 1.000 contra el libro, traslado de 9.000 a Mayor, quedan 5.000 y la sesión se cierra')
-await fails(() => run((q) => confirmCierre(q, { dayKey: todayKey(), cajero: 'Ana', notas: '', efectivoFisico: 100, trasladar: 200, aggregate: agg })), /más efectivo del que contaste/, 'trasladar más de lo contado')
+await fails(() => run((q) => confirmCierre(q, { dayKey: todayKey(), cajero: 'Ana', notas: '', efectivoFisico: 100, trasladar: 200 })), /más efectivo del que contaste/, 'trasladar más de lo contado')
 ok('no se puede trasladar más de lo contado')
 await fails(() => run((q) => cash.openCaja(q, { countedCash: 5000, by: 'Ana', mayorInitial: 1000 })), /primera apertura/, 'saldo inicial solo la primera vez')
 const s2 = await run((q) => cash.openCaja(q, { countedCash: 5000, by: 'Ana' }))

@@ -1,12 +1,16 @@
 import type { Request, Response } from 'express'
 import { errorMessage } from './generic'
 
-/** An error that answers with a specific HTTP status (404 not found, 409 duplicate...). */
+/** An error that answers with a specific HTTP status (404 not found, 409 duplicate...). `extra`
+ * travels next to the message — e.g. `{ need }` on a 403, so the app can ask for the PIN of
+ * someone allowed and retry, or `{ lockedUntil }` on a PIN lockout. */
 export class HttpError extends Error {
   status: number
-  constructor(status: number, message: string) {
+  extra?: Record<string, unknown>
+  constructor(status: number, message: string, extra?: Record<string, unknown>) {
     super(message)
     this.status = status
+    this.extra = extra
   }
 }
 
@@ -21,7 +25,8 @@ export function handle(fn: (req: Request) => Promise<unknown>, okStatus = 200) {
       if (result === undefined) res.status(204).end()
       else res.status(okStatus).json(result)
     } catch (err) {
-      res.status(err instanceof HttpError ? err.status : 400).json({ error: errorMessage(err) })
+      const status = err instanceof HttpError ? err.status : 400
+      res.status(status).json({ ...(err instanceof HttpError ? err.extra : {}), error: errorMessage(err) })
     }
   }
 }

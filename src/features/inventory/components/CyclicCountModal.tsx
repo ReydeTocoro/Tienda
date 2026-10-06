@@ -21,7 +21,7 @@ export function CyclicCountModal({ open, onClose, products }: CyclicCountModalPr
   const [counts, setCounts] = useState<Record<string, number>>({})
   const [reasons, setReasons] = useState<Record<string, string>>({})
   const [busy, setBusy] = useState(false)
-  const { requireAdmin, currentUserName } = usePermission()
+  const { requirePermission, currentUserName } = usePermission()
 
   const cats = useMemo(() => Array.from(new Set(products.map((p) => p.cat).filter(Boolean))).sort(), [products])
   const filtered = useMemo(() => (catFilter === '__all__' ? products : products.filter((p) => (p.cat || '') === catFilter)), [products, catFilter]);
@@ -56,7 +56,7 @@ export function CyclicCountModal({ open, onClose, products }: CyclicCountModalPr
       toast('Completa el motivo de cada diferencia', 'orange')
       return
     }
-    const ok = await requireAdmin('Ajuste de Inventario', 'Se requiere PIN para aplicar ajustes de conteo cíclico')
+    const ok = await requirePermission('stock.ajustar', 'Ajuste de inventario', 'Aplicar los ajustes del conteo requiere permiso.')
     if (!ok) return
     setBusy(true)
     try {

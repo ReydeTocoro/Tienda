@@ -1,64 +1,58 @@
 import { create } from 'zustand'
+import type { Operator } from './useSessionStore'
 
+/** What the server answered to a PIN. */
 export interface PinVerifyResult {
   ok: boolean
-  /** Display name of whoever the entered PIN matched — shown on success and used for audit
-   * attribution (e.g. "unlocked by Juan"). */
-  identity?: string
+  /** Who the PIN belongs to, when it was accepted. */
+  operator?: Operator
+  /** Shown instead of "PIN incorrecto" — e.g. the PIN is right but that person lacks the permission. */
+  error?: string
+  /** Wrong PIN: tries left before this device locks for a while. */
+  attemptsLeft?: number
+  /** Locked out until this moment (epoch ms): this device, or the whole store. */
+  lockedUntil?: number
 }
 
 interface PendingPinRequest {
   title: string
   subtitle: string
-  /** Each caller supplies its own check — the admin gate matches the master PIN or any active
-   * admin-role usuario; a "log in as this cashier" flow matches one specific usuario. The modal
-   * itself stays generic. */
+  /** Each caller supplies its own check (sign in, or authorize one step); the modal stays generic. */
   verify: (entered: string) => Promise<PinVerifyResult>
   resolve: (result: PinVerifyResult) => void
 }
 
 interface PinState {
-  /** Persists for the whole session once unlocked (decision 3) — resets only on a full reload. */
-  isAdminUnlocked: boolean
-  /** Display name from the most recent successful PIN entry (any kind), for attribution. */
-  lastIdentity: string | null
   request: PendingPinRequest | null
-  /** Digit buffer + failed-attempt count live here (not component state) so they survive the
-   * PIN modal unmounting/remounting between separate `ask()` calls. */
-  buffer: string
-  attempts: number
+  /** The server's last word on wrong PINs, shared by every pad on this device (the dialog and the
+   * lock screen): tries left, and a lockout. The server enforces both; this only shows them. */
+  attemptsLeft: number | null
+  lockedUntil: number
   ask: (title: string, subtitle: string, verify: (entered: string) => Promise<PinVerifyResult>) => Promise<PinVerifyResult>
   settle: (result: PinVerifyResult) => void
-  markAdminUnlocked: () => void
-  setBuffer: (b: string) => void
-  incAttempts: () => number
-  resetAttempts: () => void
+  /** Records what a PIN check said about tries and lockout. */
+  noteResult: (result: PinVerifyResult) => void
 }
 
-/** Replaces the legacy role-picker + `pedirPin()` callback system (decision 3: no role
- * screen, PIN is the only gate, and unlocking it stays unlocked for the session). */
+/** The PIN modal's request queue of one: `ask()` opens it and resolves with what was entered. */
 export const usePinStore = create<PinState>((set, get) => ({
-  isAdminUnlocked: false,
-  lastIdentity: null,
   request: null,
-  buffer: '',
-  attempts: 0,
+  attemptsLeft: null,
+  lockedUntil: 0,
   ask: (title, subtitle, verify) =>
     new Promise<PinVerifyResult>((resolve) => {
-      set({ request: { title, subtitle, verify, resolve }, buffer: '' })
+      // A second ask while one is open (shouldn't happen) cancels the first instead of leaving it hanging.
+      get().request?.resolve({ ok: false })
+      set({ request: { title, subtitle, verify, resolve } })
     }),
   settle: (result) => {
     const req = get().request
-    set({ request: null, buffer: '' })
-    if (result.ok) set({ attempts: 0, ...(result.identity ? { lastIdentity: result.identity } : {}) })
+    set({ request: null })
     req?.resolve(result)
   },
-  markAdminUnlocked: () => set({ isAdminUnlocked: true }),
-  setBuffer: (buffer) => set({ buffer }),
-  incAttempts: () => {
-    const next = get().attempts + 1
-    set({ attempts: next })
-    return next
-  },
-  resetAttempts: () => set({ attempts: 0 }),
+  noteResult: (result) =>
+    set({
+      attemptsLeft: result.ok ? null : (result.attemptsLeft ?? get().attemptsLeft),
+      lockedUntil: result.lockedUntil ?? (result.ok ? 0 : get().lockedUntil),
+    }),
 }))

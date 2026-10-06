@@ -28,10 +28,10 @@ function invariant() {
   assert.equal(new Set(carts.map((c) => c.id)).size, carts.length, 'los ids no se repiten')
 }
 
-const unit = (code: string, name: string, price: number) => ({ code, name, price, cost: price / 2, brand: '', unit: 'unidad', stock: 10 })
+const unit = (code: string, name: string, price: number) => ({ code, name, price, brand: '', unit: 'unidad', stock: 10 })
 const milk = unit('L1', 'Leche', 3000)
 const rice = unit('A1', 'Arroz', 2500)
-const kg = (code: string, qty: number) => ({ code, name: code, price: 4000, cost: 2000, qty, brand: '', unit: 'kg', isFree: false })
+const kg = (code: string, qty: number) => ({ code, name: code, price: 4000, qty, brand: '', unit: 'kg', isFree: false })
 
 // --- arranca con un carrito
 assert.deepEqual(names(), ['Carrito 1'])

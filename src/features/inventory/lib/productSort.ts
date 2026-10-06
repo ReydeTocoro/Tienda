@@ -27,7 +27,7 @@ function sortValue(p: Product, key: SortKey): string | number {
     case 'cost':
       return p.cost || 0
     case 'margin':
-      return p.cost > 0 ? (p.price - p.cost) / p.cost : -Infinity
+      return (p.cost ?? 0) > 0 ? (p.price - p.cost!) / p.cost! : -Infinity
     case 'invested':
       return (p.cost || 0) * (p.stock || 0)
   }

@@ -1,7 +1,20 @@
+import type { AccessSettings, Role } from '../shared/lib/permissions'
+
+/** Business details printed on receipts (Configuración → Negocio). All optional. */
+export interface BusinessInfo {
+  nit?: string
+  phone?: string
+  address?: string
+  /** Closing line of every receipt; "¡Gracias por su compra!" when empty. */
+  receiptFooter?: string
+}
+
 export interface Settings {
   key: 'main'
   storeName: string
-  pinHash: string
+  business?: BusinessInfo
+  /** Digits of every PIN in the store (the PIN pad submits itself at this length). The PINs themselves
+   * are hashed in a database table no device can read (private.pins). */
   pinLength: 4 | 6
   pinChangedAt?: string
   theme: 'dark' | 'light'
@@ -9,6 +22,9 @@ export interface Settings {
   /** Cash left in the Caja Menor drawer after each close (the "base" for the next day). */
   cajaBase?: number
   hidScannerEnabled: boolean
-  /** Absolute epoch-ms timestamp until which the PIN entry stays locked out. Persists across reloads. */
-  pinLockedUntil?: number
+  /** Editable roles (everything but the fixed Administrador). Absent = the defaults. Read it through
+   * `resolveRoles()`, never directly. */
+  roles?: Role[]
+  /** Counter access mode, counter role and auto-lock. Read it through `sanitizeAccess()`. */
+  access?: AccessSettings
 }

@@ -2,6 +2,8 @@ import { Router } from 'express'
 import { randomUUID } from 'node:crypto'
 import type { Customer } from '../../src/types/customer'
 import type { Db, Sql } from '../db'
+import { authOf } from '../auth'
+import { actorOf, requireNeed } from '../domain/counter'
 import { getRow, putRow, deleteRow } from './generic'
 import { HttpError, handle } from './http'
 
@@ -16,35 +18,36 @@ interface CustomerInput {
   birthday?: string
 }
 
+const text = (v: unknown, max: number): string | undefined => (typeof v === 'string' && v.trim() ? v.trim().slice(0, max) : undefined)
+
+function clean(input: CustomerInput) {
+  const name = text(input?.name, 80)
+  if (!name) throw new HttpError(400, 'Escribe el nombre del cliente')
+  const birthday = typeof input.birthday === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(input.birthday) ? input.birthday : undefined
+  return { name, cedula: text(input.cedula, 30), phone: text(input.phone, 30), email: text(input.email, 80), notes: text(input.notes, 300), birthday }
+}
+
 async function findByCedula(q: Sql, cedula: string): Promise<Customer | undefined> {
   const [row] = await q.query<{ data: Customer }>(`select data from ${TABLE} where data ->> 'cedula' = $1 limit 1`, [cedula])
   return row?.data
 }
 
-/** legacy saveClient()'s cedula-duplicate check (repositories/customers.ts L22-41). */
+/** Customers, mounted at /api/customers — writing needs `clientes.editar`. A cédula belongs to one
+ * customer only. */
 export function customersRouter(db: Db) {
   const router = Router()
 
   router.post(
     '/',
     handle(async (req) => {
-      const input = req.body as CustomerInput
-      const cedula = input.cedula?.trim() || undefined
+      const input = clean(req.body as CustomerInput)
       return db.tx(async (q) => {
-        if (cedula) {
-          const dup = await findByCedula(q, cedula)
+        await requireNeed(q, await actorOf(q, authOf(req)), 'clientes.editar')
+        if (input.cedula) {
+          const dup = await findByCedula(q, input.cedula)
           if (dup) throw new HttpError(409, 'Esa cédula ya existe: ' + dup.name)
         }
-        const customer: Customer = {
-          id: randomUUID(),
-          name: input.name.trim(),
-          cedula,
-          phone: input.phone?.trim(),
-          email: input.email?.trim(),
-          notes: input.notes?.trim(),
-          birthday: input.birthday,
-          createdAt: new Date().toISOString(),
-        }
+        const customer: Customer = { id: randomUUID(), ...input, createdAt: new Date().toISOString() }
         await putRow(q, TABLE, 'id', customer.id, customer)
         return customer
       })
@@ -54,24 +57,16 @@ export function customersRouter(db: Db) {
   router.put(
     '/:id',
     handle(async (req) => {
-      const input = req.body as CustomerInput
+      const input = clean(req.body as CustomerInput)
       return db.tx(async (q) => {
+        await requireNeed(q, await actorOf(q, authOf(req)), 'clientes.editar')
         const existing = await getRow<Customer>(q, TABLE, 'id', req.params.id)
         if (!existing) throw new HttpError(404, 'Cliente no encontrado')
-        const cedula = input.cedula?.trim() || undefined
-        if (cedula) {
-          const dup = await findByCedula(q, cedula)
+        if (input.cedula) {
+          const dup = await findByCedula(q, input.cedula)
           if (dup && dup.id !== req.params.id) throw new HttpError(409, 'Esa cédula ya existe: ' + dup.name)
         }
-        const updated: Customer = {
-          ...existing,
-          name: input.name.trim(),
-          cedula,
-          phone: input.phone?.trim(),
-          email: input.email?.trim(),
-          notes: input.notes?.trim(),
-          birthday: input.birthday,
-        }
+        const updated: Customer = { ...existing, ...input }
         await putRow(q, TABLE, 'id', req.params.id, updated)
         return updated
       })
@@ -81,7 +76,10 @@ export function customersRouter(db: Db) {
   router.delete(
     '/:id',
     handle(async (req) => {
-      await db.tx((q) => deleteRow(q, TABLE, 'id', req.params.id))
+      await db.tx(async (q) => {
+        await requireNeed(q, await actorOf(q, authOf(req)), 'clientes.editar')
+        await deleteRow(q, TABLE, 'id', req.params.id)
+      })
     }),
   )
 

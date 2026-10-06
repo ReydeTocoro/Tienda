@@ -176,6 +176,22 @@ body {
   }
 }
 
+/* Wrong PIN: the card shakes sideways (PinModal, LockScreen). */
+@keyframes pinShake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  20%,
+  60% {
+    transform: translateX(-8px);
+  }
+  40%,
+  80% {
+    transform: translateX(8px);
+  }
+}
+
 @keyframes dialogIn {
   from {
     transform: scale(0.96);

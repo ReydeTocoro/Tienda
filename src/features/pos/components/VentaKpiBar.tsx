@@ -1,14 +1,20 @@
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../../../db/index'
 import { formatMoney, formatQty, todayKey } from '../../../shared/lib/currency'
+import { useProfits } from '../../../shared/hooks/useSecretFigures'
+import { usePermission } from '../../pin/usePermission'
 
 interface VentaKpiBarProps {
   onClickLowStock: () => void
 }
 
-/** Mini live stats row — legacy `updateVentaKPIs()` (index.html L5199-5224). */
+/** Mini live stats row — legacy `updateVentaKPIs()` (index.html L5199-5224). Sales totals and the
+ * margin only show to whoever may see them (`ventas.verTotales`, `ganancias.ver`); the profits
+ * themselves only reach this device for whoever may see them. */
 export function VentaKpiBar({ onClickLowStock }: VentaKpiBarProps) {
+  const { can } = usePermission()
   const sales = useLiveQuery(() => db.sales.where('dayKey').equals(todayKey()).toArray(), [], [])
+  const profits = useProfits().sales
   const lowStockCount = useLiveQuery(
     () => db.products.filter((p) => p.stock > 0 && p.min > 0 && p.stock <= p.min).count(),
     [],
@@ -18,7 +24,7 @@ export function VentaKpiBar({ onClickLowStock }: VentaKpiBarProps) {
   const totalVentas = sales.reduce((a, s) => a + s.total, 0)
   const numTx = sales.length
   const avgTicket = numTx ? totalVentas / numTx : 0
-  const totalGanancia = sales.reduce((a, s) => a + (s.ganancia || 0), 0)
+  const totalGanancia = sales.reduce((a, s) => a + (profits.get(s.id ?? -1) ?? 0), 0)
   const margen = totalVentas > 0 ? (totalGanancia / totalVentas) * 100 : 0
 
   return (
@@ -26,10 +32,10 @@ export function VentaKpiBar({ onClickLowStock }: VentaKpiBarProps) {
     // receipt summary line — instead of five identical bordered/rounded tiles. Each cell grows
     // evenly (flex-1) so the row fills the available width instead of bunching to the left.
     <div className="flex flex-shrink-0 divide-x divide-br overflow-x-auto border-b border-br bg-s1 [scrollbar-width:none]">
-      <Kpi label="Ventas hoy" value={formatMoney(totalVentas)} />
+      {can('ventas.verTotales') && <Kpi label="Ventas hoy" value={formatMoney(totalVentas)} />}
       <Kpi label="Transacc." value={formatQty(numTx)} />
-      <Kpi label="Margen" value={margen.toFixed(0) + '%'} />
-      <Kpi label="Ticket prom." value={formatMoney(avgTicket)} />
+      {can('ganancias.ver') && <Kpi label="Margen" value={margen.toFixed(0) + '%'} />}
+      {can('ventas.verTotales') && <Kpi label="Ticket prom." value={formatMoney(avgTicket)} />}
       <Kpi label="Stock bajo" value={formatQty(lowStockCount)} warn={lowStockCount > 0} onClick={onClickLowStock} />
     </div>
   )

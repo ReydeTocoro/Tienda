@@ -2,12 +2,13 @@ import { useMemo, useReducer, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { Check, Search, Trash2 } from 'lucide-react'
 import { db } from '../../../db/index'
+import { useSecureTable } from '../../../db/secure'
+import { useCostMap, withCosts } from '../../../shared/hooks/useSecretFigures'
 import { createOrder, updateOrder } from '../../../db/repositories/purchaseOrders'
 import { formatMoney, formatQty } from '../../../shared/lib/currency'
 import { toast } from '../../../store/useToastStore'
 import type { Product } from '../../../types/product'
 import type { PurchaseOrder } from '../../../types/purchaseOrder'
-import type { Supplier } from '../../../types/supplier'
 import { draftFromOrder, draftReducer, draftTotal, EMPTY_DRAFT, lineFromProduct } from '../lib/orderDraft'
 import { termsLabel } from '../lib/terms'
 
@@ -22,8 +23,11 @@ interface NewOrderViewProps {
 /** "Solicitud": pick what to ask a supplier for. The left side lists what is out of stock or
  * under its minimum (or any product, via search); the right side is the order being built. */
 export function NewOrderView({ editing, onDone }: NewOrderViewProps) {
-  const products = useLiveQuery(() => db.products.toArray(), [], [] as Product[])
-  const suppliers = useLiveQuery(() => db.suppliers.toArray(), [], [] as Supplier[])
+  const stored = useLiveQuery(() => db.products.toArray(), [], [] as Product[])
+  const costs = useCostMap()
+  // With their last purchase price, the default cost of each line.
+  const products = useMemo(() => withCosts(stored, costs), [stored, costs])
+  const suppliers = useSecureTable('suppliers')
   const [draft, dispatch] = useReducer(draftReducer, editing, (o) => (o ? draftFromOrder(o) : EMPTY_DRAFT))
   const [mode, setMode] = useState<'bajo' | 'todos'>('bajo')
   const [search, setSearch] = useState('')

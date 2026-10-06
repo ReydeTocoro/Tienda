@@ -6,6 +6,7 @@ import { confirmEntradasBulk } from '../../../db/repositories/entradas'
 import { addProduct } from '../../../db/repositories/products'
 import { formatQty } from '../../../shared/lib/currency'
 import { toast } from '../../../store/useToastStore'
+import { usePermission } from '../../pin/usePermission'
 
 interface LogEntry {
   code: string
@@ -25,6 +26,7 @@ interface MassiveScanModalProps {
  * flow. Legacy "Escaneo Masivo de Stock" (index.html L6089-6510). This is one of the two
  * real call sites (besides Venta) that validates `useBarcodeScanner`'s camera half. */
 export function MassiveScanModal({ open, onClose, products }: MassiveScanModalProps) {
+  const { can, requirePermission } = usePermission()
   const [mode, setMode] = useState<'cam' | 'hid'>('cam')
   const [log, setLog] = useState<LogEntry[]>([])
   const [pendingCode, setPendingCode] = useState<string | null>(null)
@@ -124,6 +126,8 @@ export function MassiveScanModal({ open, onClose, products }: MassiveScanModalPr
 
   async function finalize() {
     if (!log.length) return
+    // Registering the unknown codes as new products is product editing, beyond a stock entry.
+    if (log.some((e) => e.isNew) && !(await requirePermission('stock.editar', 'Productos nuevos', 'Registrar códigos nuevos como productos requiere permiso.'))) return
     setBusy(true)
     try {
       let totalUnidades = 0
@@ -238,7 +242,7 @@ export function MassiveScanModal({ open, onClose, products }: MassiveScanModalPr
           <div className="mb-2 grid grid-cols-2 gap-2">
             <input className="input border-lime" placeholder="Nombre *" value={newName} onChange={(e) => setNewName(e.target.value)} autoFocus />
             <input className="input border-lime" type="number" placeholder="Precio Venta *" value={newPrice} onChange={(e) => setNewPrice(e.target.value)} />
-            <input className="input" type="number" placeholder="Costo (opcional)" value={newCost} onChange={(e) => setNewCost(e.target.value)} />
+            {can('costos.ver') && <input className="input" type="number" placeholder="Costo (opcional)" value={newCost} onChange={(e) => setNewCost(e.target.value)} />}
             <input className="input" placeholder="Categoría (opcional)" value={newCat} onChange={(e) => setNewCat(e.target.value)} />
           </div>
           <div className="flex gap-2">

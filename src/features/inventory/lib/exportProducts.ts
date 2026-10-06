@@ -2,7 +2,8 @@ import * as XLSX from 'xlsx'
 import type { Product } from '../../../types/product'
 
 function marginOf(p: Product): string {
-  return p.cost > 0 && p.price > 0 ? (((p.price - p.cost) / p.cost) * 100).toFixed(1) : ''
+  const cost = p.cost ?? 0
+  return cost > 0 && p.price > 0 ? (((p.price - cost) / cost) * 100).toFixed(1) : ''
 }
 
 function downloadBlob(blob: Blob, filename: string) {

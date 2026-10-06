@@ -13,6 +13,7 @@ import { MovementFormSheet } from '../cash/components/MovementFormSheet'
 import { CierresHistoryList } from './components/CierresHistoryList'
 import { CorrectionsHistoryList } from './components/CorrectionsHistoryList'
 import { usePermission } from '../pin/usePermission'
+import { useProfits } from '../../shared/hooks/useSecretFigures'
 
 const PAY_LABEL: Record<string, string> = { efectivo: 'Efectivo', transferencia: 'Transferencia' }
 
@@ -22,13 +23,19 @@ export function ReportePage() {
   const [reporteXOpen, setReporteXOpen] = useState(false)
   const [cierreZOpen, setCierreZOpen] = useState(false)
   const [extraOpen, setExtraOpen] = useState(false)
-  const { requireAdmin } = usePermission()
+  const { can, requirePermission } = usePermission()
+  const showProfit = can('ganancias.ver')
 
   const agg = useDayAggregation(dayKey, { onlyOpen: false })
+  const profits = useProfits().sales
 
   async function openCierreZ() {
-    const ok = await requireAdmin('Cierre de Caja', 'Acción definitiva — requiere PIN de seguridad')
+    const ok = await requirePermission('caja.cerrar', 'Cierre de caja', 'Cerrar el día requiere permiso.')
     if (ok) setCierreZOpen(true)
+  }
+
+  async function openMovement() {
+    if (await requirePermission('caja.gestionar', 'Gasto o ingreso de caja', 'Registrar movimientos de caja requiere permiso.')) setExtraOpen(true)
   }
 
   // Global fiado portfolio (all-time), independent of the selected date.
@@ -70,12 +77,14 @@ export function ReportePage() {
         </div>
       </div>
 
-      <div className="mb-3.5 grid grid-cols-2 gap-2.5 md:grid-cols-4">
+      <div className={`mb-3.5 grid grid-cols-2 gap-2.5 ${showProfit ? 'md:grid-cols-4' : 'md:grid-cols-3'}`}>
         <Kpi label="Ventas del día" value={formatMoney(agg.totalVentas)} color="text-green" sub={`${agg.numTx} transacción${agg.numTx !== 1 ? 'es' : ''}`} />
-        <Kpi label="Ganancia bruta" value={formatMoney(agg.totalGanancia)} color="text-lime" sub={`Margen: ${agg.totalVentas ? ((agg.totalGanancia / agg.totalVentas) * 100).toFixed(1) : 0}%`} />
+        {showProfit && (
+          <Kpi label="Ganancia bruta" value={formatMoney(agg.totalGanancia)} color="text-lime" sub={`Margen: ${agg.totalVentas ? ((agg.totalGanancia / agg.totalVentas) * 100).toFixed(1) : 0}%`} />
+        )}
         <Kpi label="Ticket promedio" value={formatMoney(agg.avgTicket)} color="text-blue" sub={`Desc. dados: ${formatMoney(agg.totalDescuentos)}`} />
         <Kpi label="Egresos de caja" value={formatMoney(agg.totalExOut)} color="text-red" sub={`Otros ingresos: +${formatMoney(agg.totalExIn)}`} />
-        <div className="col-span-2 rounded-[14px] border border-br bg-s1 p-4 text-center shadow-xs md:col-span-4">
+        <div className={`col-span-2 rounded-[14px] border border-br bg-s1 p-4 text-center shadow-xs ${showProfit ? 'md:col-span-4' : 'md:col-span-3'}`}>
           <div className="field-label">Flujo neto del día</div>
           <div className={`my-1.5 font-mono text-[26px] font-bold ${agg.netDay >= 0 ? 'text-lime' : 'text-red'}`}>{formatMoney(agg.netDay)}</div>
           <div className="text-[11px] text-txt2">
@@ -177,7 +186,7 @@ export function ReportePage() {
                 </div>
                 <div className="text-right">
                   <div className="font-mono text-[15px] font-semibold text-green">{formatMoney(s.total)}</div>
-                  <div className="text-[11px] text-lime">G: {formatMoney(s.ganancia || 0)}</div>
+                  {showProfit && <div className="text-[11px] text-lime">G: {formatMoney(profits.get(s.id ?? -1) ?? 0)}</div>}
                 </div>
               </div>
             </button>
@@ -201,7 +210,7 @@ export function ReportePage() {
           Reporte Z — Cierre definitivo de caja
         </button>
         <button
-          onClick={() => setExtraOpen(true)}
+          onClick={openMovement}
           className="flex w-full items-center justify-center gap-1.5 rounded-[10px] border border-br2 py-2.5 text-[13px] text-txt2 transition-colors hover:bg-s2"
         >
           <Plus size={14} />

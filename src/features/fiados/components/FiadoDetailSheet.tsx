@@ -23,13 +23,13 @@ export function FiadoDetailSheet({ group, customer, onClose }: FiadoDetailSheetP
   const [abonoTarget, setAbonoTarget] = useState<{ saleId: number; maxDebt: number } | null>(null)
   const [method, setMethod] = useState<CollectMethod>('efectivo')
   const confirm = useConfirm()
-  const { requireAdmin } = usePermission()
+  const { requirePermission } = usePermission()
 
   if (!group) return null
   const { totalOwed, totalDebt, totalPaid } = groupTotals(group)
 
   async function openAbono(saleId: number, maxDebt: number) {
-    const ok = await requireAdmin('Registrar Abono', 'Se requiere PIN para registrar el abono')
+    const ok = await requirePermission('fiados.abonar', 'Registrar abono', 'Recibir abonos de fiados requiere permiso.')
     if (!ok) return
     setAbonoTarget({ saleId, maxDebt })
   }
@@ -42,8 +42,7 @@ export function FiadoDetailSheet({ group, customer, onClose }: FiadoDetailSheetP
   }
 
   async function pagar(saleId: number, debt: number) {
-    const isAdmin = await requireAdmin('Pago de Fiado', 'Se requiere PIN para registrar el pago')
-    if (!isAdmin) return
+    if (!(await requirePermission('fiados.abonar', 'Pago de fiado', 'Recibir pagos de fiados requiere permiso.'))) return
     const ok = await confirm(`¿Marcar este fiado como pagado en su totalidad (${formatMoney(debt)})?`)
     if (!ok) return
     await payFiadoInFull(saleId, 'Pago completo', false, method)
@@ -51,8 +50,7 @@ export function FiadoDetailSheet({ group, customer, onClose }: FiadoDetailSheetP
   }
 
   async function condonar(saleId: number, debt: number) {
-    const isAdmin = await requireAdmin('Condonar Deuda', 'Se requiere PIN para condonar un fiado')
-    if (!isAdmin) return
+    if (!(await requirePermission('fiados.condonar', 'Condonar deuda', 'Perdonar un fiado requiere permiso.'))) return
     const ok = await confirm({ message: `¿Condonar (perdonar) esta deuda de ${formatMoney(debt)}? Se marcará como cancelada sin cobro.`, danger: true })
     if (!ok) return
     await payFiadoInFull(saleId, 'Deuda condonada/abandonada', true)
@@ -61,8 +59,7 @@ export function FiadoDetailSheet({ group, customer, onClose }: FiadoDetailSheetP
 
   async function pagarTodo() {
     if (!group) return
-    const isAdmin = await requireAdmin('Pago de Fiado', 'Se requiere PIN para registrar el pago')
-    if (!isAdmin) return
+    if (!(await requirePermission('fiados.abonar', 'Pago de fiado', 'Recibir pagos de fiados requiere permiso.'))) return
     const ok = await confirm(`¿Marcar TODOS los fiados como pagados? Total: ${formatMoney(totalDebt)}`)
     if (!ok) return
     const paid = await payAllFiados(
@@ -76,8 +73,7 @@ export function FiadoDetailSheet({ group, customer, onClose }: FiadoDetailSheetP
 
   async function condonarTodo() {
     if (!group) return
-    const isAdmin = await requireAdmin('Condonar Deuda', 'Se requiere PIN para condonar un fiado')
-    if (!isAdmin) return
+    if (!(await requirePermission('fiados.condonar', 'Condonar deuda', 'Perdonar un fiado requiere permiso.'))) return
     const ok = await confirm({ message: `¿Condonar TODOS los fiados de ${group.name}? Total: ${formatMoney(totalDebt)}. Esto no puede deshacerse.`, danger: true })
     if (!ok) return
     await payAllFiados(

@@ -216,10 +216,15 @@ export interface ReceiveInput {
   by?: string
 }
 
+/** `revealBalance`: whether a "not enough money" refusal may say how much the caja holds. */
+export interface PayOptions {
+  revealBalance?: boolean
+}
+
 /** The only place stock grows from a purchase. One transaction: stock + entrada records + the
  * payment (cash out of the chosen caja) or the account payable — if any step fails, nothing
  * happens, and a second attempt on the same order is rejected. */
-export async function receiveOrder(sql: Sql, id: number, input: ReceiveInput): Promise<PurchaseOrder> {
+export async function receiveOrder(sql: Sql, id: number, input: ReceiveInput, opts: PayOptions = {}): Promise<PurchaseOrder> {
   const o = await getOrder(sql, id)
   if (o.status !== 'pedido') throw new Error(o.status === 'recibido' ? 'Este pedido ya fue recibido' : 'Solo se puede recibir un pedido que ya fue enviado')
 
@@ -246,7 +251,8 @@ export async function receiveOrder(sql: Sql, id: number, input: ReceiveInput): P
     if (!p) throw new Error(`El producto "${l.name}" ya no existe en el inventario`)
     const stockAntes = p.stock || 0
     const stockDespues = roundQty(stockAntes + qty)
-    const updated: Product = { ...p, stock: stockDespues, cost: l.unitCost > 0 ? l.unitCost : p.cost }
+    // A new purchase price replaces the old one (the products table's trigger files it in "productCosts").
+    const updated: Product = l.unitCost > 0 ? { ...p, stock: stockDespues, cost: l.unitCost } : { ...p, stock: stockDespues }
     await putRow(sql, 'products', 'code', p.code, updated)
     const record: Omit<EntradaRecord, 'id'> = { code: p.code, name: p.name, qty, stockAntes, stockDespues, date: new Date().toISOString(), source }
     await insertAutoRow(sql, 'entradas', record)
@@ -258,7 +264,7 @@ export async function receiveOrder(sql: Sql, id: number, input: ReceiveInput): P
     const pay = input.payment as { mode?: string; caja?: unknown } | undefined
     if (pay?.mode === 'contado') {
       if (!isCaja(pay.caja)) throw new Error('Elige de qué caja sale el dinero')
-      await requireFunds(sql, pay.caja, receivedTotal)
+      await requireFunds(sql, pay.caja, receivedTotal, opts.revealBalance)
       const mv = await insertMovement(sql, {
         caja: pay.caja,
         direction: 'out',
@@ -303,7 +309,7 @@ export interface PayInput {
 }
 
 /** A (partial or full) payment of a supplier debt, taken out of a caja — usually the Mayor. */
-export async function payPayable(sql: Sql, id: number, input: PayInput): Promise<Payable> {
+export async function payPayable(sql: Sql, id: number, input: PayInput, opts: PayOptions = {}): Promise<Payable> {
   const p = await getRow<Payable & { id: number }>(sql, PAYABLES, 'id', id)
   if (!p) throw new Error('Cuenta por pagar no encontrada')
   const balance = payableBalance(p)
@@ -312,7 +318,7 @@ export async function payPayable(sql: Sql, id: number, input: PayInput): Promise
   const amount = round2(input.amount)
   if (!(amount > 0)) throw new Error('El monto del pago debe ser mayor a 0')
   if (amount > balance + 0.001) throw new Error(`El pago supera el saldo pendiente (${formatMoney(balance)})`)
-  await requireFunds(sql, input.caja, amount)
+  await requireFunds(sql, input.caja, amount, opts.revealBalance)
   const by = input.by?.trim() || undefined
   const mv = await insertMovement(sql, {
     caja: input.caja,

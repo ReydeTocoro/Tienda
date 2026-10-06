@@ -1,19 +1,18 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { getSettings, updateSettings } from '../../db/repositories/settings'
+import { getSettings } from '../../db/repositories/settings'
 import { usePinStore } from '../../store/usePinStore'
 
+/** Wrong PINs in a row before the server locks this device for a while (server/domain/counter.ts). */
 export const PIN_MAX_ATTEMPTS = 5
-export const PIN_LOCKOUT_MS = 30_000
 
-/** PIN verification + persistent lockout (decision 4: an absolute `pinLockedUntil` timestamp
- * in `settings`, so a reload or app close mid-lockout doesn't reset it). Ported from legacy's
- * `_checkPin`/`_startLockout` (index.html L6756-6828), minus the in-memory-only timer. */
+/** What every PIN pad shows about lockouts. The server counts the wrong PINs and decides the lockout
+ * (per device, and store-wide); this only reflects its last answer, with a live countdown. */
 export function usePinGate() {
   const settings = useLiveQuery(() => getSettings())
+  const lockedUntil = usePinStore((s) => s.lockedUntil)
+  const attemptsLeft = usePinStore((s) => s.attemptsLeft)
   const [now, setNow] = useState(() => Date.now())
-
-  const lockedUntil = settings?.pinLockedUntil ?? 0
   const isLocked = lockedUntil > now
 
   useEffect(() => {
@@ -22,25 +21,11 @@ export function usePinGate() {
     return () => clearInterval(t)
   }, [isLocked])
 
-  const registerFailure = useCallback(async (): Promise<{ attempts: number; lockedNow: boolean }> => {
-    const attempts = usePinStore.getState().incAttempts()
-    if (attempts >= PIN_MAX_ATTEMPTS) {
-      await updateSettings({ pinLockedUntil: Date.now() + PIN_LOCKOUT_MS })
-      usePinStore.getState().resetAttempts()
-      return { attempts, lockedNow: true }
-    }
-    return { attempts, lockedNow: false }
-  }, [])
-
-  const registerSuccess = useCallback((): void => {
-    usePinStore.getState().resetAttempts()
-  }, [])
-
   return {
     pinLength: settings?.pinLength ?? 4,
     isLocked,
     remainingSecs: Math.max(0, Math.ceil((lockedUntil - now) / 1000)),
-    registerFailure,
-    registerSuccess,
+    /** Wrong PINs counted so far in the current streak (0 when the server hasn't said). */
+    attemptsUsed: attemptsLeft === null ? 0 : PIN_MAX_ATTEMPTS - attemptsLeft,
   }
 }

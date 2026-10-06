@@ -21,7 +21,8 @@ export interface Cierre {
   cajero: string
   cerradoEn: string
   totalVentas: number
-  totalGanancia: number
+  /** Never in the synced row — filed in "profits" (`ganancias.ver`) like a sale's profit. */
+  totalGanancia?: number
   numTx: number
   /** Cash that entered outside of sales (extra income, fiado payments) / left the drawer (expenses, supplier payments). */
   totalExIn: number

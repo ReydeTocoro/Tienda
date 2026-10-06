@@ -20,18 +20,19 @@ interface PackageCardProps {
 /** "Vereda-style" dual-counter package card — legacy package section of `renderInventory()`
  * (index.html L3771-3845) plus the direct quick actions (L3976-4043). All three quick
  * actions bypassed PIN entirely in the legacy app (a real bug the plan calls out) — here
- * they all go through `requireAdmin()` first. */
+ * they all need the "Ajustar existencias" permission first. */
 export function PackageCard({ product: p, showCosts = false, onEdit, onDelete, onClose }: PackageCardProps) {
   const suelta = useLiveQuery(() => (p.codigoSuelta ? db.products.get(p.codigoSuelta) : undefined), [p.codigoSuelta])
   const qSueltas = suelta?.stock ?? 0
   const lowPaq = p.stock <= p.min
   const lowSuel = !!suelta && qSueltas <= (suelta.min || 0)
-  const lineValue = (p.cost || 0) * (p.stock || 0)
-  const lineMargin = p.cost > 0 ? ((p.price - p.cost) / p.cost) * 100 : 0
-  const { requireAdmin } = usePermission()
+  const cost = p.cost ?? 0
+  const lineValue = cost * (p.stock || 0)
+  const lineMargin = cost > 0 ? ((p.price - cost) / cost) * 100 : 0
+  const { requirePermission } = usePermission()
 
   async function handleAbrir() {
-    const ok = await requireAdmin('Abrir Paquete', 'Se requiere PIN para convertir un paquete en unidades sueltas')
+    const ok = await requirePermission('stock.ajustar', 'Abrir paquete', 'Convertir un paquete en unidades sueltas requiere permiso.')
     if (!ok) return
     try {
       const r = await openPackage(p.code, 1)
@@ -42,7 +43,7 @@ export function PackageCard({ product: p, showCosts = false, onEdit, onDelete, o
   }
 
   async function handleVenderUnidad() {
-    const ok = await requireAdmin('Vender Unidad Suelta', 'Se requiere PIN para descontar stock')
+    const ok = await requirePermission('stock.ajustar', 'Descontar unidad suelta', 'Descontar existencias requiere permiso.')
     if (!ok) return
     try {
       await sellLooseUnit(p.code)
@@ -52,7 +53,7 @@ export function PackageCard({ product: p, showCosts = false, onEdit, onDelete, o
   }
 
   async function handleVenderPaquete() {
-    const ok = await requireAdmin('Vender Paquete', 'Se requiere PIN para descontar stock')
+    const ok = await requirePermission('stock.ajustar', 'Descontar paquete', 'Descontar existencias requiere permiso.')
     if (!ok) return
     try {
       await sellWholePackage(p.code)
@@ -145,7 +146,7 @@ export function PackageCard({ product: p, showCosts = false, onEdit, onDelete, o
         <span>
           Suelta: <b className="font-mono text-green">{formatMoney(p.precioSuelta || 0)}</b>
         </span>
-        {showCosts && p.cost > 0 && (
+        {showCosts && cost > 0 && (
           <span>
             Margen: <b className="font-mono text-blue">{lineMargin.toFixed(1)}%</b>
           </span>

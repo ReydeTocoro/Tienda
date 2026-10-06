@@ -22,6 +22,7 @@ import { QuickDiscountModal } from './components/QuickDiscountModal'
 import { VentaKpiBar } from './components/VentaKpiBar'
 import { CajaBanner } from '../cash/components/CajaBanner'
 import { useFinalizeSale } from './hooks/useFinalizeSale'
+import { usePermission } from '../pin/usePermission'
 
 export function VentaPage() {
   const products = useLiveQuery(() => db.products.toArray(), [], []) as Product[]
@@ -43,6 +44,11 @@ export function VentaPage() {
   const items = useActiveCart((c) => c.items)
   const addUnitItem = useCartStore((s) => s.addUnitItem)
   const finalize = useFinalizeSale()
+  const { requirePermission } = usePermission()
+
+  async function openFree(prefill: number | null) {
+    if (await requirePermission('ventas.productoLibre', 'Producto sin registrar', 'Cobrar algo que no está en el inventario requiere autorización.')) setFreeModal({ open: true, prefill })
+  }
 
   function flashOnce(success: boolean) {
     setFlash({ show: true, success })
@@ -206,7 +212,7 @@ export function VentaPage() {
               activeCat={activeCat}
               onSetCat={setActiveCat}
               onPick={pickProduct}
-              onOpenFree={() => setFreeModal({ open: true, prefill: null })}
+              onOpenFree={() => openFree(null)}
               lowStockOnly={lowStockOnly}
             />
           </div>
@@ -225,7 +231,7 @@ export function VentaPage() {
         onClose={() => setCalcOpen(false)}
         onUseAsPrice={(v) => {
           setCalcOpen(false)
-          setFreeModal({ open: true, prefill: v })
+          void openFree(v)
         }}
       />
       <QuickDiscountModal open={discOpen} onClose={() => setDiscOpen(false)} />

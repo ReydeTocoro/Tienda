@@ -3,6 +3,7 @@ import { Moon, Sun } from 'lucide-react'
 import { updateSettings } from '../db/repositories/settings'
 import { toast } from '../store/useToastStore'
 import { useThemeStore } from '../store/useThemeStore'
+import { OperatorMenu } from './OperatorMenu'
 
 function useClock() {
   const [now, setNow] = useState(() => new Date())
@@ -13,11 +14,10 @@ function useClock() {
   return now
 }
 
-/** Clock + light/dark toggle. Lives in the corner of the desktop tab strip (`DesktopTabs`) and
- * in the slim mobile header — both are the blue nav bar now, so it uses the `nav-*` colors. Its
- * own component so the 1s clock tick re-renders only this. */
+/** Who is working (`OperatorMenu`), clock and light/dark toggle. Lives in the corner of the
+ * desktop tab strip (`DesktopTabs`) and in the slim mobile header — both are the blue nav bar now,
+ * so it uses the `nav-*` colors. */
 export function HeaderTools() {
-  const now = useClock()
   const theme = useThemeStore((s) => s.theme)
   const setTheme = useThemeStore((s) => s.setTheme)
   const dark = theme === 'dark'
@@ -37,10 +37,8 @@ export function HeaderTools() {
 
   return (
     <div className="flex items-center gap-2.5">
-      <div className="text-right font-mono text-[11px] leading-[1.35] text-nav-fg-dim">
-        <div>{now.toLocaleDateString('es', { weekday: 'short', day: 'numeric', month: 'short' })}</div>
-        <div>{now.toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</div>
-      </div>
+      <OperatorMenu />
+      <Clock />
       <button
         onClick={toggleTheme}
         title={dark ? 'Modo claro' : 'Modo oscuro'}
@@ -49,6 +47,17 @@ export function HeaderTools() {
       >
         {dark ? <Sun size={17} /> : <Moon size={17} />}
       </button>
+    </div>
+  )
+}
+
+/** Its own component so the 1s tick re-renders only the clock. */
+function Clock() {
+  const now = useClock()
+  return (
+    <div className="text-right font-mono text-[11px] leading-[1.35] text-nav-fg-dim">
+      <div>{now.toLocaleDateString('es', { weekday: 'short', day: 'numeric', month: 'short' })}</div>
+      <div>{now.toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</div>
     </div>
   )
 }

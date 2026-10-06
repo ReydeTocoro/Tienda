@@ -52,7 +52,7 @@ export function CorrectionModal({ sale, onClose, onCorrected }: CorrectionModalP
       toast('Completa nombre, cantidad y precio', 'orange')
       return
     }
-    setItems((s) => [...s, { code: 'CORR', name, price, cost: 0, qty, brand: '', unit: 'unidad', isFree: true }])
+    setItems((s) => [...s, { code: 'CORR', name, price, qty, brand: '', unit: 'unidad', isFree: true }])
     setNewName('')
     setNewQty('')
     setNewPrice('')

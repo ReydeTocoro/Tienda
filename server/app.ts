@@ -1,8 +1,9 @@
 import express, { type RequestHandler } from 'express'
 import type { Db } from './db'
-import { auditLogRouter } from './routes/auditLog'
+import { refreshCounterPerms } from './domain/counter'
 import { cashRouter } from './routes/cash'
 import { cierresRouter } from './routes/cierres'
+import { counterRouter } from './routes/counter'
 import { customersRouter } from './routes/customers'
 import { entradasRouter } from './routes/entradas'
 import { inventoryOpsRouter } from './routes/inventoryOps'
@@ -15,12 +16,23 @@ import { suppliersRouter } from './routes/suppliers'
 import { usuariosRouter } from './routes/usuarios'
 
 /** The write API under /api — reads don't come through here: the app reads Supabase directly
- * (src/sync). Shared by the local dev server (server/index.ts) and the Firebase Function
- * (functions/index.js, via server/serverApp.ts). */
+ * (src/sync), where RLS only serves the secret tables to whoever may see them. Every route checks
+ * the permission of whoever is working on the requesting device (server/domain/counter.ts). Shared
+ * by the local dev server (server/index.ts) and the Firebase Function (functions/index.js, via
+ * server/serverApp.ts). */
 export function createApp(db: Db, auth: RequestHandler) {
   const app = express()
   app.disable('x-powered-by')
+  // Answers can carry purchase prices or who is signed in: never kept by a browser or a proxy cache.
+  app.use((_req, res, next) => {
+    res.set({ 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' })
+    next()
+  })
   app.use(express.json({ limit: '5mb' }))
+
+  // The open counter's permissions as RLS sees them follow the current roles (they're kept in step
+  // on every change; this catches up a database that was just migrated).
+  db.tx(refreshCounterPerms).catch((err) => console.error('No se pudieron preparar los permisos del mostrador', err))
 
   // Open and cheap: the app pings it when it starts, so a cold Function (and its database
   // connection) is warm by the first sale. Answers 503 when the database can't be reached.
@@ -34,11 +46,11 @@ export function createApp(db: Db, auth: RequestHandler) {
   })
 
   app.use('/api', auth)
+  app.use('/api/counter', counterRouter(db))
   app.use('/api/products', productsRouter(db))
   app.use('/api/customers', customersRouter(db))
   app.use('/api/sales', salesRouter(db))
   app.use('/api/cierres', cierresRouter(db))
-  app.use('/api/auditLog', auditLogRouter(db))
   app.use('/api/entradas', entradasRouter(db))
   app.use('/api/settings', settingsRouter(db))
   app.use('/api/inventory', inventoryOpsRouter(db))

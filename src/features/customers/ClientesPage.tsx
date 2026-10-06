@@ -13,6 +13,7 @@ import { SearchInput } from '../../shared/components/SearchInput'
 import { formatMoney } from '../../shared/lib/currency'
 import { nextSort, type SortState } from '../../shared/lib/sortRows'
 import { useCartStore } from '../../store/useCartStore'
+import { usePermission } from '../pin/usePermission'
 
 const TIERS: Array<{ key: TierKey; label: string }> = [
   { key: 'nuevo', label: 'Nuevo' },
@@ -31,6 +32,7 @@ export function ClientesPage() {
   const [profile, setProfile] = useState<Customer | null>(null)
   const navigate = useNavigate()
   const setCartCustomer = useCartStore((s) => s.setCustomer)
+  const { requirePermission } = usePermission()
 
   const totalRevenue = useMemo(() => list.reduce((a, c) => a + c.spent, 0), [list])
   const top = useMemo(() => (list.length ? list.reduce((a, c) => (c.spent > a.spent ? c : a), list[0]) : null), [list])
@@ -49,12 +51,16 @@ export function ClientesPage() {
     return sortCustomers(filtered, sort)
   }, [list, search, tierFilter, sort])
 
-  function openNew() {
+  const mayEdit = () => requirePermission('clientes.editar', 'Clientes', 'Crear o editar clientes requiere permiso.')
+
+  async function openNew() {
+    if (!(await mayEdit())) return
     setEditing(null)
     setFormOpen(true)
   }
 
-  function openEdit(c: Customer) {
+  async function openEdit(c: Customer) {
+    if (!(await mayEdit())) return
     setEditing(c)
     setFormOpen(true)
     setProfile(null)

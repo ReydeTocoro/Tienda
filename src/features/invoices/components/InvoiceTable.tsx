@@ -42,11 +42,13 @@ interface InvoiceTableProps {
   onViewSale: (s: Sale) => void
   onCorrectSale: (s: Sale) => void
   onViewOrder: (o: PurchaseOrder) => void
+  /** Purchase invoices are listed (whoever is working may see purchase prices). */
+  withPurchases?: boolean
 }
 
 /** Facturas list on the shared spreadsheet-style `DataTable`: sales and received supplier
  * orders side by side. A row opens its receipt (sale) or its order detail (purchase). */
-export function InvoiceTable({ rows, sort, onSort, resetKey, onViewSale, onCorrectSale, onViewOrder }: InvoiceTableProps) {
+export function InvoiceTable({ rows, sort, onSort, resetKey, onViewSale, onCorrectSale, onViewOrder, withPurchases = true }: InvoiceTableProps) {
   const columns = useMemo<DataColumn<InvoiceRow, InvoiceSortKey>[]>(
     () => [
       {
@@ -67,12 +69,23 @@ export function InvoiceTable({ rows, sort, onSort, resetKey, onViewSale, onCorre
       },
       {
         key: 'party',
-        label: 'Cliente / Proveedor',
+        label: withPurchases ? 'Cliente / Proveedor' : 'Cliente',
         min: 178,
         sortKey: 'party',
         cell: (r) => (
           <span className={`max-w-full truncate font-semibold ${PARTY_CLS[r.partyKind]}`} title={r.party}>
             {r.partyKind === 'fiado' ? `Fiado: ${r.party}` : r.party}
+          </span>
+        ),
+      },
+      {
+        key: 'seller',
+        label: 'Atendió',
+        min: 104,
+        sortKey: 'seller',
+        cell: (r) => (
+          <span className="max-w-full truncate text-txt2" title={r.seller}>
+            {r.seller || '—'}
           </span>
         ),
       },
@@ -167,7 +180,7 @@ export function InvoiceTable({ rows, sort, onSort, resetKey, onViewSale, onCorre
           ),
       },
     ],
-    [onViewSale, onCorrectSale, onViewOrder],
+    [onViewSale, onCorrectSale, onViewOrder, withPurchases],
   )
 
   return (

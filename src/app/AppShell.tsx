@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react'
-import { Outlet } from 'react-router-dom'
+import { Outlet, useNavigate } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { Header } from './Header'
 import { BottomNav } from './BottomNav'
@@ -7,6 +7,9 @@ import { DesktopTabs } from './DesktopTabs'
 import { ToastHost } from '../shared/components/ToastHost'
 import { ConfirmDialog } from '../shared/components/ConfirmDialog'
 import { PinModal } from '../features/pin/PinModal'
+import { FactoryPinGate } from '../features/pin/FactoryPinGate'
+import { LockScreen } from '../features/pin/LockScreen'
+import { useSessionGuard } from '../features/pin/useSessionGuard'
 import { useKeyboardShortcuts } from '../shared/hooks/useKeyboardShortcuts'
 import { getSettings } from '../db/repositories/settings'
 import { useScannerStore } from '../store/useScannerStore'
@@ -20,6 +23,13 @@ import { warmUpApi } from '../api/client'
  * pages only need to worry about their own internal layout. */
 export function AppShell() {
   useKeyboardShortcuts()
+  const { locked } = useSessionGuard()
+  const navigate = useNavigate()
+
+  // Whoever signs in next starts at Venta, not on the last person's screen (which they may not be allowed to see).
+  useEffect(() => {
+    if (locked) navigate('/', { replace: true })
+  }, [locked, navigate])
 
   useEffect(() => {
     startSync()
@@ -53,15 +63,24 @@ export function AppShell() {
 
   return (
     <div className="flex h-full flex-col bg-bg text-txt">
-      <DesktopTabs />
-      <Header />
-      <main className="min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden">
-        <Outlet />
-      </main>
-      <BottomNav />
+      {/* PIN mode with nobody signed in: nothing of the store renders until someone does. Sync and
+       * the rest of the effects above keep running behind it. */}
+      {locked ? (
+        <LockScreen />
+      ) : (
+        <>
+          <DesktopTabs />
+          <Header />
+          <main className="min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden">
+            <Outlet />
+          </main>
+          <BottomNav />
+        </>
+      )}
       <ToastHost />
       <ConfirmDialog />
       <PinModal />
+      <FactoryPinGate />
     </div>
   )
 }

@@ -5,6 +5,7 @@ import { BottomSheet } from '../../../shared/components/BottomSheet'
 import { PrintPortal } from '../../../shared/components/PrintPortal'
 import { PrintHeader } from '../../../shared/components/PrintHeader'
 import { formatMoney } from '../../../shared/lib/currency'
+import { usePermission } from '../../pin/usePermission'
 
 interface ReporteXModalProps {
   open: boolean
@@ -19,6 +20,7 @@ const PAY_LABEL: Record<string, string> = { efectivo: 'Efectivo', transferencia:
 export function ReporteXModal({ open, dayKey, onClose }: ReporteXModalProps) {
   const settings = useLiveQuery(() => getSettings())
   const agg = useDayAggregation(dayKey, { onlyOpen: false })
+  const showProfit = usePermission().can('ganancias.ver')
 
   if (!open) return null
   const storeName = settings?.storeName ?? 'Mi Tienda Pro'
@@ -37,7 +39,7 @@ export function ReporteXModal({ open, dayKey, onClose }: ReporteXModalProps) {
         <div className="my-2 border-t border-dashed border-br2" />
         <Row label="Transacciones" value={String(agg.numTx)} color="text-blue" />
         <Row label="Ventas brutas" value={formatMoney(agg.totalVentas)} color="text-green" />
-        <Row label="Ganancia bruta" value={formatMoney(agg.totalGanancia)} color="text-lime" />
+        {showProfit && <Row label="Ganancia bruta" value={formatMoney(agg.totalGanancia)} color="text-lime" />}
         <Row label="Ticket promedio" value={formatMoney(agg.avgTicket)} />
         <div className="my-2 border-t border-dashed border-br2" />
         {(Object.keys(agg.payBreak) as Array<keyof typeof agg.payBreak>).map(
@@ -62,12 +64,12 @@ export function ReporteXModal({ open, dayKey, onClose }: ReporteXModalProps) {
 
       <PrintPortal>
         <div className="w-[80mm] p-2 font-mono text-[11px] leading-snug text-black">
-          <PrintHeader storeName={storeName} />
+          <PrintHeader storeName={storeName} business={settings?.business} />
           <div className="text-center text-[10px]">REPORTE X — Lectura Parcial · {dayKey}</div>
           <div className="my-1 border-t border-dashed border-black" />
           <PrintRow label="Transacciones" value={String(agg.numTx)} />
           <PrintRow label="Ventas brutas" value={formatMoney(agg.totalVentas)} />
-          <PrintRow label="Ganancia bruta" value={formatMoney(agg.totalGanancia)} />
+          {showProfit && <PrintRow label="Ganancia bruta" value={formatMoney(agg.totalGanancia)} />}
           <PrintRow label="Ticket promedio" value={formatMoney(agg.avgTicket)} />
           <div className="my-1 border-t border-dashed border-black" />
           {(Object.keys(agg.payBreak) as Array<keyof typeof agg.payBreak>).map(

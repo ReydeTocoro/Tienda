@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useScannerStore } from '../../store/useScannerStore'
 import { usePinStore } from '../../store/usePinStore'
+import { useSessionStore } from '../../store/useSessionStore'
 import { toast } from '../../store/useToastStore'
 
 const FMAP: Record<string, string> = { F1: '/', F2: '/inventario', F3: '/clientes', F4: '/fiados', F5: '/facturas', F6: '/reporte' }
@@ -15,6 +16,7 @@ export function useKeyboardShortcuts() {
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
       if (usePinStore.getState().request) return // the PIN modal owns keydown while open
+      if (useSessionStore.getState().locked) return // the lock screen's PIN pad does too
 
       const tag = (e.target as HTMLElement)?.tagName
       const isField = tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT'

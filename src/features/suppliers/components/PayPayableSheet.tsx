@@ -25,7 +25,7 @@ export function PayPayableSheet({ payable, onClose }: PayPayableSheetProps) {
 }
 
 function PayForm({ payable, onClose }: { payable: Payable; onClose: () => void }) {
-  const { menor, mayor } = useCaja()
+  const { menor, mayor, balancesKnown } = useCaja()
   const actor = useActorName()
   const balance = payableBalance(payable)
   const [amount, setAmount] = useState(balance)
@@ -34,7 +34,8 @@ function PayForm({ payable, onClose }: { payable: Payable; onClose: () => void }
 
   const balances = { menor, mayor }
   const over = amount > balance + 0.001
-  const insufficient = amount > balances[caja] + 0.005
+  // Without "ver el efectivo esperado" the balances never reach this device: the server decides.
+  const insufficient = balancesKnown && amount > balances[caja] + 0.005
 
   async function submit() {
     if (!(amount > 0)) {
@@ -81,7 +82,7 @@ function PayForm({ payable, onClose }: { payable: Payable; onClose: () => void }
         {(['mayor', 'menor'] as const).map((c) => (
           <button key={c} type="button" onClick={() => setCaja(c)} className={choice(caja === c)}>
             <div className="text-[13px] font-bold">{CAJA_LABEL[c]}</div>
-            <div className={`font-mono text-[12px] ${balances[c] + 0.005 < amount ? 'text-red' : 'text-txt2'}`}>{formatMoney(balances[c])}</div>
+            {balancesKnown && <div className={`font-mono text-[12px] ${balances[c] + 0.005 < amount ? 'text-red' : 'text-txt2'}`}>{formatMoney(balances[c])}</div>}
           </button>
         ))}
       </div>

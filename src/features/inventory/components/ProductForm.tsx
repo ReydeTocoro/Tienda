@@ -41,6 +41,8 @@ const EMPTY = {
 
 interface ProductFormProps {
   product: Product | null
+  /** Whether purchase price and margin are shown. When they aren't, the stored cost is kept as is. */
+  showCosts: boolean
   onSaved: () => void
   onCancel: () => void
   /** Bump `token` to push a freshly scanned barcode into the code field (Fase 3). */
@@ -48,16 +50,20 @@ interface ProductFormProps {
   onOpenCamera?: () => void
 }
 
-export function ProductForm({ product, onSaved, onCancel, scanSeed, onOpenCamera }: ProductFormProps) {
+export function ProductForm({ product, showCosts, onSaved, onCancel, scanSeed, onOpenCamera }: ProductFormProps) {
   const [f, setF] = useState(EMPTY)
   const confirm = useConfirm()
-  const { requireAdmin } = usePermission()
+  const { can, requirePermission } = usePermission()
+  // Stock of an existing product changes through Ajustar / Entrada (which leave a trail), unless
+  // whoever edits may adjust stock anyway.
+  const stockLocked = !!product && !can('stock.ajustar')
   const editing = !!product
   const allProducts = useLiveQuery(() => db.products.toArray(), [], []) as Product[]
 
   useEffect(() => {
     if (product) {
-      const margin = product.cost > 0 && product.price > 0 ? (((product.price - product.cost) / product.cost) * 100).toFixed(1) : ''
+      const cost = product.cost ?? 0
+      const margin = cost > 0 && product.price > 0 ? (((product.price - cost) / cost) * 100).toFixed(1) : ''
       setF({
         code: product.code,
         name: product.name,
@@ -133,7 +139,7 @@ export function ProductForm({ product, onSaved, onCancel, scanSeed, onOpenCamera
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    const ok = await requireAdmin('Agregar / Editar Stock', 'Se requiere PIN para modificar inventario')
+    const ok = await requirePermission('stock.editar', editing ? 'Editar producto' : 'Nuevo producto', 'Crear o editar productos requiere permiso.')
     if (!ok) return
     const code = f.code.trim()
     const name = f.name.trim()
@@ -147,7 +153,9 @@ export function ProductForm({ product, onSaved, onCancel, scanSeed, onOpenCamera
     }
     if (cost > 0 && price > 0 && cost > price) {
       const ok = await confirm(
-        `El precio de compra ($${cost.toFixed(2)}) es mayor al precio de venta ($${price.toFixed(2)}). ¿Continuar de todas formas?`,
+        showCosts
+          ? `El precio de compra ($${cost.toFixed(2)}) es mayor al precio de venta ($${price.toFixed(2)}). ¿Continuar de todas formas?`
+          : 'Con ese precio de venta el producto se vendería por debajo de lo que cuesta. ¿Continuar de todas formas?',
       )
       if (!ok) return
     }
@@ -186,11 +194,13 @@ export function ProductForm({ product, onSaved, onCancel, scanSeed, onOpenCamera
       }
     }
 
+    // Without purchase prices on screen the form doesn't send one: the stored cost stays (and the
+    // server only takes a cost from someone who may see them).
     const prod: Product = {
       code,
       name,
       price,
-      cost,
+      ...(showCosts ? { cost } : {}),
       stock: parseFloat(f.stock) || 0,
       min: parseFloat(f.min) || 0,
       cat: f.cat.trim(),
@@ -273,8 +283,10 @@ export function ProductForm({ product, onSaved, onCancel, scanSeed, onOpenCamera
 
         <div className="col-span-2 rounded-xl border border-br2 bg-s2 p-3 md:col-span-6">
           <div className="mb-2 flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
-            <label className="field-label">{isMeasured ? `Costo y Precio por ${unitLbl}` : 'Precio y Margen'}</label>
-            {cost > 0 && price > 0 && (
+            <label className="field-label">
+              {showCosts ? (isMeasured ? `Costo y Precio por ${unitLbl}` : 'Precio y Margen') : isMeasured ? `Precio de venta por ${unitLbl}` : 'Precio de venta'}
+            </label>
+            {showCosts && cost > 0 && price > 0 && (
               <div className="flex items-center gap-2 rounded-lg bg-s1 px-2.5 py-1 text-[12px] text-muted">
                 <span>Ganancia{isMeasured ? ` /${unitLbl}` : ''}:</span>
                 <span className={gain >= 0 ? 'font-mono font-bold text-green' : 'font-mono font-bold text-red'}>
@@ -284,12 +296,16 @@ export function ProductForm({ product, onSaved, onCancel, scanSeed, onOpenCamera
               </div>
             )}
           </div>
-          <div className="grid grid-cols-3 gap-2">
-            <NumField label={isMeasured ? `Costo /${unitLbl}` : 'Precio Compra'} value={f.cost} onChange={(v) => calcFromCost(v, f.margin)} />
-            <NumField label="% Ganancia" value={f.margin} onChange={(v) => calcFromCost(f.cost, v)} accent />
+          <div className={`grid gap-2 ${showCosts ? 'grid-cols-3' : 'grid-cols-1'}`}>
+            {showCosts && (
+              <>
+                <NumField label={isMeasured ? `Costo /${unitLbl}` : 'Precio Compra'} value={f.cost} onChange={(v) => calcFromCost(v, f.margin)} />
+                <NumField label="% Ganancia" value={f.margin} onChange={(v) => calcFromCost(f.cost, v)} accent />
+              </>
+            )}
             <NumField label={isMeasured ? `Venta /${unitLbl}` : 'Precio Venta'} value={f.price} onChange={calcFromPrice} />
           </div>
-          <div className="mt-2.5 flex flex-wrap gap-1.5">
+          <div className={`mt-2.5 flex-wrap gap-1.5 ${showCosts ? 'flex' : 'hidden'}`}>
             {MARGIN_PRESETS.map((p) => (
               <button
                 type="button"
@@ -315,6 +331,8 @@ export function ProductForm({ product, onSaved, onCancel, scanSeed, onOpenCamera
               value={f.stock}
               onChange={(e) => set('stock', e.target.value)}
               placeholder="0"
+              disabled={stockLocked}
+              title={stockLocked ? 'Las existencias se cambian con Ajustar o con Entrada de mercancía' : undefined}
             />
             <span className="whitespace-nowrap text-[12px] text-muted">{unitLbl}</span>
           </div>

@@ -32,7 +32,7 @@ const PERIODS: Record<string, { label: string; days: number | null }> = {
 const PAGE = 40
 
 export function CajasPage() {
-  const { ready, movements, menor, mayor, session, firstOpening } = useCaja()
+  const { ready, movements, menor, mayor, balancesKnown, session, firstOpening } = useCaja()
   const [sheet, setSheet] = useState<Sheet>(null)
   const [cierreOpen, setCierreOpen] = useState(false)
   const [cajaFilter, setCajaFilter] = useState<'todas' | CajaId>('todas')
@@ -74,7 +74,7 @@ export function CajasPage() {
         <CajaCard
           title="Caja Menor"
           subtitle={!ready ? ' ' : session ? `Abierta desde ${formatDateTime(session.openedAt)} · ${session.openedBy}` : firstOpening ? 'Sin iniciar: la primera apertura registra tu base inicial' : 'Cerrada'}
-          balance={menor}
+          balance={balancesKnown ? menor : null}
           accent={session ? 'text-green' : 'text-txt2'}
         >
           <div className="mb-3 grid grid-cols-2 gap-2 text-[12px]">
@@ -93,7 +93,7 @@ export function CajasPage() {
           </div>
         </CajaCard>
 
-        <CajaCard title="Caja Mayor" subtitle="Caja fuerte y bancos: recibe traslados y transferencias, y paga lo grande" balance={mayor} accent="text-lime">
+        <CajaCard title="Caja Mayor" subtitle="Caja fuerte y bancos: recibe traslados y transferencias, y paga lo grande" balance={balancesKnown ? mayor : null} accent="text-lime">
           <div className="mb-3 grid grid-cols-2 gap-2 text-[12px]">
             <MiniStat label="Transferencias recibidas hoy" value={formatMoney(todayStats.transferencias)} color="text-blue" />
             <div className="rounded-lg bg-s2 px-3 py-2 text-[11px] text-txt2">Nómina, servicios, arriendo y pagos a proveedores salen de aquí.</div>
@@ -150,7 +150,8 @@ export function CajasPage() {
   )
 }
 
-function CajaCard({ title, subtitle, balance, accent, children }: { title: string; subtitle: string; balance: number; accent: string; children: ReactNode }) {
+/** `balance` null while the ledger is still arriving (right after signing in). */
+function CajaCard({ title, subtitle, balance, accent, children }: { title: string; subtitle: string; balance: number | null; accent: string; children: ReactNode }) {
   return (
     <section className="rounded-[14px] border border-br bg-s1 p-4 shadow-xs">
       <div className="mb-3 flex items-start justify-between gap-3">
@@ -160,7 +161,7 @@ function CajaCard({ title, subtitle, balance, accent, children }: { title: strin
         </div>
         <div className="text-right">
           <div className="field-label">Saldo</div>
-          <div className={`font-mono text-[24px] font-bold leading-tight ${balance < 0 ? 'text-red' : accent}`}>{formatMoney(balance)}</div>
+          <div className={`font-mono text-[24px] font-bold leading-tight ${balance !== null && balance < 0 ? 'text-red' : accent}`}>{balance === null ? '…' : formatMoney(balance)}</div>
         </div>
       </div>
       {children}

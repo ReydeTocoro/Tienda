@@ -4,7 +4,10 @@ export interface Product {
   /** Price per selling unit — "per kg"/"per lb" when `unit` is measured, "per unidad" otherwise.
    * One field for both: a measured product has no separate "total" price to duplicate it with. */
   price: number
-  cost: number
+  /** Purchase price. Never in the row every device syncs: the database files it in "productCosts",
+   * which only whoever may see purchase prices (`costos.ver`) receives. Present on a product only
+   * where the app merged it in for them (`useProductCosts`), and on writes from them. */
+  cost?: number
   stock: number
   min: number
   cat: string

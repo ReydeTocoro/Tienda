@@ -1,11 +1,17 @@
-import { useLiveQuery } from 'dexie-react-hooks'
-import { listCierres } from '../../../db/repositories/cierres'
+import { useMemo } from 'react'
+import { useSecureTable } from '../../../db/secure'
+import { useProfits } from '../../../shared/hooks/useSecretFigures'
 import { formatMoney } from '../../../shared/lib/currency'
 import { formatCierreId } from '../../../shared/lib/id'
+import { usePermission } from '../../pin/usePermission'
 
-/** legacy `renderCierres()` (index.html L5050-5083). */
+/** legacy `renderCierres()` (index.html L5050-5083). The cierres only reach this device for whoever
+ * may see reports, and their profit only for whoever may see profits. */
 export function CierresHistoryList() {
-  const cierres = useLiveQuery(() => listCierres(), [], [])
+  const stored = useSecureTable('cierres')
+  const cierres = useMemo(() => [...stored].sort((a, b) => (b.id ?? 0) - (a.id ?? 0)), [stored])
+  const profits = useProfits().cierres
+  const showProfit = usePermission().can('ganancias.ver')
 
   if (!cierres.length) {
     return <div className="py-2 text-[13px] text-muted">Sin cierres registrados aún.</div>
@@ -27,13 +33,15 @@ export function CierresHistoryList() {
               </div>
               <span className="text-[11px] text-muted">{c.cajero}</span>
             </div>
-            <div className="grid grid-cols-3 gap-1.5 text-[11px]">
+            <div className={`grid gap-1.5 text-[11px] ${showProfit ? 'grid-cols-3' : 'grid-cols-2'}`}>
               <div>
                 Ventas: <span className="font-mono font-semibold text-green">{formatMoney(c.totalVentas || 0)}</span>
               </div>
-              <div>
-                Ganancia: <span className="font-mono font-semibold text-lime">{formatMoney(c.totalGanancia || 0)}</span>
-              </div>
+              {showProfit && (
+                <div>
+                  Ganancia: <span className="font-mono font-semibold text-lime">{formatMoney(profits.get(c.id ?? -1) ?? 0)}</span>
+                </div>
+              )}
               <div>
                 Tx: <span className="font-semibold text-blue">{c.numTx || 0}</span>
               </div>

@@ -62,10 +62,13 @@ export async function insertMovement(sql: Sql, m: NewMovement): Promise<CashMove
   return insertAutoRow(sql, MOVEMENTS, row)
 }
 
-export async function requireFunds(sql: Sql, caja: CajaId, amount: number): Promise<void> {
+/** `revealBalance` false (someone who may not see the expected cash): the refusal doesn't say how
+ * much there is. */
+export async function requireFunds(sql: Sql, caja: CajaId, amount: number, revealBalance = true): Promise<void> {
   const available = await cajaBalance(sql, caja)
   if (available + 0.005 < amount) {
     const hint = caja === 'menor' ? ' Abre la caja contando el efectivo si aún no lo has hecho.' : ''
+    if (!revealBalance) throw new Error(`Saldo insuficiente en ${CAJA_LABEL[caja]} para pagar ${formatMoney(amount)}.${hint}`)
     throw new Error(`Saldo insuficiente en ${CAJA_LABEL[caja]}: hay ${formatMoney(available)} y necesitas ${formatMoney(amount)}.${hint}`)
   }
 }

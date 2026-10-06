@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../../db/index'
+import { useSecureTable } from '../../db/secure'
 import type { PurchaseOrder } from '../../types/purchaseOrder'
 import type { PayMethod, Sale } from '../../types/sale'
 import { Chip } from '../../shared/components/Chip'
@@ -28,7 +29,9 @@ const SALE_METHODS: PayMethod[] = ['efectivo', 'transferencia', 'fiado']
 
 export function FacturasPage() {
   const sales = useLiveQuery(() => db.sales.toArray(), [], []) as Sale[]
-  const orders = useLiveQuery(() => db.purchaseOrders.where('status').equals('recibido').toArray(), [], []) as PurchaseOrder[]
+  // Purchase invoices only reach this device for whoever may see purchase prices.
+  const allOrders = useSecureTable('purchaseOrders')
+  const orders = useMemo(() => allOrders.filter((o) => o.status === 'recibido'), [allOrders])
   const [receiptSale, setReceiptSale] = useState<Sale | null>(null)
   const [correctingSale, setCorrectingSale] = useState<Sale | null>(null)
   const [viewOrder, setViewOrder] = useState<PurchaseOrder | null>(null)
@@ -37,18 +40,24 @@ export function FacturasPage() {
   const [method, setMethod] = useState<'todos' | PayMethod>('todos')
   const [period, setPeriod] = useState<InvoicePeriod>('todo')
   const [sort, setSort] = useState<SortState<InvoiceSortKey>>(DEFAULT_INVOICE_SORT)
-  const { requireAdmin } = usePermission()
+  const { can, requirePermission } = usePermission()
+  // Purchase invoices show what each product cost: only for whoever may see purchase prices.
+  const canSeePurchases = can('costos.ver')
 
   async function requestCorrection(sale: Sale) {
-    const ok = await requireAdmin('Corregir Factura', 'Se requiere PIN para modificar una venta')
+    const ok = await requirePermission('facturas.corregir', 'Corregir factura', 'Cambiar una venta ya hecha requiere permiso.')
     if (!ok) return
     setCorrectingSale(sale)
     setReceiptSale(null)
   }
 
-  const all = useMemo(() => buildInvoiceRows(sales, orders), [sales, orders])
+  const all = useMemo(() => buildInvoiceRows(sales, canSeePurchases ? orders : []), [sales, orders, canSeePurchases])
   const today = todayKey()
-  const rows = useMemo(() => sortInvoices(filterInvoices(all, { search, kind, method, period }, today), sort), [all, search, kind, method, period, today, sort])
+  const shownKind = canSeePurchases ? kind : 'todas'
+  const rows = useMemo(
+    () => sortInvoices(filterInvoices(all, { search, kind: shownKind, method, period }, today), sort),
+    [all, search, shownKind, method, period, today, sort],
+  )
 
   // Totals of what the filters leave on screen, like the sum in a spreadsheet's status bar.
   const totals = useMemo(() => {
@@ -83,12 +92,14 @@ export function FacturasPage() {
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          <SearchInput value={search} onChange={setSearch} placeholder="Buscar número, cliente, proveedor o producto..." />
-          <select value={kind} onChange={(e) => setKind(e.target.value as 'todas' | InvoiceKind)} aria-label="Filtrar por tipo" className="input w-auto py-2">
-            <option value="todas">Ventas y compras</option>
-            <option value="venta">Solo ventas</option>
-            <option value="compra">Solo compras</option>
-          </select>
+          <SearchInput value={search} onChange={setSearch} placeholder={canSeePurchases ? 'Buscar número, cliente, proveedor o producto...' : 'Buscar número, cliente o producto...'} />
+          {canSeePurchases && (
+            <select value={kind} onChange={(e) => setKind(e.target.value as 'todas' | InvoiceKind)} aria-label="Filtrar por tipo" className="input w-auto py-2">
+              <option value="todas">Ventas y compras</option>
+              <option value="venta">Solo ventas</option>
+              <option value="compra">Solo compras</option>
+            </select>
+          )}
           <select value={method} onChange={(e) => setMethod(e.target.value as 'todos' | PayMethod)} aria-label="Filtrar por forma de pago" className="input w-auto py-2">
             <option value="todos">Todos los pagos</option>
             {SALE_METHODS.map((m) => (
@@ -115,10 +126,11 @@ export function FacturasPage() {
             rows={rows}
             sort={sort}
             onSort={(key) => setSort((s) => nextSort(s, key))}
-            resetKey={`${search}|${kind}|${method}|${period}|${sort.key}|${sort.dir}`}
+            resetKey={`${search}|${shownKind}|${method}|${period}|${sort.key}|${sort.dir}`}
             onViewSale={setReceiptSale}
             onCorrectSale={requestCorrection}
             onViewOrder={setViewOrder}
+            withPurchases={canSeePurchases}
           />
         )}
       </div>

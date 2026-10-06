@@ -8,7 +8,6 @@ interface AddUnitSource {
   code: string
   name: string
   price: number
-  cost: number
   brand: string
   unit: string
   stock: number
@@ -134,7 +133,7 @@ export const useCartStore = create<CartState>((set, get) => {
           return
         }
         patchActive({
-          items: [...items, { code: p.code, name: p.name, price: p.price, cost: p.cost, qty, brand: p.brand, unit: p.unit || 'unidad', isFree: false }],
+          items: [...items, { code: p.code, name: p.name, price: p.price, qty, brand: p.brand, unit: p.unit || 'unidad', isFree: false }],
         })
       }
     },
@@ -175,7 +174,6 @@ export const useCartStore = create<CartState>((set, get) => {
         code: 'FREE_' + generateId(),
         name: desc,
         price,
-        cost: 0,
         qty,
         brand: '',
         unit: 'unidad',

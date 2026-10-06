@@ -11,6 +11,8 @@ import { unitShortLabel, isMeasuredUnit } from '../lib/units'
 import { getPts } from '../lib/loyalty'
 import { toast } from '../../store/useToastStore'
 import logoSrc from '../../assets/logo.png'
+import { businessLines, receiptFooter } from '../lib/business'
+import type { BusinessInfo } from '../../types/settings'
 
 interface ReceiptSheetProps {
   sale: Sale | null
@@ -18,7 +20,7 @@ interface ReceiptSheetProps {
   onCorrect?: () => void
 }
 
-function buildReceiptText(sale: Sale, storeName: string): string {
+function buildReceiptText(sale: Sale, storeName: string, business?: BusinessInfo): string {
   const itemLines = sale.items
     .map((i) => {
       const ul = isMeasuredUnit(i.unit) ? unitShortLabel(i.unit) : null
@@ -27,10 +29,10 @@ function buildReceiptText(sale: Sale, storeName: string): string {
     })
     .join('\n')
 
-  return `${storeName.toUpperCase()}
+  return `${[storeName.toUpperCase(), ...businessLines(business)].join('\n')}
 ━━━━━━━━━━━━━━━━━━━━
 RECIBO DE VENTA ${formatSaleId(sale.id)}
-${formatDateTime(sale.date)}${sale.customerName ? '\n' + sale.customerName : ''}${sale.fiadoName && !sale.customerId ? '\nFiado: ' + sale.fiadoName : ''}
+${formatDateTime(sale.date)}${sale.sellerName ? '\nAtendió: ' + sale.sellerName : ''}${sale.customerName ? '\n' + sale.customerName : ''}${sale.fiadoName && !sale.customerId ? '\nFiado: ' + sale.fiadoName : ''}
 ━━━━━━━━━━━━━━━━━━━━
 ${itemLines}
 ━━━━━━━━━━━━━━━━━━━━
@@ -38,7 +40,7 @@ Subtotal: ${formatMoney(sale.subtotal ?? sale.total)}${sale.discount ? '\nDescue
 TOTAL: ${formatMoney(sale.total)}
 Pago: ${sale.payMethod.charAt(0).toUpperCase() + sale.payMethod.slice(1)}${sale.amountReceived !== undefined ? '\nRecibido: ' + formatMoney(sale.amountReceived) : ''}${sale.changeGiven !== undefined ? '\nCambio: ' + formatMoney(sale.changeGiven) : ''}
 ━━━━━━━━━━━━━━━━━━━━
-¡Gracias por su compra!`
+${receiptFooter(business)}`
 }
 
 /** jsPDF's standard fonts (incl. "courier", used below to keep buildReceiptText's manual
@@ -66,9 +68,9 @@ function getLogoImage(): Promise<HTMLImageElement> {
   return logoImgPromise
 }
 
-async function buildReceiptPdfBlob(sale: Sale, storeName: string): Promise<Blob> {
+async function buildReceiptPdfBlob(sale: Sale, storeName: string, business?: BusinessInfo): Promise<Blob> {
   const { jsPDF } = await import('jspdf')
-  const lines = stripEmojiForPdf(buildReceiptText(sale, storeName))
+  const lines = stripEmojiForPdf(buildReceiptText(sale, storeName, business))
   const fontSize = 9
   const lineHeight = 4.2 // mm — comfortably clears 9pt courier's line advance
   const marginX = 4
@@ -97,6 +99,7 @@ async function buildReceiptPdfBlob(sale: Sale, storeName: string): Promise<Blob>
 export function ReceiptSheet({ sale, onClose, onCorrect }: ReceiptSheetProps) {
   const settings = useLiveQuery(() => getSettings())
   const storeName = settings?.storeName ?? 'Mi Tienda Pro'
+  const business = settings?.business
   const customerSales = useLiveQuery(
     () => (sale?.customerId ? db.sales.where('customerId').equals(sale.customerId).toArray() : Promise.resolve([] as Sale[])),
     [sale?.customerId],
@@ -107,14 +110,14 @@ export function ReceiptSheet({ sale, onClose, onCorrect }: ReceiptSheetProps) {
 
   const ptsEarned = sale.customerId ? Math.floor(sale.total / 10) : 0
   const ptsTotal = sale.customerId ? getPts(customerSales, sale.customerId) : 0
-  const text = buildReceiptText(sale, storeName)
+  const text = buildReceiptText(sale, storeName, business)
 
   /** Shares the receipt as an actual PDF file (so WhatsApp/etc. show it as a document, not a
    * wall of plain text) via the Web Share API's file-sharing (canShare({files})); falls back to
    * text-only sharing, then to a plain download, on browsers that support less than that. */
   async function share() {
     if (!sale) return
-    const blob = await buildReceiptPdfBlob(sale, storeName)
+    const blob = await buildReceiptPdfBlob(sale, storeName, business)
     const filename = `Recibo-${String(sale.id ?? 0).padStart(4, '0')}.pdf`
     const file = new File([blob], filename, { type: 'application/pdf' })
 
@@ -159,8 +162,14 @@ export function ReceiptSheet({ sale, onClose, onCorrect }: ReceiptSheetProps) {
       <div className="font-mono text-[12px] leading-[1.9]">
         <img src={logoSrc} alt="" className="mx-auto mb-1.5 h-10 w-auto object-contain" />
         <div className="text-center font-display text-[19px] text-lime">{storeName}</div>
+        {businessLines(business).map((l) => (
+          <div key={l} className="text-center text-[11px] text-muted">
+            {l}
+          </div>
+        ))}
         <div className="text-center text-[11px] text-muted">RECIBO DE VENTA {formatSaleId(sale.id)}</div>
         <div className="text-center text-[11px] text-muted">{formatDateTime(sale.date)}</div>
+        {sale.sellerName && <div className="text-center text-[11px] text-muted">Atendió: {sale.sellerName}</div>}
         {sale.customerName && <div className="mt-0.5 text-center text-[11px] text-lime">{sale.customerName}</div>}
         {sale.fiadoName && !sale.customerId && <div className="text-center text-[11px] text-red">Fiado: {sale.fiadoName}</div>}
         <div className="my-1.5 border-t border-dashed border-br2" />
@@ -228,14 +237,15 @@ export function ReceiptSheet({ sale, onClose, onCorrect }: ReceiptSheetProps) {
             Factura corregida — {sale.correctionReason}
           </div>
         )}
-        <div className="mt-2 text-center text-[11px] text-muted">¡Gracias por su compra!</div>
+        <div className="mt-2 text-center text-[11px] text-muted">{receiptFooter(business)}</div>
       </div>
 
       <PrintPortal>
         <div className="w-[80mm] p-2 font-mono text-[11px] leading-snug text-black">
-          <PrintHeader storeName={storeName} />
+          <PrintHeader storeName={storeName} business={business} />
           <div className="text-center text-[10px]">RECIBO DE VENTA {formatSaleId(sale.id)}</div>
           <div className="text-center text-[10px]">{formatDateTime(sale.date)}</div>
+          {sale.sellerName && <div className="text-center text-[10px]">Atendió: {sale.sellerName}</div>}
           {sale.customerName && <div className="text-center text-[10px]">{sale.customerName}</div>}
           {sale.fiadoName && !sale.customerId && <div className="text-center text-[10px]">Fiado: {sale.fiadoName}</div>}
           <div className="my-1 border-t border-dashed border-black" />
@@ -301,7 +311,7 @@ export function ReceiptSheet({ sale, onClose, onCorrect }: ReceiptSheetProps) {
           {sale.corrected && (
             <div className="mt-1 text-[10px]">Factura corregida — {sale.correctionReason}</div>
           )}
-          <div className="mt-1.5 text-center text-[10px]">¡Gracias por su compra!</div>
+          <div className="mt-1.5 text-center text-[10px]">{receiptFooter(business)}</div>
         </div>
       </PrintPortal>
 

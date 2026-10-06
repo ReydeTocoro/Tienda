@@ -1,9 +1,8 @@
-import { useState } from 'react'
-import { useLiveQuery } from 'dexie-react-hooks'
-import { db } from '../../db/index'
+import { useMemo, useState } from 'react'
+import { useSecureTable } from '../../db/secure'
 import { payableBalance } from '../../shared/lib/cash'
 import { todayKey } from '../../shared/lib/currency'
-import type { Payable, PurchaseOrder } from '../../types/purchaseOrder'
+import type { PurchaseOrder } from '../../types/purchaseOrder'
 import { NewOrderView } from './components/NewOrderView'
 import { OrderList } from './components/OrderList'
 import { PayablesList } from './components/PayablesList'
@@ -16,16 +15,13 @@ export function ProveedoresPage() {
   const [tab, setTab] = useState<Tab>('pedidos')
   // `key` forces a fresh draft each time a different order (or a new one) is opened for editing.
   const [editing, setEditing] = useState<{ order: PurchaseOrder | null; key: number }>({ order: null, key: 0 })
-  const toReceive = useLiveQuery(() => db.purchaseOrders.where('status').equals('pedido').count(), [], 0)
-  const overdue = useLiveQuery(
-    async () => {
-      const today = todayKey()
-      const all = (await db.payables.toArray()) as Payable[]
-      return all.filter((p) => payableBalance(p) > 0 && p.dueDate < today).length
-    },
-    [],
-    0,
-  )
+  const orders = useSecureTable('purchaseOrders')
+  const payables = useSecureTable('payables')
+  const toReceive = useMemo(() => orders.filter((o) => o.status === 'pedido').length, [orders])
+  const overdue = useMemo(() => {
+    const today = todayKey()
+    return payables.filter((p) => payableBalance(p) > 0 && p.dueDate < today).length
+  }, [payables])
 
   function startOrder(order: PurchaseOrder | null) {
     setEditing((e) => ({ order, key: e.key + 1 }))

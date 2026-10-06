@@ -12,6 +12,7 @@ import { CartTabs } from './CartTabs'
 import { ClientBar } from './ClientBar'
 import { CartLine } from './CartLine'
 import { BILLS } from '../../../shared/lib/bills'
+import { usePermission } from '../../pin/usePermission'
 import { countItems } from '../lib/cartCount'
 
 interface CartPanelProps {
@@ -49,6 +50,10 @@ export function CartPanel({ products, onEditMeasured, onOpenDiscount, onCheckout
 
   const [notesOpen, setNotesOpen] = useState(false)
   const [checkoutOpen, setCheckoutOpen] = useState(false)
+  // "Cambiar el total" approved by someone allowed, for this one charge.
+  const [totalUnlocked, setTotalUnlocked] = useState(false)
+  const { can, requirePermission } = usePermission()
+  const canEditTotal = can('ventas.cambiarTotal') || totalUnlocked
   const { pts: loyaltyPts } = useSelectedCustomerLoyalty()
   const { subtotal, discount, discountLabel, total, chargeAmount, roundingAdjustment } = useCartTotals(loyaltyPts)
 
@@ -65,7 +70,21 @@ export function CartPanel({ products, onEditMeasured, onOpenDiscount, onCheckout
       toast('Agrega productos al carrito para cobrar', 'orange')
       return
     }
+    setTotalUnlocked(false)
     setCheckoutOpen(true)
+  }
+
+  async function unlockTotal() {
+    if (await requirePermission('ventas.cambiarTotal', 'Cambiar el total', 'Ajustar el total a cobrar requiere autorización de alguien con permiso.')) setTotalUnlocked(true)
+  }
+
+  async function choosePayMethod(m: (typeof PAY_METHODS)[number]['key']) {
+    if (m === 'fiado' && !(await requirePermission('ventas.fiar', 'Vender fiado', 'Fiar requiere autorización de alguien con permiso.'))) return
+    setPayMethod(m)
+  }
+
+  async function openDiscount() {
+    if (await requirePermission('ventas.descuentos', 'Descuento manual', 'Dar un descuento requiere autorización de alguien con permiso.')) onOpenDiscount()
   }
 
   function confirmCheckout() {
@@ -147,12 +166,27 @@ export function CartPanel({ products, onEditMeasured, onOpenDiscount, onCheckout
               </label>
               {roundingAdjustment !== 0 && <span className="text-[11px] text-orange">ajustado de {formatMoney(total)}</span>}
             </div>
-            <MoneyInput
-              id="charge-input"
-              className="input text-right font-mono text-[22px] font-bold text-lime"
-              value={chargeOverride ?? total}
-              onChange={setChargeOverride}
-            />
+            {canEditTotal ? (
+              <MoneyInput
+                id="charge-input"
+                className="input text-right font-mono text-[22px] font-bold text-lime"
+                value={chargeOverride ?? total}
+                onChange={setChargeOverride}
+              />
+            ) : (
+              <div className="flex items-center gap-2">
+                <output id="charge-input" className="input block flex-1 text-right font-mono text-[22px] font-bold text-lime">
+                  {formatMoney(chargeAmount)}
+                </output>
+                <button
+                  type="button"
+                  onClick={unlockTotal}
+                  className="flex-shrink-0 rounded-[10px] border border-br2 px-3 py-3 text-[12px] font-semibold text-txt2 transition-colors hover:bg-s2"
+                >
+                  Cambiar
+                </button>
+              </div>
+            )}
           </div>
         </div>
 
@@ -206,7 +240,7 @@ export function CartPanel({ products, onEditMeasured, onOpenDiscount, onCheckout
           {PAY_METHODS.map((m) => (
             <button
               key={m.key}
-              onClick={() => setPayMethod(m.key)}
+              onClick={() => choosePayMethod(m.key)}
               className={`rounded-xl border-2 py-2.5 text-center transition-colors ${
                 payMethod === m.key ? 'border-lime bg-lime/15 text-lime' : 'border-br bg-s1 text-txt2 hover:border-br2 hover:bg-s2 hover:text-txt'
               }`}
@@ -242,7 +276,7 @@ export function CartPanel({ products, onEditMeasured, onOpenDiscount, onCheckout
           <button onClick={() => setNotesOpen((o) => !o)} title="Agregar nota" className="rounded-[10px] border border-br2 px-3 py-2.5 text-txt2 transition-colors hover:border-br2 hover:bg-s2">
             <FileText size={16} />
           </button>
-          <button onClick={onOpenDiscount} title="Descuento manual" className="rounded-[10px] border border-br2 px-3 py-2.5 text-txt2 transition-colors hover:border-br2 hover:bg-s2">
+          <button onClick={openDiscount} title="Descuento manual" className="rounded-[10px] border border-br2 px-3 py-2.5 text-txt2 transition-colors hover:border-br2 hover:bg-s2">
             %
           </button>
           <button

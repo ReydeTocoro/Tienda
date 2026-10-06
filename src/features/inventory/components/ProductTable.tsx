@@ -117,7 +117,7 @@ export function ProductTable({ products, byCode, showCosts, onRevealCosts, sort,
         // Always listed, but its values stay masked (and the header is a lock, not a sort) until
         // costs are revealed — so the purchase price has a place in the table without showing on
         // a shared screen.
-        lock: showCosts ? undefined : { title: 'Ver precios de compra (pide la clave de administrador)', onClick: onRevealCosts },
+        lock: showCosts ? undefined : { title: 'Ver precios de compra (pide el PIN de alguien que pueda verlos)', onClick: onRevealCosts },
         cell: (p) =>
           showCosts ? (
             <span className="font-mono text-txt2">
@@ -149,7 +149,7 @@ export function ProductTable({ products, byCode, showCosts, onRevealCosts, sort,
         min: 70,
         align: 'right',
         sortKey: 'margin',
-        cell: (p) => <span className="font-mono text-green">{p.cost > 0 ? `${(((p.price - p.cost) / p.cost) * 100).toFixed(1)}%` : '—'}</span>,
+        cell: (p) => <span className="font-mono text-green">{(p.cost ?? 0) > 0 ? `${(((p.price - p.cost!) / p.cost!) * 100).toFixed(1)}%` : '—'}</span>,
       },
       {
         key: 'invested',

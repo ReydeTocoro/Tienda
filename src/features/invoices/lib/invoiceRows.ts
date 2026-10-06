@@ -26,6 +26,8 @@ export interface InvoiceRow {
   partyKind: 'cliente' | 'fiado' | 'publico' | 'proveedor'
   /** Items as "name ×qty, …". */
   detail: string
+  /** Who made the sale or received the order, when someone was signed in. */
+  seller: string
   method: InvoiceMethod
   total: number
   /** Fiado balance still owed (sales only). */
@@ -54,7 +56,7 @@ export const STATUS_LABEL: Record<InvoiceStatus, string> = {
 }
 
 function finish(row: Omit<InvoiceRow, 'haystack'>): InvoiceRow {
-  return { ...row, haystack: [row.number, row.party, row.detail, METHOD_LABEL[row.method], STATUS_LABEL[row.status]].join(' ').toLowerCase() }
+  return { ...row, haystack: [row.number, row.party, row.detail, row.seller, METHOD_LABEL[row.method], STATUS_LABEL[row.status]].join(' ').toLowerCase() }
 }
 
 export function buildInvoiceRows(sales: Sale[], orders: PurchaseOrder[]): InvoiceRow[] {
@@ -69,6 +71,7 @@ export function buildInvoiceRows(sales: Sale[], orders: PurchaseOrder[]): Invoic
       party: s.customerName || s.fiadoName || 'Público general',
       partyKind: s.customerName ? 'cliente' : s.fiadoName ? 'fiado' : 'publico',
       detail: s.items.map((i) => `${i.name} ×${formatQty(i.qty)}`).join(', '),
+      seller: s.sellerName ?? '',
       method: s.payMethod,
       total: s.total,
       debt,
@@ -91,6 +94,7 @@ export function buildInvoiceRows(sales: Sale[], orders: PurchaseOrder[]): Invoic
         .filter((l) => (l.qtyReceived ?? 0) > 0)
         .map((l) => `${l.name} ×${formatQty(l.qtyReceived)}`)
         .join(', '),
+      seller: o.receivedBy ?? '',
       method: o.payment?.mode ?? 'ninguno',
       total: o.receivedTotal ?? o.total,
       debt: 0,
@@ -102,7 +106,7 @@ export function buildInvoiceRows(sales: Sale[], orders: PurchaseOrder[]): Invoic
   return [...ventas, ...compras]
 }
 
-export type InvoiceSortKey = 'number' | 'date' | 'kind' | 'party' | 'method' | 'total' | 'status'
+export type InvoiceSortKey = 'number' | 'date' | 'kind' | 'party' | 'seller' | 'method' | 'total' | 'status'
 
 /** Newest first — the order the old history list had. */
 export const DEFAULT_INVOICE_SORT: SortState<InvoiceSortKey> = { key: 'date', dir: 'desc' }
@@ -117,6 +121,8 @@ function sortValue(r: InvoiceRow, key: InvoiceSortKey): string | number {
       return r.kind
     case 'party':
       return r.party
+    case 'seller':
+      return r.seller
     case 'method':
       return METHOD_LABEL[r.method]
     case 'total':

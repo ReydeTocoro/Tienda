@@ -21,8 +21,10 @@ export interface FinalizeSaleInput {
   notes?: string
 }
 
-/** Insert the sale AND decrement stock atomically — now a single better-sqlite3 transaction on
- * the server (server/routes/sales.ts). Free items never touch stock. */
+/** Insert the sale AND decrement stock atomically, in one transaction on the server
+ * (server/domain/sales.ts), which re-prices the lines from the inventory, checks the permissions a
+ * discount, a changed total, a fiado or an unregistered product need, and signs the sale with
+ * whoever is signed in on this device. Free items never touch stock. */
 export async function finalizeSale(input: FinalizeSaleInput): Promise<Sale> {
   return apiPost<Sale>('/api/sales/finalize', input)
 }
