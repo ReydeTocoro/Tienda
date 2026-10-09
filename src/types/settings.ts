@@ -9,6 +9,14 @@ export interface BusinessInfo {
   receiptFooter?: string
 }
 
+/** The owner's own details, edited in Configuración → Usuarios → Propietario. Both optional. */
+export interface OwnerProfile {
+  /** Shown (and signed on sales and cierres) instead of the name on their `staff` row. */
+  name?: string
+  /** A small square picture (a JPEG data URL, see src/shared/lib/photo.ts). */
+  photo?: string
+}
+
 export interface Settings {
   key: 'main'
   storeName: string
@@ -27,4 +35,6 @@ export interface Settings {
   roles?: Role[]
   /** How sessions behave (closing after inactivity). Read it through `sanitizeAccess()`. */
   access?: AccessSettings
+  /** The owner's name and picture. Absent = the name of their `staff` row (else "Propietario"), no picture. */
+  owner?: OwnerProfile
 }

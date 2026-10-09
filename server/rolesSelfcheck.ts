@@ -11,6 +11,7 @@ import { changeOwnerPin, sha256, type Actor } from './domain/counter'
 import { applySettingsPatch, createUsuario, deleteUsuario, updateUsuario } from './domain/users'
 import { getRow, listAll } from './routes/generic'
 import { MAX_PASSWORD, MIN_PASSWORD, cleanEmail, newPasswordProblem } from '../src/shared/lib/account'
+import { MAX_PHOTO_CHARS, cleanPhoto } from '../src/shared/lib/photo'
 import { HttpError } from './routes/http'
 import {
   ADMIN_ROLE_ID,
@@ -119,6 +120,24 @@ assert.match(newPasswordProblem('a'.repeat(MAX_PASSWORD + 1), 'a'.repeat(MAX_PAS
 assert.match(newPasswordProblem('abcdefgh', 'abcdefgx')!, /no coinciden/)
 assert.equal(newPasswordProblem('abcdefgh', 'abcdefgh'), null)
 ok('el correo se limpia y la contraseña pide de 8 a 72 caracteres, escrita igual dos veces')
+
+const PHOTO = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEASABIAAD/' + 'A'.repeat(200)
+const PHOTO_2 = 'data:image/jpeg;base64,/9j/' + 'B'.repeat(300) + '=='
+assert.equal(cleanPhoto(PHOTO), PHOTO, 'una foto JPEG pequeña vale')
+for (const bad of [
+  'data:image/svg+xml;base64,PHN2ZyBvbmxvYWQ9YWxlcnQoMSk+',
+  'data:image/png;base64,iVBORw0KGgo=',
+  'data:image/jpeg;base64,AAAA',
+  'data:text/html;base64,PGgxPg==',
+  'javascript:alert(1)',
+  'https://sitio.com/foto.jpg',
+  'data:image/jpeg;base64,/9j/<script>',
+  'data:image/jpeg;base64,/9j/' + 'A'.repeat(MAX_PHOTO_CHARS),
+  '',
+  undefined,
+  42,
+]) assert.equal(cleanPhoto(bad), undefined, `no es una foto válida: ${String(bad).slice(0, 30)}`)
+ok('solo se aceptan fotos JPEG pequeñas: ni SVG, ni otros formatos, ni enlaces, ni scripts, ni pesadas')
 
 assert.equal(newRoleId('Bodega', []), 'bodega')
 assert.equal(newRoleId('Bodega', ['bodega']), 'bodega-2')
@@ -278,6 +297,35 @@ await db.tx((q) => deleteUsuario(q, owner, luis.id, accounts))
 assert.deepEqual(await pinOwner('9047'), [], 'borrar un usuario borra su PIN')
 assert.equal(accounts.passwords.has('luis.p@tienda.co'), false, 'y su cuenta')
 ok('borrar un usuario se lleva su PIN y su cuenta')
+
+// Profile pictures: a user's (set, kept, replaced, removed) and the owner's (in the settings).
+const conFoto = await db.tx((q) => createUsuario(q, owner, { name: 'Lola', role: CAJERO_ROLE_ID, email: 'lola@tienda.co', password: 'lola-clave-123', photo: PHOTO, active: true }, accounts))
+assert.equal(conFoto.photo, PHOTO, 'queda en su fila')
+const sinFoto = async (input: Record<string, unknown>) =>
+  db.tx((q) => updateUsuario(q, owner, conFoto.id, { name: 'Lola', role: CAJERO_ROLE_ID, email: 'lola@tienda.co', active: true, ...input }, accounts))
+assert.equal((await sinFoto({})).photo, PHOTO, 'sin "photo" en el cambio conserva la que tiene')
+assert.equal((await sinFoto({ photo: PHOTO_2 })).photo, PHOTO_2, 'una foto nueva la reemplaza')
+await refused(() => sinFoto({ photo: 'data:image/svg+xml;base64,PHN2Zz4=' }), 400, /foto no es válida/, 'una foto que no es JPEG')
+await refused(() => sinFoto({ photo: 'https://sitio.com/foto.jpg' }), 400, /foto no es válida/, 'ni un enlace')
+assert.equal((await getRow<Usuario>(db, 'usuarios', 'id', conFoto.id))!.photo, PHOTO_2, 'lo rechazado no cambió nada')
+assert.equal('photo' in (await sinFoto({ photo: null })), false, 'null la quita')
+await refused(
+  () => db.tx((q) => createUsuario(q, owner, { name: 'Mala', role: CAJERO_ROLE_ID, email: 'mala@tienda.co', password: 'mala-clave-123', photo: 'javascript:alert(1)', active: true }, accounts)),
+  400,
+  /foto no es válida/,
+  'crear con una foto inválida',
+)
+assert.equal((await users()).some((u) => u.name === 'Mala'), false, 'y no creó nada')
+assert.equal(accounts.passwords.has('mala@tienda.co'), false, 'ni su cuenta')
+await db.tx((q) => deleteUsuario(q, owner, conFoto.id, accounts))
+
+await refused(() => db.tx((q) => applySettingsPatch(q, supervisor, { owner: { name: 'Yo' } })), 403, /administrador/, 'solo un administrador cambia los datos del propietario')
+await db.tx((q) => applySettingsPatch(q, owner, { owner: { name: '  Franci Rojas Samboni  ', photo: PHOTO, extra: 'x' } }))
+assert.deepEqual((await settings()).owner, { name: 'Franci Rojas Samboni', photo: PHOTO }, 'el nombre y la foto del propietario se guardan limpios')
+await refused(() => db.tx((q) => applySettingsPatch(q, owner, { owner: { name: 'Franci', photo: 'data:text/html;base64,PGgxPg==' } })), 400, /foto no es válida/, 'la foto del propietario también se valida')
+await db.tx((q) => applySettingsPatch(q, owner, { owner: { name: '   ' } }))
+assert.equal('owner' in (await settings()), false, 'sin nombre ni foto no queda perfil')
+ok('las fotos de perfil: de un usuario (se guarda, se conserva, se reemplaza, se quita) y del propietario (en los ajustes, solo el Administrador); solo JPEG pequeños')
 
 await db.end()
 console.log(`\nTodo en orden: ${n} comprobaciones de roles y usuarios pasaron.`)

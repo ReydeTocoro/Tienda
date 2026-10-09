@@ -4,18 +4,19 @@ import { Check, X } from 'lucide-react'
 import { db } from '../../../db/index'
 import { getSettings } from '../../../db/repositories/settings'
 import { addUsuario, deleteUsuario, updateUsuario } from '../../../db/repositories/usuarios'
+import { Avatar } from '../../../shared/components/Avatar'
 import { BottomSheet } from '../../../shared/components/BottomSheet'
 import { MIN_PASSWORD, cleanEmail, newPasswordProblem } from '../../../shared/lib/account'
 import { ADMIN_ROLE_ID, CAJERO_ROLE_ID, findRole } from '../../../shared/lib/permissions'
 import { newPinProblem } from '../../../shared/lib/pin'
 import { useSecurityVersion, type SecurityInfo } from '../lib/useSecurityInfo'
-import { initials } from '../../../shared/lib/text'
 import type { Usuario } from '../../../types/usuario'
 import { useConfirm } from '../../../store/useConfirmStore'
 import { useSessionStore } from '../../../store/useSessionStore'
 import { toast } from '../../../store/useToastStore'
 import { useAccessConfig } from '../../pin/usePermission'
 import { roleSummary, roleTone, TONE_AVATAR } from '../lib/roleDisplay'
+import { PhotoField } from './PhotoField'
 import { Switch, dangerButton, primaryButton, secondaryButton } from './ui'
 
 interface UsuarioFormSheetProps {
@@ -52,6 +53,7 @@ function UsuarioForm({ user, security, onClose }: { user: Usuario | null; securi
   const hasPin = !!user && !!security?.pinUserIds.includes(user.id)
   const [name, setName] = useState(user?.name ?? '')
   const [email, setEmail] = useState(user?.email ?? '')
+  const [photo, setPhoto] = useState<string | undefined>(user?.photo)
   const [roleId, setRoleId] = useState(user ? (findRole(roles, user.role) ? user.role : '') : CAJERO_ROLE_ID)
   const [active, setActive] = useState(user?.active ?? true)
   const [changePassword, setChangePassword] = useState(needsAccount)
@@ -75,7 +77,7 @@ function UsuarioForm({ user, security, onClose }: { user: Usuario | null; securi
     if (!mail) return setError('Escribe un correo válido para que pueda iniciar sesión')
     const taken = usuarios.find((u) => u.id !== user?.id && u.email === mail)
     if (taken) return setError(`Ese correo ya lo usa ${taken.name}`)
-    if (security?.ownerEmails.some((o) => o.toLowerCase() === mail)) return setError('Ese correo es la cuenta del propietario')
+    if (security?.owners.some((o) => o.email.toLowerCase() === mail)) return setError('Ese correo es la cuenta del propietario')
     if (!findRole(roles, roleId)) return setError('Elige un rol')
     if (sendPassword) {
       const problem = newPasswordProblem(password, password2)
@@ -87,7 +89,7 @@ function UsuarioForm({ user, security, onClose }: { user: Usuario | null; securi
     }
     setBusy(true)
     try {
-      const input = { name: clean, email: mail, role: roleId, active, ...(sendPassword ? { password } : {}), ...(changePin ? { pin } : {}) }
+      const input = { name: clean, email: mail, role: roleId, active, ...(photo !== user?.photo ? { photo: photo ?? null } : {}), ...(sendPassword ? { password } : {}), ...(changePin ? { pin } : {}) }
       if (user) {
         await updateUsuario(user.id, input)
         toast(`${clean}: cambios guardados`, 'green')
@@ -129,7 +131,7 @@ function UsuarioForm({ user, security, onClose }: { user: Usuario | null; securi
   return (
     <form onSubmit={submit}>
       <div className="mb-4 flex items-center gap-3">
-        <span className={`flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full text-[14px] font-bold ${TONE_AVATAR[tone]}`}>{initials(name || '?')}</span>
+        <Avatar name={name || '?'} photo={photo} className={`h-11 w-11 text-[14px] font-bold ${TONE_AVATAR[tone]}`} />
         <div className="min-w-0 flex-1">
           <div className="font-display text-[18px] font-bold leading-tight">{user ? 'Editar usuario' : 'Nuevo usuario'}</div>
           <div className="truncate text-[12px] text-muted">{user ? `Creado el ${new Date(user.createdAt).toLocaleDateString('es', { day: 'numeric', month: 'short', year: 'numeric' })}` : 'Una persona que trabaja en la tienda'}</div>
@@ -143,6 +145,8 @@ function UsuarioForm({ user, security, onClose }: { user: Usuario | null; securi
         Nombre
       </label>
       <input id="user-name" className="input mb-4" value={name} maxLength={40} onChange={(e) => setName(e.target.value)} placeholder="Ej: Ana Gómez" autoFocus={!user} />
+
+      <PhotoField photo={photo} onChange={setPhoto} hint="Opcional. Se ve junto a su nombre." />
 
       <div className="mb-4 rounded-xl border border-br p-3">
         <div className="mb-2 flex items-center justify-between gap-3">

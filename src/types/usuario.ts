@@ -10,6 +10,8 @@ export interface Usuario {
    * keeps (lowercase). Absent on rows saved before each person had an account: they can't sign in
    * until an administrator gives them one. */
   email?: string
+  /** A small square picture (a JPEG data URL, see src/shared/lib/photo.ts), shown beside their name. */
+  photo?: string
   /* Their PIN (optional) authorizes steps on someone else's session. It's unique (nobody else, nor
    * the owner's master PIN, has it) and lives hashed in a database table no device can read; it's
    * checked by the server only. */

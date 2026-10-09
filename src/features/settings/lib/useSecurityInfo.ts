@@ -15,8 +15,8 @@ export interface SecurityInfo {
   /** Wrong PINs across the store in the current 24 hours, and a store-wide lockout if one is on. */
   wrongPins24h: number
   lockedUntil: number | null
-  /** The owners' sign-in emails. */
-  ownerEmails: string[]
+  /** The owners' sign-in accounts: their email and the name their `staff` row carries. */
+  owners: Array<{ email: string; name: string }>
   /** The server can create accounts and set passwords (it has the Supabase secret key). */
   accountsEnabled: boolean
 }

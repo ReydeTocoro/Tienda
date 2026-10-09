@@ -55,7 +55,7 @@ export function HeaderTools() {
 function Clock() {
   const now = useClock()
   return (
-    <div className="text-right font-mono text-[11px] leading-[1.35] text-nav-fg-dim">
+    <div className="flex-shrink-0 whitespace-nowrap text-right font-mono text-[11px] leading-[1.35] text-nav-fg-dim">
       <div>{now.toLocaleDateString('es', { weekday: 'short', day: 'numeric', month: 'short' })}</div>
       <div>{now.toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</div>
     </div>

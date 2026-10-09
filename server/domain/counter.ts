@@ -55,7 +55,6 @@ const FACTORY_PIN = '1234'
 
 export const sha256 = (s: string): string => createHash('sha256').update(s, 'utf8').digest('hex')
 
-const ownerOperator = (): Operator => ({ id: OWNER_ID, name: OWNER_NAME, roleId: ADMIN_ROLE_ID })
 const pinOwnerId = (operatorId: string) => (operatorId === OWNER_ID ? 'owner' : `user:${operatorId}`)
 
 async function settingsOf(q: Sql): Promise<Settings> {
@@ -66,11 +65,21 @@ async function settingsOf(q: Sql): Promise<Settings> {
 
 const rolesOf = async (q: Sql) => resolveRoles((await settingsOf(q)).roles)
 
+/** The owner, as a person: the name typed in Configuración (settings.owner), else the one their
+ * `staff` row carries (`staffName`; when it isn't known — the master PIN —, the first owner's), else
+ * "Propietario". Sales and cierres are signed with it. */
+async function ownerOperator(q: Sql, staffName?: string | null): Promise<Operator> {
+  let name = (await settingsOf(q)).owner?.name?.trim() || staffName?.trim() || ''
+  if (!name && staffName === undefined) name = (await q.query<{ name: string | null }>(`select name from public.staff order by created_at, email limit 1`))[0]?.name?.trim() ?? ''
+  return { id: OWNER_ID, name: name || OWNER_NAME, roleId: ADMIN_ROLE_ID }
+}
+
 // ------------------------------------------------------------------------------ the account
 
 /** Who signs in with this email: an owner, or the active user it belongs to — else nobody. */
 export async function accountOperator(q: Sql, email: string): Promise<Operator | null> {
-  if ((await q.query(`select 1 from public.staff where lower(email) = lower($1)`, [email])).length) return ownerOperator()
+  const [owner] = await q.query<{ name: string | null }>(`select name from public.staff where lower(email) = lower($1)`, [email])
+  if (owner) return ownerOperator(q, owner.name)
   const [u] = await q.query<{ data: Usuario }>(
     `select data from public.usuarios where lower(data ->> 'email') = lower($1) and (data -> 'active') = 'true'::jsonb`,
     [email],
@@ -179,7 +188,7 @@ export async function refreshCounterPerms(q: Sql): Promise<void> {
 async function pinOwner(q: Sql, pin: string): Promise<Operator | null> {
   const rows = await q.query<{ owner_id: string }>(`select owner_id from private.pins where hash = private.pin_digest($1)`, [sha256(pin)])
   if (!rows.length) return null
-  if (rows.some((r) => r.owner_id === 'owner')) return ownerOperator()
+  if (rows.some((r) => r.owner_id === 'owner')) return ownerOperator(q)
   const users: Usuario[] = []
   for (const r of rows) {
     const u = await getRow<Usuario>(q, 'usuarios', 'id', r.owner_id.replace(/^user:/, ''))
@@ -316,8 +325,8 @@ export interface SecurityInfo {
   /** Wrong PINs across the store in the current 24-hour window, and a store-wide lock if one is on. */
   wrongPins24h: number
   lockedUntil: number | null
-  /** The owners' sign-in emails (public.staff). */
-  ownerEmails: string[]
+  /** The owners' sign-in accounts (public.staff): their email and the name their row carries. */
+  owners: Array<{ email: string; name: string }>
   /** The server can create accounts and set passwords (it has the Supabase secret key). */
   accountsEnabled: boolean
 }
@@ -328,7 +337,7 @@ export async function securityInfo(q: Sql, actor: Actor, accountsEnabled: boolea
   const users = await q.query<{ owner_id: string }>(`select owner_id from private.pins where owner_id like 'user:%'`)
   const shared = await q.query<{ owner_id: string }>(`select owner_id from private.pins where hash in (select hash from private.pins group by hash having count(*) > 1)`)
   const [g] = await q.query<{ failures: number; window_start: Date; locked_until: Date | null }>(`select failures, window_start, locked_until from private.pin_guard where scope = 'global'`)
-  const owners = await q.query<{ email: string }>(`select email from public.staff order by created_at, email`)
+  const owners = await q.query<{ email: string; name: string }>(`select email, coalesce(name, '') as name from public.staff order by created_at, email`)
   const fresh = g && Date.now() - new Date(g.window_start).getTime() < DAY_MS
   const lockedUntil = g?.locked_until && new Date(g.locked_until).getTime() > Date.now() ? new Date(g.locked_until).getTime() : null
   return {
@@ -338,7 +347,7 @@ export async function securityInfo(q: Sql, actor: Actor, accountsEnabled: boolea
     ownerSharesPin: shared.some((r) => r.owner_id === 'owner'),
     wrongPins24h: fresh ? g.failures : 0,
     lockedUntil,
-    ownerEmails: owners.map((r) => r.email),
+    owners,
     accountsEnabled,
   }
 }

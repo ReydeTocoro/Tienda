@@ -13,6 +13,8 @@ export interface UsuarioInput {
   /** A new PIN to authorize steps — sent once over HTTPS, hashed by the server, never readable
    * again. Omitted to keep (or not have) one. */
   pin?: string
+  /** A profile picture (a data URL from src/shared/lib/image.ts). Omitted = unchanged; null = remove. */
+  photo?: string | null
   active: boolean
 }
 

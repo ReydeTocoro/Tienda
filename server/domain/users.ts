@@ -1,8 +1,9 @@
 import { randomUUID } from 'node:crypto'
 import type { Usuario } from '../../src/types/usuario'
-import type { BusinessInfo, Settings } from '../../src/types/settings'
+import type { BusinessInfo, OwnerProfile, Settings } from '../../src/types/settings'
 import { ADMIN_ROLE_ID, resolveRoles, sanitizeAccess, sanitizeRoles } from '../../src/shared/lib/permissions'
 import { cleanEmail, newPasswordProblem } from '../../src/shared/lib/account'
+import { cleanPhoto } from '../../src/shared/lib/photo'
 import type { Accounts } from '../accounts'
 import type { Sql } from '../db'
 import { deleteRow, getRow, listAll, putRow } from '../routes/generic'
@@ -19,7 +20,9 @@ import { assertNewPin, refreshCounterPerms, requireNeed, storePin, type Actor } 
  * - no two users share a name (sales and cierres are signed with it);
  * - every user's role exists, so a role in use can't be deleted out from under them;
  * - an administrator can't lock themselves out (deactivate or delete themselves, or drop their own
- *   Administrador role).
+ *   Administrador role);
+ * - a profile picture (a user's, or the owner's in the settings) is a small raster image data URL
+ *   (src/shared/lib/photo.ts) or nothing.
  * Supabase Auth is written last, once every rule passed: it isn't part of the transaction. */
 
 const USERS = 'usuarios'
@@ -36,6 +39,8 @@ export interface UsuarioInput {
   /** A PIN to authorize steps on other people's sessions — optional; sent once, hashed by the
    * database. Omitted on update = unchanged. */
   pin?: string
+  /** A profile picture (a data URL from src/shared/lib/image.ts). Omitted = unchanged; null = remove. */
+  photo?: string | null
   active: boolean
 }
 
@@ -54,6 +59,18 @@ async function checkUsuario(sql: Sql, input: UsuarioInput, selfId: string | null
   const others = (await listAll<Usuario>(sql, USERS)).filter((u) => u.id !== selfId)
   if (others.some((u) => u.name.trim().toLowerCase() === name.toLowerCase())) throw new HttpError(409, `Ya hay un usuario llamado "${name}"`)
   return { name, role, settings }
+}
+
+const BAD_PHOTO = 'La foto no es válida: elige otra imagen'
+
+/** A picture sent with a user or the owner: undefined = leave it as it is, null (or empty) = remove it,
+ * else it must be one this app could have made — or a 400. */
+function checkPhoto(input: unknown): string | null | undefined {
+  if (input === undefined) return undefined
+  if (input === null || input === '') return null
+  const photo = cleanPhoto(input)
+  if (!photo) throw new HttpError(400, BAD_PHOTO)
+  return photo
 }
 
 /** A sign-in email nobody else has: not an owner's, not another user's. */
@@ -86,10 +103,11 @@ export async function createUsuario(sql: Sql, actor: Actor, input: UsuarioInput,
   const email = await checkEmail(sql, input.email, null)
   const password = checkPassword(input.password, accounts)
   if (accounts.enabled && !password) throw new HttpError(400, 'Escribe una contraseña para su cuenta')
+  const photo = checkPhoto(input.photo)
   const id = randomUUID()
   const pinLength = pinLengthOf(settings)
   const pin = hasValue(input.pin) ? await assertNewPin(sql, input.pin, pinLength, id) : null
-  const usuario: Usuario = { id, name, role, email, ...(pin ? { pinLength } : {}), active: input.active !== false, createdAt: new Date().toISOString() }
+  const usuario: Usuario = { id, name, role, email, ...(photo ? { photo } : {}), ...(pin ? { pinLength } : {}), active: input.active !== false, createdAt: new Date().toISOString() }
   await putRow(sql, USERS, 'id', id, usuario)
   if (pin) await storePin(sql, id, pin)
   if (password) await accounts.ensure(email, password, name)
@@ -110,7 +128,10 @@ export async function updateUsuario(sql: Sql, actor: Actor, id: string, input: U
   const password = checkPassword(input.password, accounts)
   if (password && !email) throw new HttpError(400, 'Escribe primero el correo de su cuenta')
   if (accounts.enabled && email && !existing.email && !password) throw new HttpError(400, 'Escribe una contraseña para su cuenta')
+  const photo = checkPhoto(input.photo)
   const updated: Usuario = { ...existing, name, role, active, ...(email ? { email } : {}) }
+  if (photo) updated.photo = photo
+  else if (photo === null) delete updated.photo
   let pin: string | null = null
   if (hasValue(input.pin)) {
     updated.pinLength = pinLengthOf(settings)
@@ -156,10 +177,18 @@ function cleanBusiness(input: unknown): BusinessInfo {
   return { nit: text(b.nit, 30), phone: text(b.phone, 30), address: text(b.address, 80), receiptFooter: text(b.receiptFooter, 80) }
 }
 
+/** The owner's profile: a name (up to 40 characters) and/or a picture; none of them = no profile. */
+function cleanOwner(input: unknown): OwnerProfile | undefined {
+  const o = (input && typeof input === 'object' ? input : {}) as Record<string, unknown>
+  const name = text(o.name, MAX_NAME)
+  const photo = checkPhoto(o.photo) ?? undefined
+  return name || photo ? { ...(name ? { name } : {}), ...(photo ? { photo } : {}) } : undefined
+}
+
 /** What a settings patch may touch, and who may touch it. The master PIN, the PIN length, the caja's
  * base and the last cashier have their own routes (counter and cierre), never this one. */
 const ANYONE = new Set(['theme'])
-const ADMIN_ONLY = new Set(['storeName', 'business', 'roles', 'access', 'hidScannerEnabled'])
+const ADMIN_ONLY = new Set(['storeName', 'business', 'roles', 'access', 'hidScannerEnabled', 'owner'])
 
 /** Merges a settings patch into the 'main' row, cleaning what has rules: `roles` (catalog
  * permissions only, built-ins kept, none removed while someone still has it) and `access`. */
@@ -179,6 +208,11 @@ export async function applySettingsPatch(sql: Sql, actor: Actor, patch: Record<s
     next.storeName = storeName
   }
   if ('business' in patch) next.business = cleanBusiness(patch.business)
+  if ('owner' in patch) {
+    const owner = cleanOwner(patch.owner)
+    if (owner) next.owner = owner
+    else delete next.owner
+  }
   if ('roles' in patch) {
     const roles = sanitizeRoles(patch.roles)
     const ids = new Set([ADMIN_ROLE_ID, ...roles.map((r) => r.id)])
