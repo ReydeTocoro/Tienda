@@ -4,95 +4,91 @@ import { db } from '../../db/index'
 import { needsOfRole } from '../../shared/lib/permissions'
 import { setSecurePerms } from '../../sync'
 import { OWNER_ID, useSessionStore } from '../../store/useSessionStore'
-import { toast } from '../../store/useToastStore'
-import { counterHeartbeat, counterSignOut, counterSignOutOnExit, resetCounterOnServer } from './counterSession'
-import { effectiveRoleId, useAccessConfig } from './usePermission'
+import { lastActivity, markActive, signOut } from '../auth/session'
+import { refreshCounterSession, startCounterSession, type SessionEnded } from './counterSession'
+import { useAccessConfig } from './usePermission'
 
 const ACTIVITY_EVENTS = ['pointerdown', 'keydown', 'wheel', 'touchstart'] as const
-/** How often the app tells the server the signed-in person is still here (it forgets them after 3
- * minutes without hearing from this device). */
-const HEARTBEAT_MS = 45_000
+/** How often the app renews its session's binding on the server and asks who it is now. */
+const REFRESH_MS = 60_000
 
-/** Keeps the counter session honest, mounted once from AppShell:
- * - as the app starts, the server is told nobody is signed in here (a reload signs out);
- * - PIN mode with nobody signed in → `locked` (AppShell shows the lock screen);
- * - nobody touches the screen for `access.autoLockMinutes` → whoever signed in is signed out, so a
- *   supervisor who walked away doesn't leave their permissions on the counter;
- * - while someone is signed in, a heartbeat keeps the server's record alive — and if the server no
- *   longer has them (deactivated, expired), they're signed out here too; closing the page signs out;
- * - an admin deactivates or deletes the signed-in user → signed out; renames them or changes their
- *   role → applied at once;
+export const idleLabel = (m: number) => (m < 60 ? `${m} minutos` : m === 60 ? '1 hora' : `${m / 60} horas`)
+
+/** The server said this session can't go on (it lost access, or must sign in again): sign out, and
+ * the login says why. */
+function endIf(result: SessionEnded | null | undefined): void {
+  if (result) void signOut({ notice: result.ended }).catch(() => {})
+}
+
+/** Keeps the session honest, mounted once from AppShell:
+ * - as the app starts the server binds this session to its account's person (what RLS reads), and
+ *   renews it every minute; an account that lost access (deactivated, deleted) or has to sign in
+ *   again is signed out, and the login says why;
+ * - an admin renames the person or changes their role → applied at once;
+ * - with "cerrar sesión por inactividad" on, nobody touching the screen for that long signs out —
+ *   also when the app is reopened after that long;
  * - the secret data downloaded to this device always matches what whoever is working may see. */
-export function useSessionGuard(): { locked: boolean } {
+export function useSessionGuard(): void {
   const operator = useSessionStore((s) => s.operator)
   const serverReady = useSessionStore((s) => s.serverReady)
-  const { roles, access, ready } = useAccessConfig()
+  const { roles, access } = useAccessConfig()
   const usuarios = useLiveQuery(() => db.usuarios.toArray())
-  const locked = ready && access.mode === 'pin' && !operator
 
   useEffect(() => {
-    void resetCounterOnServer()
-    window.addEventListener('pagehide', counterSignOutOnExit)
-    return () => window.removeEventListener('pagehide', counterSignOutOnExit)
+    let alive = true
+    void startCounterSession().then((r) => alive && endIf(r))
+    const timer = setInterval(() => void refreshCounterSession().then(endIf), REFRESH_MS)
+    return () => {
+      alive = false
+      clearInterval(timer)
+    }
   }, [])
 
-  useEffect(() => {
-    useSessionStore.getState().setLocked(locked)
-  }, [locked])
-
-  // What this device may download: whoever is signed in, else the open counter — and nothing until
-  // the server agrees on who that is.
-  const roleId = ready ? effectiveRoleId(operator, access) : null
-  const needs = useMemo(() => needsOfRole(roles, roleId).join(','), [roles, roleId])
+  // What this device may download: whoever is signed in — and nothing until the server agrees.
+  const needs = useMemo(() => needsOfRole(roles, operator?.roleId).join(','), [roles, operator?.roleId])
   useEffect(() => {
     setSecurePerms(serverReady && needs ? needs.split(',') : [])
   }, [serverReady, needs])
 
+  // An admin's edit of this person applies at once; deactivating them is confirmed with the server
+  // right away (the local list alone may simply not have arrived yet).
   useEffect(() => {
     if (!operator || operator.id === OWNER_ID || !usuarios) return
     const u = usuarios.find((x) => x.id === operator.id)
-    if (!u || !u.active) {
-      void counterSignOut()
-      toast(`${operator.name} ya no tiene un usuario activo`, 'orange')
-      return
-    }
-    if (u.name !== operator.name || u.role !== operator.roleId) useSessionStore.getState().updateOperator({ name: u.name, roleId: u.role })
+    if (!u) return
+    if (!u.active) void refreshCounterSession().then(endIf)
+    else if (u.name !== operator.name || u.role !== operator.roleId) useSessionStore.getState().updateOperator({ name: u.name, roleId: u.role })
   }, [operator, usuarios])
 
+  // Inactivity. The last use is kept on the device (also with the option off), so turning it on
+  // doesn't count from some old time, and an app reopened after too long asks to sign in.
   const signedIn = !!operator
+  const minutes = access.idleSignOutMinutes
   useEffect(() => {
     if (!signedIn) return
-    const timer = setInterval(async () => {
-      const current = useSessionStore.getState().operator
-      if (!current) return
-      const onServer = await counterHeartbeat()
-      if (onServer === null && useSessionStore.getState().operator?.id === current.id) {
-        useSessionStore.getState().signOut()
-        toast(`${current.name}: la sesión se cerró`, 'muted')
-      }
-    }, HEARTBEAT_MS)
-    return () => clearInterval(timer)
-  }, [signedIn])
-
-  const minutes = access.autoLockMinutes
-  useEffect(() => {
-    if (!signedIn || minutes <= 0) return
-    let last = Date.now()
+    let last = lastActivity() || Date.now()
+    let saved = 0
+    let retryAt = 0
     const touch = () => {
       last = Date.now()
+      if (last - saved > 15_000) {
+        saved = last
+        markActive(last)
+      }
     }
+    const check = () => {
+      // The latest use on any tab of this browser counts (they share the sign-in).
+      const idleSince = Math.max(last, lastActivity())
+      if (minutes <= 0 || Date.now() - idleSince < minutes * 60_000 || Date.now() < retryAt) return
+      retryAt = Date.now() + 60_000 // offline, signing out fails: try again in a minute
+      void signOut({ notice: `La sesión se cerró sola tras ${idleLabel(minutes)} sin uso` }).catch(() => {})
+    }
+    check()
     for (const e of ACTIVITY_EVENTS) window.addEventListener(e, touch, { capture: true, passive: true })
-    const timer = setInterval(() => {
-      if (Date.now() - last < minutes * 60_000) return
-      const name = useSessionStore.getState().operator?.name
-      void counterSignOut()
-      toast(`${name ?? 'La sesión'}: se cerró por ${minutes} min sin uso`, 'muted')
-    }, 5_000)
+    const timer = setInterval(check, 5_000)
     return () => {
       clearInterval(timer)
       for (const e of ACTIVITY_EVENTS) window.removeEventListener(e, touch, { capture: true })
     }
   }, [signedIn, minutes])
-
-  return { locked }
 }

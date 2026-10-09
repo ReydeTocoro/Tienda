@@ -5,12 +5,14 @@ import { db } from '../../../db/index'
 import { getSettings } from '../../../db/repositories/settings'
 import { addUsuario, deleteUsuario, updateUsuario } from '../../../db/repositories/usuarios'
 import { BottomSheet } from '../../../shared/components/BottomSheet'
+import { MIN_PASSWORD, cleanEmail, newPasswordProblem } from '../../../shared/lib/account'
 import { ADMIN_ROLE_ID, CAJERO_ROLE_ID, findRole } from '../../../shared/lib/permissions'
 import { newPinProblem } from '../../../shared/lib/pin'
-import { useSecurityVersion } from '../lib/useSecurityInfo'
+import { useSecurityVersion, type SecurityInfo } from '../lib/useSecurityInfo'
 import { initials } from '../../../shared/lib/text'
 import type { Usuario } from '../../../types/usuario'
 import { useConfirm } from '../../../store/useConfirmStore'
+import { useSessionStore } from '../../../store/useSessionStore'
 import { toast } from '../../../store/useToastStore'
 import { useAccessConfig } from '../../pin/usePermission'
 import { roleSummary, roleTone, TONE_AVATAR } from '../lib/roleDisplay'
@@ -20,35 +22,48 @@ interface UsuarioFormSheetProps {
   open: boolean
   /** null = a new user. */
   user: Usuario | null
+  security: SecurityInfo | null
   onClose: () => void
 }
 
-export function UsuarioFormSheet({ open, user, onClose }: UsuarioFormSheetProps) {
+export function UsuarioFormSheet({ open, user, security, onClose }: UsuarioFormSheetProps) {
   return (
     <BottomSheet open={open} onClose={onClose} maxWidthClass="max-w-[560px]">
-      <UsuarioForm user={user} onClose={onClose} />
+      <UsuarioForm user={user} security={security} onClose={onClose} />
     </BottomSheet>
   )
 }
 
-/** Create or edit one user: name, role (picked from cards that say what each role can do), PIN and
- * whether they may sign in. Checks what it can before sending (a name nobody else has, an acceptable
- * PIN); whether someone else already has that PIN only the server can tell — it alone holds the PINs,
- * hashed — and its answer shows here. */
-function UsuarioForm({ user, onClose }: { user: Usuario | null; onClose: () => void }) {
+/** Create or edit one user: name, the account they sign in with (email and password), role (picked
+ * from cards that say what each role can do), an optional PIN to authorize steps on other people's
+ * sessions, and whether they may sign in. Checks what it can before sending (a name and an email
+ * nobody else has, an acceptable password and PIN); whether someone else already has that PIN only
+ * the server can tell — it alone holds the PINs, hashed — and its answer shows here. Without the
+ * Supabase secret key on the server, the account itself is made in the Supabase dashboard. */
+function UsuarioForm({ user, security, onClose }: { user: Usuario | null; security: SecurityInfo | null; onClose: () => void }) {
   const usuarios = useLiveQuery(() => db.usuarios.toArray(), [], [] as Usuario[])
   const settings = useLiveQuery(() => getSettings())
   const { roles } = useAccessConfig()
+  const isSelf = useSessionStore((s) => !!user && s.operator?.id === user.id)
   const confirm = useConfirm()
+  const accountsEnabled = security?.accountsEnabled ?? true
+  // Someone without an account yet (new, or saved before each person had one) gets a password now.
+  const needsAccount = !user?.email
+  const hasPin = !!user && !!security?.pinUserIds.includes(user.id)
   const [name, setName] = useState(user?.name ?? '')
+  const [email, setEmail] = useState(user?.email ?? '')
   const [roleId, setRoleId] = useState(user ? (findRole(roles, user.role) ? user.role : '') : CAJERO_ROLE_ID)
   const [active, setActive] = useState(user?.active ?? true)
-  const [changePin, setChangePin] = useState(!user)
+  const [changePassword, setChangePassword] = useState(needsAccount)
+  const [password, setPassword] = useState('')
+  const [password2, setPassword2] = useState('')
+  const [changePin, setChangePin] = useState(false)
   const [pin, setPin] = useState('')
   const [pinConfirm, setPinConfirm] = useState('')
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
   const pinLength = settings?.pinLength ?? 4
+  const sendPassword = accountsEnabled && changePassword
 
   async function submit(e: FormEvent) {
     e.preventDefault()
@@ -56,19 +71,29 @@ function UsuarioForm({ user, onClose }: { user: Usuario | null; onClose: () => v
     const clean = name.trim()
     if (!clean) return setError('Escribe el nombre')
     if (usuarios.some((u) => u.id !== user?.id && u.name.trim().toLowerCase() === clean.toLowerCase())) return setError(`Ya hay un usuario llamado "${clean}"`)
+    const mail = cleanEmail(email)
+    if (!mail) return setError('Escribe un correo válido para que pueda iniciar sesión')
+    const taken = usuarios.find((u) => u.id !== user?.id && u.email === mail)
+    if (taken) return setError(`Ese correo ya lo usa ${taken.name}`)
+    if (security?.ownerEmails.some((o) => o.toLowerCase() === mail)) return setError('Ese correo es la cuenta del propietario')
     if (!findRole(roles, roleId)) return setError('Elige un rol')
+    if (sendPassword) {
+      const problem = newPasswordProblem(password, password2)
+      if (problem) return setError(problem)
+    }
     if (changePin) {
       const problem = newPinProblem(pin, pinConfirm, pinLength)
       if (problem) return setError(problem)
     }
     setBusy(true)
     try {
+      const input = { name: clean, email: mail, role: roleId, active, ...(sendPassword ? { password } : {}), ...(changePin ? { pin } : {}) }
       if (user) {
-        await updateUsuario(user.id, { name: clean, role: roleId, active, ...(changePin ? { pin } : {}) })
+        await updateUsuario(user.id, input)
         toast(`${clean}: cambios guardados`, 'green')
       } else {
-        await addUsuario({ name: clean, role: roleId, active, pin })
-        toast(`${clean} ya puede ingresar con su PIN`, 'green')
+        await addUsuario(input)
+        toast(accountsEnabled ? `${clean} ya puede entrar con ${mail}` : `${clean} quedó creado: falta su cuenta en Supabase`, 'green')
       }
       useSecurityVersion.getState().bump()
       onClose()
@@ -83,13 +108,14 @@ function UsuarioForm({ user, onClose }: { user: Usuario | null; onClose: () => v
     if (!user) return
     const ok = await confirm({
       title: 'Eliminar usuario',
-      message: `${user.name} ya no podrá ingresar. Sus ventas y cierres anteriores conservan su nombre. Si solo es por un tiempo, mejor desactívalo.`,
+      message: `${user.name} ya no podrá entrar: su cuenta se borra. Sus ventas y cierres anteriores conservan su nombre. Si solo es por un tiempo, mejor desactívalo.`,
       confirmLabel: 'Eliminar',
       danger: true,
     })
     if (!ok) return
     try {
       await deleteUsuario(user.id)
+      useSecurityVersion.getState().bump()
       toast(`${user.name} eliminado`, 'muted')
       onClose()
     } catch (err) {
@@ -98,6 +124,7 @@ function UsuarioForm({ user, onClose }: { user: Usuario | null; onClose: () => v
   }
 
   const tone = roleId ? roleTone(roles, roleId) : 'blue'
+  const field = 'input text-center font-mono tracking-[5px]'
 
   return (
     <form onSubmit={submit}>
@@ -117,6 +144,53 @@ function UsuarioForm({ user, onClose }: { user: Usuario | null; onClose: () => v
       </label>
       <input id="user-name" className="input mb-4" value={name} maxLength={40} onChange={(e) => setName(e.target.value)} placeholder="Ej: Ana Gómez" autoFocus={!user} />
 
+      <div className="mb-4 rounded-xl border border-br p-3">
+        <div className="mb-2 flex items-center justify-between gap-3">
+          <div>
+            <div className="text-[13px] font-semibold">Cuenta para entrar</div>
+            <div className="text-[12px] text-muted">Entra con este correo y su contraseña, en cualquier equipo.</div>
+          </div>
+          {accountsEnabled && !needsAccount && (
+            <button
+              type="button"
+              className={`${secondaryButton} flex-shrink-0 px-3 py-1.5 text-[12px]`}
+              onClick={() => {
+                setChangePassword((c) => !c)
+                setPassword('')
+                setPassword2('')
+              }}
+            >
+              {changePassword ? 'No cambiarla' : 'Cambiar contraseña'}
+            </button>
+          )}
+        </div>
+        <label htmlFor="user-email" className="mb-1 block field-label">
+          Correo
+        </label>
+        <input id="user-email" type="email" autoComplete="off" className="input" value={email} maxLength={120} onChange={(e) => setEmail(e.target.value)} placeholder="ana@correo.com" />
+        {sendPassword && (
+          <div className="mt-2 grid grid-cols-2 gap-2">
+            <div>
+              <label htmlFor="user-password" className="mb-1 block field-label">
+                {needsAccount ? 'Contraseña' : 'Contraseña nueva'}
+              </label>
+              <input id="user-password" type="password" autoComplete="new-password" className="input" value={password} onChange={(e) => setPassword(e.target.value)} placeholder={`${MIN_PASSWORD}+ caracteres`} />
+            </div>
+            <div>
+              <label htmlFor="user-password2" className="mb-1 block field-label">
+                Repítela
+              </label>
+              <input id="user-password2" type="password" autoComplete="new-password" className="input" value={password2} onChange={(e) => setPassword2(e.target.value)} />
+            </div>
+          </div>
+        )}
+        {!accountsEnabled && (
+          <p className="mt-2 rounded-lg bg-orange/10 px-3 py-2 text-[12px] leading-relaxed text-orange">
+            La contraseña se pone en Supabase: Authentication → Users → Add user, con este mismo correo y marcando “Auto Confirm User”.
+          </p>
+        )}
+      </div>
+
       <p className="mb-1.5 field-label">Rol</p>
       <div role="radiogroup" aria-label="Rol" className="mb-4 grid gap-1.5">
         {roles.map((r) => {
@@ -129,7 +203,7 @@ function UsuarioForm({ user, onClose }: { user: Usuario | null; onClose: () => v
               role="radio"
               aria-checked={selected}
               onClick={() => setRoleId(r.id)}
-              className={`flex items-center gap-3 rounded-xl border px-3 py-2.5 text-left transition-colors ${selected ? 'border-lime bg-lime/10' : 'border-br hover:bg-s2'}`}
+              className={`flex items-center gap-3 rounded-xl border px-3 py-2 text-left transition-colors ${selected ? 'border-lime bg-lime/10' : 'border-br hover:bg-s2'}`}
             >
               <span className={`flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full ${TONE_AVATAR[t]}`}>{selected ? <Check size={14} strokeWidth={3} /> : <span className="h-2 w-2 rounded-full bg-current" />}</span>
               <span className="min-w-0 flex-1">
@@ -145,67 +219,57 @@ function UsuarioForm({ user, onClose }: { user: Usuario | null; onClose: () => v
       <div className="mb-4 rounded-xl border border-br p-3">
         <div className="flex items-center justify-between gap-3">
           <div>
-            <div className="text-[13px] font-semibold">PIN de {pinLength} dígitos</div>
-            <div className="text-[12px] text-muted">{changePin ? 'Con él entra y autoriza lo que su rol permite.' : 'Conserva el PIN que ya tiene.'}</div>
+            <div className="text-[13px] font-semibold">PIN para autorizar (opcional)</div>
+            <div className="text-[12px] text-muted">
+              {changePin ? `${pinLength} dígitos.` : hasPin ? 'Ya tiene uno.' : 'Sin PIN.'} Con él aprueba, en el equipo de otra persona, lo que su rol permite.
+            </div>
           </div>
-          {user && (
-            <button
-              type="button"
-              className={`${secondaryButton} px-3 py-1.5 text-[12px]`}
-              onClick={() => {
-                setChangePin((c) => !c)
-                setPin('')
-                setPinConfirm('')
-              }}
-            >
-              {changePin ? 'No cambiar' : 'Cambiar PIN'}
-            </button>
-          )}
+          <button
+            type="button"
+            className={`${secondaryButton} flex-shrink-0 px-3 py-1.5 text-[12px]`}
+            onClick={() => {
+              setChangePin((c) => !c)
+              setPin('')
+              setPinConfirm('')
+            }}
+          >
+            {changePin ? 'No cambiar' : hasPin ? 'Cambiar PIN' : 'Darle PIN'}
+          </button>
         </div>
         {changePin && (
           <div className="mt-3 grid grid-cols-2 gap-2">
-            <div>
-              <label htmlFor="user-pin" className="mb-1 block field-label">
-                PIN
-              </label>
-              <input
-                id="user-pin"
-                type="password"
-                inputMode="numeric"
-                autoComplete="off"
-                maxLength={pinLength}
-                className="input text-center font-mono tracking-[5px]"
-                value={pin}
-                onChange={(e) => setPin(e.target.value.replace(/\D/g, ''))}
-                placeholder={'•'.repeat(pinLength)}
-              />
-            </div>
-            <div>
-              <label htmlFor="user-pin2" className="mb-1 block field-label">
-                Repite el PIN
-              </label>
-              <input
-                id="user-pin2"
-                type="password"
-                inputMode="numeric"
-                autoComplete="off"
-                maxLength={pinLength}
-                className="input text-center font-mono tracking-[5px]"
-                value={pinConfirm}
-                onChange={(e) => setPinConfirm(e.target.value.replace(/\D/g, ''))}
-                placeholder={'•'.repeat(pinLength)}
-              />
-            </div>
+            <input
+              type="password"
+              inputMode="numeric"
+              autoComplete="off"
+              aria-label="PIN"
+              maxLength={pinLength}
+              className={field}
+              value={pin}
+              onChange={(e) => setPin(e.target.value.replace(/\D/g, ''))}
+              placeholder={'•'.repeat(pinLength)}
+            />
+            <input
+              type="password"
+              inputMode="numeric"
+              autoComplete="off"
+              aria-label="Repite el PIN"
+              maxLength={pinLength}
+              className={field}
+              value={pinConfirm}
+              onChange={(e) => setPinConfirm(e.target.value.replace(/\D/g, ''))}
+              placeholder={'•'.repeat(pinLength)}
+            />
           </div>
         )}
       </div>
 
       <div className="mb-4 flex items-center justify-between gap-3 rounded-xl border border-br p-3">
         <div>
-          <div className="text-[13px] font-semibold">Puede ingresar</div>
-          <div className="text-[12px] text-muted">Desactívalo si deja de trabajar un tiempo: no se borra nada.</div>
+          <div className="text-[13px] font-semibold">Puede entrar</div>
+          <div className="text-[12px] text-muted">{isSelf ? 'Es tu propio usuario: no puedes desactivarlo.' : 'Desactívalo si deja de trabajar un tiempo: no se borra nada.'}</div>
         </div>
-        <Switch checked={active} onChange={setActive} label="Puede ingresar" />
+        <Switch checked={active} onChange={setActive} label="Puede entrar" disabled={isSelf} />
       </div>
 
       {error && (
@@ -215,7 +279,7 @@ function UsuarioForm({ user, onClose }: { user: Usuario | null; onClose: () => v
       )}
 
       <div className="flex flex-wrap gap-2">
-        {user && (
+        {user && !isSelf && (
           <button type="button" className={dangerButton} onClick={remove}>
             Eliminar
           </button>

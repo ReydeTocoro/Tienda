@@ -2,6 +2,8 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { PGlite } from '@electric-sql/pglite'
 import { pgcrypto } from '@electric-sql/pglite/contrib/pgcrypto'
+import type { Accounts } from './accounts'
+import { HttpError } from './routes/http'
 
 /** The bits of a Supabase database the migrations rely on, for an in-memory PGlite: the API roles
  * (with Supabase's default grants on new public tables, so the migrations' revokes are really
@@ -62,4 +64,37 @@ export async function asBrowser<T>(lite: PGlite, claims: Record<string, unknown>
     await lite.exec('reset role')
     await lite.query(`select set_config('request.jwt.claims', '', false)`)
   }
+}
+
+/** Stands in for Supabase Auth's accounts (server/accounts.ts): each account's password by email,
+ * in memory. `refuse` makes it turn a password down, the way Supabase may (too weak for it). Without
+ * `enabled` (no secret key) the server must not touch accounts at all. */
+export function fakeAccounts(enabled = true): Accounts & { passwords: Map<string, string>; refuse: (password: string) => boolean } {
+  const passwords = new Map<string, string>()
+  const off = () => {
+    throw new Error('sin la llave secreta, el servidor no debería tocar las cuentas')
+  }
+  const fake = {
+    enabled,
+    passwords,
+    refuse: (_password: string) => false,
+    async ensure(email: string, password: string) {
+      if (!enabled) off()
+      if (fake.refuse(password)) throw new HttpError(400, 'Supabase rechazó esa contraseña por débil: usa una más larga, con letras y números')
+      passwords.set(email, password)
+    },
+    async changeEmail(email: string, next: string) {
+      if (!enabled) off()
+      const password = passwords.get(email)
+      if (password === undefined) return false
+      passwords.delete(email)
+      passwords.set(next, password)
+      return true
+    },
+    async remove(email: string) {
+      if (!enabled) off()
+      passwords.delete(email)
+    },
+  }
+  return fake
 }

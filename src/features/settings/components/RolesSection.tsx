@@ -16,9 +16,7 @@ import {
   newRoleId,
   permissionLabel,
   requirementsOf,
-  sanitizeAccess,
   sanitizeRoles,
-  resolveRoles,
   withRequirements,
   withoutPermission,
   type Permission,
@@ -57,7 +55,6 @@ export function RolesSection({ onDirtyChange }: { onDirtyChange: (dirty: boolean
   const all = [ADMIN_ROLE, ...editable]
   const selected = all.find((r) => r.id === selectedId) ?? all.find((r) => r.id === CAJERO_ROLE_ID)!
   const dirty = draft !== null && !awaitingSync && !same(draft, saved)
-  const counterRole = sanitizeAccess(settings?.access, resolveRoles(editable)).counterRole
 
   useEffect(() => onDirtyChange(dirty), [dirty, onDirtyChange])
   // Once the saved roles catch up with the draft (the write came back), the draft is done — adjusted
@@ -99,10 +96,6 @@ export function RolesSection({ onDirtyChange }: { onDirtyChange: (dirty: boolean
     const holders = usersOf(role.id)
     if (holders.length) {
       toast(`Primero cambia el rol de ${holders.map((u) => u.name).join(', ')}`, 'orange')
-      return
-    }
-    if (role.id === counterRole) {
-      toast('Es el rol del mostrador: elige otro en Seguridad antes de eliminarlo', 'orange')
       return
     }
     const ok = await confirm({ title: 'Eliminar rol', message: `¿Eliminar el rol "${role.name}"? Nadie lo tiene asignado.`, confirmLabel: 'Eliminar', danger: true })
@@ -240,15 +233,14 @@ export function RolesSection({ onDirtyChange }: { onDirtyChange: (dirty: boolean
                 <div className="flex flex-wrap items-center gap-1.5 px-4 py-2.5 text-[12px] text-muted md:px-5">
                   <span>Lo tienen:</span>
                   {usersOf(selected.id).length ? usersOf(selected.id).map((u) => <Pill key={u.id}>{u.name}</Pill>) : <span>nadie todavía</span>}
-                  {selected.id === counterRole && <Pill tone="blue">Rol del mostrador</Pill>}
                 </div>
               )}
             </Card>
 
             {isAdmin && (
               <div className="mb-4 rounded-2xl border border-lime/25 bg-lime/5 px-4 py-3 text-[13px] leading-relaxed text-txt2">
-                El Administrador tiene todos los permisos y es el único que entra a Configuración (usuarios, roles y seguridad). No se puede cambiar: así nunca te quedas por fuera. El
-                PIN maestro del propietario siempre entra como Administrador.
+                El Administrador tiene todos los permisos y es el único que entra a Configuración (usuarios, roles y seguridad). No se puede cambiar: así nunca te quedas por fuera. La
+                cuenta del propietario siempre entra como Administrador.
               </div>
             )}
 

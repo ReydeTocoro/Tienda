@@ -3,9 +3,9 @@ import { supabase } from './supabase'
 
 /** Thin fetch wrapper for the write API (server/, deployed as a Firebase Function that Hosting
  * serves at /api; in dev, Vite proxies /api to `npm run server`). Every call carries the signed-in
- * session, which the API checks against the staff list — and through it, who is working on this
- * device and what they may do. Reads don't come through here: src/sync keeps the local copies up
- * to date from Supabase directly. */
+ * session, which the API checks — its account says who is working on this device and what they may
+ * do. Reads don't come through here: src/sync keeps the local copies up to date from Supabase
+ * directly. */
 
 /** A refused call, with what the server sent along: `need` (a permission someone allowed can
  * authorize), `lockedUntil` / `attemptsLeft` (PIN lockout)… */
@@ -26,13 +26,6 @@ let needHandler: NeedHandler | null = null
 export function onPermissionNeeded(handler: NeedHandler): void {
   needHandler = handler
 }
-
-// The latest access token, for the one request that can't wait for `getSession()`: telling the
-// server who is working has left when the page is being closed.
-let currentToken: string | null = null
-supabase.auth.onAuthStateChange((_event, session) => {
-  currentToken = session?.access_token ?? null
-})
 
 async function send(method: string, path: string, body?: unknown): Promise<Response> {
   const { data } = await supabase.auth.getSession()
@@ -77,16 +70,6 @@ export const apiGet = <T>(path: string): Promise<T> => request<T>('GET', path)
 export const apiPost = <T>(path: string, body?: unknown): Promise<T> => request<T>('POST', path, body)
 export const apiPut = <T>(path: string, body?: unknown): Promise<T> => request<T>('PUT', path, body)
 export const apiDelete = <T = void>(path: string): Promise<T> => request<T>('DELETE', path)
-
-/** Best effort while the page goes away: a request that outlives the page (keepalive). */
-export function apiPostOnExit(path: string): void {
-  if (!currentToken) return
-  try {
-    void fetch(path, { method: 'POST', keepalive: true, headers: { Authorization: `Bearer ${currentToken}` } }).catch(() => {})
-  } catch {
-    // The page is closing anyway; the server forgets the session in a few minutes regardless.
-  }
-}
 
 /** Wakes the API up when the app opens: a Function that sat idle starts cold, and it's better to
  * pay that second now than on the first sale. */

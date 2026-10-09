@@ -1,11 +1,13 @@
-import { ApiError, apiPost, apiPostOnExit } from '../../api/client'
+import { ApiError, apiPost } from '../../api/client'
+import { supabase } from '../../api/supabase'
 import type { Need } from '../../shared/lib/permissions'
 import { usePinStore, type PinVerifyResult } from '../../store/usePinStore'
 import { useSessionStore, type Operator } from '../../store/useSessionStore'
 
-/** Who is working on this device, as the server keeps it (server/domain/counter.ts). The PIN is
- * checked there — this app never sees a PIN hash — and the person it belongs to is bound to this
- * device's session, which is what every request and the database's RLS go by. */
+/** Who is working on this device, as the server keeps it (server/domain/counter.ts): the person
+ * whose account is signed in, bound to this device's session — which is what every request and the
+ * database's RLS go by. A PIN only authorizes one step on someone else's session; it's checked
+ * there, and this app never sees a PIN hash. */
 
 function failure(err: unknown): PinVerifyResult {
   if (err instanceof ApiError) {
@@ -19,28 +21,7 @@ function failure(err: unknown): PinVerifyResult {
   return { ok: false, error: err instanceof Error ? err.message : String(err) }
 }
 
-/** The startup "nobody is signed in here" on its way to the server: a sign-in waits for it (a few
- * seconds at most), so it can't land after the sign-in and undo it. */
-let resetting: Promise<void> | null = null
-
-/** Signs in whoever the PIN belongs to (with `need`, only someone who may do it). */
-export async function counterSignIn(pin: string, need?: Need): Promise<PinVerifyResult> {
-  if (resetting) await Promise.race([resetting, new Promise((r) => setTimeout(r, 5000))])
-  try {
-    const { operator, mustChangePin } = await apiPost<{ operator: Operator; mustChangePin: boolean }>('/api/counter/sign-in', { pin, need })
-    const result: PinVerifyResult = { ok: true, operator }
-    usePinStore.getState().noteResult(result)
-    useSessionStore.getState().signIn(operator)
-    useSessionStore.getState().setMustChangePin(mustChangePin)
-    return result
-  } catch (err) {
-    const result = failure(err)
-    usePinStore.getState().noteResult(result)
-    return result
-  }
-}
-
-/** Someone allowed lets one step through on this device without signing in. */
+/** Someone allowed lets one step through on this device without taking it over. */
 export async function counterApprove(pin: string, need: Need): Promise<PinVerifyResult> {
   try {
     const { approver } = await apiPost<{ approver: Operator }>('/api/counter/approve', { pin, need })
@@ -55,48 +36,79 @@ export async function counterApprove(pin: string, need: Need): Promise<PinVerify
   }
 }
 
-/** Whoever was working leaves: this device forgets them (and the secret data they could see) at
- * once, then the server is told. If that fails (offline) it forgets them by itself in minutes. */
-export async function counterSignOut(): Promise<void> {
-  useSessionStore.getState().signOut()
-  await apiPost('/api/counter/sign-out').catch(() => {})
+// Who this account was the last time, so the next start shows the right screens before the server
+// answers (what it may actually do is still up to the server). Per device, and only a convenience.
+const REMEMBERED = 'mtp-operator'
+
+export function assumeRemembered(email: string): void {
+  try {
+    const saved = JSON.parse(localStorage.getItem(REMEMBERED) ?? 'null') as { email?: string; operator?: Operator } | null
+    if (saved?.operator?.id && saved.email === email.toLowerCase()) useSessionStore.getState().assume(saved.operator)
+  } catch {
+    // Nothing remembered: the screens wait for the server.
+  }
 }
 
-/** As the app starts nobody is signed in on this device — the server is told so before any secret
- * data is downloaded (a tab that was closed without signing out may have left someone bound). Retried
- * until it gets through. */
-export function resetCounterOnServer(): Promise<void> {
-  resetting ??= resetLoop().finally(() => {
-    resetting = null
-  })
-  return resetting
+export function forgetRemembered(): void {
+  try {
+    localStorage.removeItem(REMEMBERED)
+  } catch {
+    // Storage blocked: nothing was remembered either.
+  }
 }
 
-async function resetLoop(): Promise<void> {
-  for (let wait = 1000; ; wait = Math.min(wait * 2, 30_000)) {
+/** Why this session can't go on (it must sign in again, or the account lost access). */
+export interface SessionEnded {
+  ended: string
+}
+
+/** Binds this device's session to its account's person, or renews it, and says who that is now:
+ * null when all is well, `{ ended }` when the session can't go on, undefined when the server
+ * couldn't be reached. */
+export async function refreshCounterSession(): Promise<SessionEnded | null | undefined> {
+  for (let attempt = 0; ; attempt++) {
     try {
-      await apiPost('/api/counter/sign-out')
-      // A sign-in that happened meanwhile already made the server agree.
-      useSessionStore.getState().setServerReady(true)
-      return
-    } catch {
-      if (useSessionStore.getState().serverReady) return
-      await new Promise((r) => setTimeout(r, wait))
+      const { operator } = await apiPost<{ operator: Operator }>('/api/counter/session')
+      useSessionStore.getState().confirm(operator)
+      const { data } = await supabase.auth.getSession()
+      const email = data.session?.user.email?.toLowerCase()
+      try {
+        if (email) localStorage.setItem(REMEMBERED, JSON.stringify({ email, operator }))
+      } catch {
+        // Storage blocked: the next start just waits for the server.
+      }
+      return null
+    } catch (err) {
+      if (!(err instanceof ApiError)) return undefined
+      // A 401 may only mean the access token expired a moment ago: renew it and ask once more. (Not
+      // when the server says this sign-in is from before one account per person: that one must be redone.)
+      if (err.status === 401 && !err.data.reauth && attempt === 0) {
+        const { error } = await supabase.auth.refreshSession()
+        if (!error) continue
+        if (error.name === 'AuthRetryableFetchError') return undefined
+      }
+      return err.status === 401 || err.status === 403 ? { ended: err.message } : undefined
     }
   }
 }
 
-/** Keeps the signed-in person bound on the server; null when the server no longer has them
- * (expired, deactivated, signed out elsewhere), undefined when it couldn't be reached. */
-export async function counterHeartbeat(): Promise<Operator | null | undefined> {
-  try {
-    return (await apiPost<{ operator: Operator | null }>('/api/counter/heartbeat')).operator
-  } catch (err) {
-    return err instanceof ApiError && err.status === 401 ? null : undefined
-  }
+/** As the app starts: retried until the server answers (offline, the app shows what it has). */
+let starting: Promise<SessionEnded | null> | null = null
+export function startCounterSession(): Promise<SessionEnded | null> {
+  starting ??= (async () => {
+    for (let wait = 1000; ; wait = Math.min(wait * 2, 30_000)) {
+      const result = await refreshCounterSession()
+      if (result !== undefined) return result
+      await new Promise((r) => setTimeout(r, wait))
+    }
+  })().finally(() => {
+    starting = null
+  })
+  return starting
 }
 
-/** The page is closing with someone signed in: tell the server right away. */
-export function counterSignOutOnExit(): void {
-  if (useSessionStore.getState().operator) apiPostOnExit('/api/counter/sign-out')
+/** The session is ending: the server stops serving it anything secret (best effort — offline, the
+ * binding dies with the session anyway). */
+export async function endCounterSession(): Promise<void> {
+  await apiPost('/api/counter/sign-out').catch(() => {})
 }

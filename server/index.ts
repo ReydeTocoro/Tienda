@@ -14,6 +14,8 @@ const app = createServerApp({
   dbUrl: requireEnv('SUPABASE_DB_URL'),
   supabaseUrl: requireEnv('VITE_SUPABASE_URL'),
   publishableKey: requireEnv('VITE_SUPABASE_PUBLISHABLE_KEY'),
+  // Optional, in .env.local: lets Configuración → Usuarios create accounts and set passwords.
+  secretKey: process.env.SUPABASE_SECRET_KEY,
 })
 
 const distDir = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'dist')

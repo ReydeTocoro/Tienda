@@ -41,8 +41,8 @@ export function useCaja() {
   }
 }
 
-/** Who to attribute a cash operation to: the unlocked admin, else the last cashier, else the owner.
- * (The server signs it with whoever is signed in anyway; this is what the open counter shows.) */
+/** Who to attribute a cash operation to on screen: whoever is signed in (else, while the app
+ * connects, the last cashier). The server signs it with whoever is signed in anyway. */
 export function useActorName(): string {
   const { currentUserName } = usePermission()
   const settings = useLiveQuery(() => getSettings())

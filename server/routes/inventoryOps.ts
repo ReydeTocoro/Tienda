@@ -110,10 +110,10 @@ export function inventoryOpsRouter(db: Db) {
   router.post(
     '/cyclic-count',
     handle(async (req) => {
-      const { adjustments, user } = (req.body ?? {}) as { adjustments: Array<{ code: string; counted: number; reason: string }>; user: string }
+      const { adjustments } = (req.body ?? {}) as { adjustments: Array<{ code: string; counted: number; reason: string }> }
       if (!Array.isArray(adjustments)) throw new HttpError(400, 'No hay ajustes para aplicar')
       return db.tx(async (q) => {
-        const by = (await requireNeed(q, await actorOf(q, authOf(req)), 'stock.ajustar')) ?? (text(user, 40) || 'Sistema')
+        const by = await requireNeed(q, await actorOf(q, authOf(req)), 'stock.ajustar')
         let applied = 0
         for (const a of adjustments) {
           const p = await getRow<Product>(q, 'products', 'code', a?.code)
@@ -151,7 +151,7 @@ export function inventoryOpsRouter(db: Db) {
       const { parsed, dupAction } = (req.body ?? {}) as { parsed: ParsedImportRow[]; dupAction: DupAction }
       if (!Array.isArray(parsed) || parsed.length > 20_000) throw new HttpError(400, 'El archivo no tiene filas válidas')
       return db.tx(async (q) => {
-        const by = (await requireNeed(q, await actorOf(q, authOf(req)), 'stock.importar')) ?? 'Sistema'
+        const by = await requireNeed(q, await actorOf(q, authOf(req)), 'stock.importar')
         let added = 0
         let updated = 0
         let skipped = 0

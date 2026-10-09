@@ -1,5 +1,6 @@
 import type { NextFunction, Request, Response } from 'express'
 import type { Sql } from './db'
+import { checkAccount } from './domain/counter'
 import { HttpError } from './routes/http'
 
 interface AuthOptions {
@@ -10,12 +11,13 @@ interface AuthOptions {
 
 /** Who a request comes from, once its Supabase session checked out. */
 export interface AuthInfo {
-  /** The Supabase Auth session (JWT claim `session_id`): one signed-in device. Who is working on
-   * that device is bound to it server-side (server/domain/counter.ts), which is also what RLS reads. */
+  /** The Supabase Auth session (JWT claim `session_id`): one signed-in device. It's bound server-side
+   * to the person whose account it is (server/domain/counter.ts), which is also what RLS reads. */
   sessionId: string
+  /** The account's email: an owner's (public.staff) or a user's (public.usuarios). */
   email: string
-  /** When this session last proved the account's password (JWT `amr`), in epoch ms — how the owner's
-   * PIN recovery knows the password was really typed just now. */
+  /** When this session proved the account's password (JWT `amr`), in epoch ms — sessions from before
+   * the switch to one account per person must sign in again. */
   passwordAt: number | null
 }
 
@@ -31,9 +33,10 @@ export function authOf(req: Request): AuthInfo {
 }
 
 interface Verdict {
-  allowed: boolean
   until: number
   auth: AuthInfo | null
+  /** Why the session may not go on (no access, or it must sign in again). */
+  refusal?: HttpError
 }
 
 const CACHE_MS = 60_000
@@ -53,10 +56,12 @@ function passwordAtOf(claims: Record<string, unknown>): number | null {
   return times.length ? Math.max(...times) : null
 }
 
-/** Every /api call must carry the Supabase session of someone on the `staff` list. The token is
+/** Every /api call must carry the Supabase session of someone who works at the store. The token is
  * verified by Supabase Auth itself (`/auth/v1/user`, which also rejects expired or revoked
- * sessions), then its email is looked up in `staff` — the same rule RLS applies to reads. The
- * verdict is cached for a minute per token, so a burst of requests costs one round trip. */
+ * sessions), then its account is checked (`checkAccount`: an owner or an active user — the same rule
+ * RLS applies to reads — signed in recently enough). The verdict is cached for a minute per token,
+ * so a burst of requests costs one round trip; the routes still look the person up again inside
+ * their transaction, so a deactivation applies at once. */
 export function requireStaff({ supabaseUrl, publishableKey, db }: AuthOptions) {
   const cache = new Map<string, Verdict>()
 
@@ -66,9 +71,16 @@ export function requireStaff({ supabaseUrl, publishableKey, db }: AuthOptions) {
     const { email } = (await res.json()) as { email?: string }
     const claims = claimsOf(token)
     const sessionId = typeof claims?.session_id === 'string' ? claims.session_id : ''
-    const rows = email ? await db.query('select 1 from public.staff where lower(email) = lower($1)', [email]) : []
-    const allowed = rows.length > 0 && !!sessionId
-    return { allowed, until: Date.now() + CACHE_MS, auth: allowed ? { sessionId, email: email!, passwordAt: passwordAtOf(claims!) } : null }
+    const until = Date.now() + CACHE_MS
+    if (!email || !sessionId) return { until, auth: null, refusal: new HttpError(403, 'Esta cuenta no tiene acceso a la tienda') }
+    const auth: AuthInfo = { sessionId, email, passwordAt: passwordAtOf(claims!) }
+    try {
+      await checkAccount(db, auth)
+    } catch (err) {
+      if (err instanceof HttpError) return { until, auth: null, refusal: err }
+      throw err
+    }
+    return { until, auth }
   }
 
   return async (req: Request, res: Response, next: NextFunction) => {
@@ -89,7 +101,10 @@ export function requireStaff({ supabaseUrl, publishableKey, db }: AuthOptions) {
         return void res.status(503).json({ error: 'No se pudo verificar la sesión. Revisa la conexión a internet.' })
       }
     }
-    if (!verdict.allowed || !verdict.auth) return void res.status(403).json({ error: 'Esta cuenta no tiene acceso a la tienda' })
+    if (verdict.refusal || !verdict.auth) {
+      const refusal = verdict.refusal ?? new HttpError(403, 'Esta cuenta no tiene acceso a la tienda')
+      return void res.status(refusal.status).json({ ...refusal.extra, error: refusal.message })
+    }
     req.auth = verdict.auth
     next()
   }

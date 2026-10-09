@@ -25,8 +25,9 @@ interface ProductTableProps {
   /** Every product by code — a package's loose-unit stock lives on a sibling product. */
   byCode: Map<string, Product>
   showCosts: boolean
-  /** Asks for the admin PIN and reveals the costs — what the locked "Precio de compra" header does. */
-  onRevealCosts: () => void
+  /** Reveals the costs — what the locked "Precio de compra" header does. Absent for someone who may
+   * not see purchase prices: then there's no such column. */
+  onRevealCosts?: () => void
   sort: SortState
   onSort: (key: SortKey) => void
   /** Changes whenever the visible list is re-queried (search/category/sort) → scroll back to top. */
@@ -37,8 +38,8 @@ interface ProductTableProps {
   onOpenPackage: (p: Product) => void
 }
 
-/** Stock list on the shared spreadsheet-style `DataTable`. The purchase price column is always
- * listed but masked (the header is a lock) until costs are revealed; margin and investment only
+/** Stock list on the shared spreadsheet-style `DataTable`. For whoever may see purchase prices the
+ * column is listed but masked (the header is a lock) until revealed; margin and investment only
  * exist while revealed. */
 export function ProductTable({ products, byCode, showCosts, onRevealCosts, sort, onSort, resetKey, onEdit, onDelete, onQuickStock, onOpenPackage }: ProductTableProps) {
   const columns = useMemo<DataColumn<Product, SortKey>[]>(() => {
@@ -108,16 +109,15 @@ export function ProductTable({ products, byCode, showCosts, onRevealCosts, sort,
         },
       },
       { key: 'min', label: 'Mín.', min: 48, align: 'right', cell: (p) => <span className="font-mono text-txt2">{formatQty(p.min)}</span> },
-      {
+      // Only for someone who may see purchase prices: listed but masked (the header is a lock, not a
+      // sort) until they reveal them — so the price has a place without showing on a shared screen.
+      ...(onRevealCosts ? [{
         key: 'cost',
         label: 'Precio de compra',
         min: 128,
         align: 'right',
         sortKey: 'cost',
-        // Always listed, but its values stay masked (and the header is a lock, not a sort) until
-        // costs are revealed — so the purchase price has a place in the table without showing on
-        // a shared screen.
-        lock: showCosts ? undefined : { title: 'Ver precios de compra (pide el PIN de alguien que pueda verlos)', onClick: onRevealCosts },
+        lock: showCosts ? undefined : { title: 'Ver precios de compra', onClick: onRevealCosts },
         cell: (p) =>
           showCosts ? (
             <span className="font-mono text-txt2">
@@ -125,11 +125,11 @@ export function ProductTable({ products, byCode, showCosts, onRevealCosts, sort,
               {isMeasuredUnit(p.unit) && <span className="text-[10px] font-normal text-muted">/{unitLabel(p)}</span>}
             </span>
           ) : (
-            <span title="Oculto: se ve con la clave de administrador" className="select-none font-mono text-muted/60">
+            <span title="Oculto: toca el candado del encabezado para verlos" className="select-none font-mono text-muted/60">
               ••••
             </span>
           ),
-      },
+      } satisfies DataColumn<Product, SortKey>] : []),
       {
         key: 'price',
         label: 'Precio de venta',

@@ -6,10 +6,15 @@ export interface Usuario {
   id: string
   name: string
   role: UsuarioRole
-  /* Their own PIN is unique (nobody else, nor the owner's master PIN, has it) and lives hashed in a
-   * database table no device can read; it's checked by the server only. */
+  /** The email they sign in with — their own Supabase Auth account, whose password only Supabase
+   * keeps (lowercase). Absent on rows saved before each person had an account: they can't sign in
+   * until an administrator gives them one. */
+  email?: string
+  /* Their PIN (optional) authorizes steps on someone else's session. It's unique (nobody else, nor
+   * the owner's master PIN, has it) and lives hashed in a database table no device can read; it's
+   * checked by the server only. */
   /** Digits of that PIN, so a later change of `settings.pinLength` can flag who needs a new one.
-   * Absent on rows saved before it existed. */
+   * Absent when they have none, or on rows saved before it existed. */
   pinLength?: 4 | 6
   active: boolean
   createdAt: string

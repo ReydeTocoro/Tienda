@@ -1,14 +1,16 @@
 /** Self-check for roles, permissions and users: the permission catalog and its requirements, how a
- * stored role list is cleaned, and the server rules on users and settings (Administrador only,
- * unique PIN and name, an existing role, no deleting a role someone has, PINs hashed where no browser
- * reads them) on an in-memory Postgres (PGlite) built from the real migrations — never the Supabase
- * data:  npm run check:roles */
+ * stored role list is cleaned, and the server rules on users and settings (Administrador only, each
+ * user with their own account — an email nobody else has, a password only Supabase keeps —, unique
+ * name and PIN, an existing role, no deleting a role someone has, no locking yourself out, PINs
+ * hashed where no browser reads them) on an in-memory Postgres (PGlite) built from the real
+ * migrations, with Supabase Auth's accounts faked — never the Supabase data:  npm run check:roles */
 import assert from 'node:assert/strict'
 import { pgliteDb } from './db'
-import { testDatabase } from './testDb'
+import { fakeAccounts, testDatabase } from './testDb'
 import { changeOwnerPin, sha256, type Actor } from './domain/counter'
 import { applySettingsPatch, createUsuario, deleteUsuario, updateUsuario } from './domain/users'
 import { getRow, listAll } from './routes/generic'
+import { MAX_PASSWORD, MIN_PASSWORD, cleanEmail, newPasswordProblem } from '../src/shared/lib/account'
 import { HttpError } from './routes/http'
 import {
   ADMIN_ROLE_ID,
@@ -102,12 +104,21 @@ const many = sanitizeRoles(Array.from({ length: 40 }, (_, i) => ({ id: `r${i}`, 
 assert.equal(many.length, MAX_ROLES + 2, 'se recorta al máximo, sin perder los dos de fábrica')
 ok('una lista de roles guardada se limpia: sin Administrador falso, sin permisos inventados ni ids repetidos, y con los roles de fábrica')
 
-// ─── Access settings and new role ids ───────────────────────────────────────────────────────────
-assert.deepEqual(sanitizeAccess(undefined, defaults), DEFAULT_ACCESS)
-assert.deepEqual(sanitizeAccess({ mode: 'pin', counterRole: 'admin', autoLockMinutes: 7 }, defaults), { mode: 'pin', counterRole: CAJERO_ROLE_ID, autoLockMinutes: 5 })
-assert.equal(sanitizeAccess({ counterRole: 'no-existe' }, defaults).counterRole, CAJERO_ROLE_ID)
-assert.equal(sanitizeAccess({ counterRole: SUPERVISOR_ROLE_ID, autoLockMinutes: 0 }, defaults).autoLockMinutes, 0, '0 = nunca')
-ok('el modo de acceso se limpia: el mostrador nunca es Administrador ni un rol inexistente')
+
+// ─── Session settings and new role ids ──────────────────────────────────────────────────────────
+assert.deepEqual(sanitizeAccess(undefined), DEFAULT_ACCESS)
+assert.deepEqual(sanitizeAccess({ mode: 'pin', counterRole: 'admin', autoLockMinutes: 5 }), { idleSignOutMinutes: 0 }, 'lo del mostrador abierto y el bloqueo con PIN se descartan')
+assert.equal(sanitizeAccess({ idleSignOutMinutes: 15 }).idleSignOutMinutes, 15)
+assert.equal(sanitizeAccess({ idleSignOutMinutes: 7 }).idleSignOutMinutes, 0, 'un valor que no está en la lista vuelve a "nunca"')
+ok('los ajustes de sesión se limpian: solo el cierre por inactividad, con un valor de la lista')
+
+assert.equal(cleanEmail('  Ana@Tienda.CO '), 'ana@tienda.co', 'el correo se guarda sin espacios y en minúsculas')
+for (const bad of ['ana', 'ana@tienda', 'ana tienda@x.co', '@x.co', 'a@@x.co', '', undefined, 42, `${'a'.repeat(250)}@x.co`]) assert.equal(cleanEmail(bad), '', `no es un correo: ${String(bad).slice(0, 20)}`)
+assert.match(newPasswordProblem('a'.repeat(MIN_PASSWORD - 1), 'a'.repeat(MIN_PASSWORD - 1))!, /al menos 8/)
+assert.match(newPasswordProblem('a'.repeat(MAX_PASSWORD + 1), 'a'.repeat(MAX_PASSWORD + 1))!, /hasta 72/)
+assert.match(newPasswordProblem('abcdefgh', 'abcdefgx')!, /no coinciden/)
+assert.equal(newPasswordProblem('abcdefgh', 'abcdefgh'), null)
+ok('el correo se limpia y la contraseña pide de 8 a 72 caracteres, escrita igual dos veces')
 
 assert.equal(newRoleId('Bodega', []), 'bodega')
 assert.equal(newRoleId('Bodega', ['bodega']), 'bodega-2')
@@ -119,7 +130,9 @@ ok('los roles nuevos reciben un id legible y que no choca')
 // ─── Server rules (PGlite with the real migrations) ─────────────────────────────────────────────
 const lite = await testDatabase()
 const db = pgliteDb(lite)
+const accounts = fakeAccounts()
 const settings = async () => (await getRow<Settings>(db, 'settings', 'key', 'main'))!
+const users = async () => listAll<Usuario>(db, 'usuarios')
 const actor = (operatorId: string, roleId: string): Actor => ({
   sessionId: `s-${operatorId}`,
   operator: { id: operatorId, name: operatorId === OWNER_ID ? OWNER_NAME : operatorId, roleId },
@@ -134,42 +147,105 @@ const pinOwner = async (pin: string) =>
 assert.deepEqual(await pinOwner('1234'), ['owner'], 'la migración deja el PIN de fábrica 1234 como PIN maestro, cifrado')
 assert.equal('pinHash' in (await settings()), false, 'y no en los ajustes que leen los dispositivos')
 
-await refused(() => db.tx((q) => createUsuario(q, supervisor, { name: 'Ana', role: CAJERO_ROLE_ID, pin: '4821', active: true })), 403, /administrador/, 'un Supervisor no crea usuarios')
-const ana = await db.tx((q) => createUsuario(q, owner, { name: '  Ana  ', role: CAJERO_ROLE_ID, pin: '4821', active: true }))
+const ANA = { name: 'Ana', role: CAJERO_ROLE_ID, email: 'ana@tienda.co', password: 'cajera-2026', active: true }
+await refused(() => db.tx((q) => createUsuario(q, supervisor, ANA, accounts)), 403, /administrador/, 'un Supervisor no crea usuarios')
+const ana = await db.tx((q) => createUsuario(q, owner, { ...ANA, name: '  Ana  ', email: '  Ana@Tienda.CO ', pin: '4821' }, accounts))
 assert.equal(ana.name, 'Ana')
+assert.equal(ana.email, 'ana@tienda.co', 'el correo se guarda limpio, en minúsculas')
 assert.equal(ana.pinLength, 4)
 assert.ok(ana.id && ana.createdAt)
-assert.equal('pinHash' in ana || 'pin' in ana, false, 'la fila del usuario no lleva su PIN')
+assert.equal(accounts.passwords.get('ana@tienda.co'), 'cajera-2026', 'su cuenta queda creada con esa contraseña')
+assert.equal('pinHash' in ana || 'pin' in ana || 'password' in ana, false, 'la fila del usuario no lleva ni su PIN ni su contraseña')
+assert.equal(JSON.stringify((await lite.query(`select data from usuarios`)).rows).includes('cajera-2026'), false, 'la contraseña no queda en la base de datos')
 assert.deepEqual(await pinOwner('4821'), [`user:${ana.id}`])
-ok('solo el Administrador crea usuarios; el PIN queda cifrado aparte, nunca en la fila del usuario')
+ok('solo el Administrador crea usuarios, cada uno con su correo y su cuenta; el PIN queda cifrado aparte y la contraseña solo en Supabase')
 
+await lite.query(`insert into public.staff (email, name) values ('dueno@tienda.co', 'Propietario')`)
 await db.tx((q) => changeOwnerPin(q, owner, '2580', 4))
 assert.deepEqual(await pinOwner('2580'), ['owner'])
 assert.deepEqual(await pinOwner('1234'), [], 'el PIN de fábrica deja de servir')
 await refused(() => db.tx((q) => changeOwnerPin(q, supervisor, '3691', 4)), 403, /administrador/, 'un Supervisor no cambia el PIN maestro')
 await refused(() => db.tx((q) => changeOwnerPin(q, owner, '4821', 4)), 409, /ya lo usa/, 'PIN maestro igual al de un usuario')
-await refused(() => db.tx((q) => createUsuario(q, owner, { name: 'Luis', role: CAJERO_ROLE_ID, pin: '4821', active: true })), 409, /ya lo usa/, 'PIN de otro usuario')
-await refused(() => db.tx((q) => createUsuario(q, owner, { name: 'Luis', role: CAJERO_ROLE_ID, pin: '2580', active: true })), 409, /ya lo usa/, 'PIN maestro')
-await refused(() => db.tx((q) => createUsuario(q, owner, { name: 'Luis', role: CAJERO_ROLE_ID, pin: '1111', active: true })), 400, /fácil/, 'PIN obvio')
-await refused(() => db.tx((q) => createUsuario(q, owner, { name: 'Luis', role: CAJERO_ROLE_ID, pin: '731', active: true })), 400, /4 dígitos/, 'PIN corto')
-await refused(() => db.tx((q) => createUsuario(q, owner, { name: 'ANA', role: CAJERO_ROLE_ID, pin: '7310', active: true })), 409, /Ya hay un usuario/, 'nombre repetido')
-await refused(() => db.tx((q) => createUsuario(q, owner, { name: 'Luis', role: 'bodega', pin: '7310', active: true })), 400, /rol no existe/, 'rol inexistente')
-await refused(() => db.tx((q) => createUsuario(q, owner, { name: '   ', role: CAJERO_ROLE_ID, pin: '7310', active: true })), 400, /nombre/, 'sin nombre')
-assert.equal((await listAll<Usuario>(db, 'usuarios')).length, 1, 'ninguno de los intentos fallidos guardó algo')
-ok('el servidor rechaza un PIN repetido (con otro usuario o con el PIN maestro), obvio o corto, un nombre repetido y un rol inexistente')
+const LUIS = { name: 'Luis', role: CAJERO_ROLE_ID, email: 'luis@tienda.co', password: 'luis-2026-ok', active: true }
+const tryCreate = (input: Record<string, unknown>) => db.tx((q) => createUsuario(q, owner, { ...LUIS, ...input }, accounts))
+await refused(() => tryCreate({ email: 'ANA@tienda.co' }), 409, /ya lo usa Ana/, 'correo de otro usuario')
+await refused(() => tryCreate({ email: 'Dueno@Tienda.co' }), 409, /propietario/, 'correo del propietario')
+await refused(() => tryCreate({ email: 'luis' }), 400, /correo válido/, 'correo inválido')
+await refused(() => tryCreate({ email: undefined }), 400, /correo válido/, 'sin correo')
+await refused(() => tryCreate({ password: undefined }), 400, /contraseña/, 'sin contraseña')
+await refused(() => tryCreate({ password: 'corta' }), 400, /al menos 8/, 'contraseña corta')
+await refused(() => tryCreate({ pin: '4821' }), 409, /ya lo usa/, 'PIN de otro usuario')
+await refused(() => tryCreate({ pin: '2580' }), 409, /ya lo usa/, 'PIN maestro')
+await refused(() => tryCreate({ pin: '1111' }), 400, /fácil/, 'PIN obvio')
+await refused(() => tryCreate({ pin: '731' }), 400, /4 dígitos/, 'PIN corto')
+await refused(() => tryCreate({ name: 'ANA' }), 409, /Ya hay un usuario/, 'nombre repetido')
+await refused(() => tryCreate({ role: 'bodega' }), 400, /rol no existe/, 'rol inexistente')
+await refused(() => tryCreate({ name: '   ' }), 400, /nombre/, 'sin nombre')
+accounts.refuse = (p) => p === 'rechazada-123'
+await refused(() => tryCreate({ password: 'rechazada-123' }), 400, /débil/, 'Supabase rechaza la contraseña')
+assert.equal((await users()).length, 1, 'ninguno de los intentos fallidos guardó algo')
+assert.deepEqual([...accounts.passwords.keys()], ['ana@tienda.co'], 'ni creó cuentas')
+ok('el servidor rechaza un correo ajeno (de otro usuario o del propietario) o inválido, una contraseña ausente, corta o que Supabase no acepta, un PIN repetido, obvio o corto, un nombre repetido y un rol inexistente')
 
-const edited = await db.tx((q) => updateUsuario(q, owner, ana.id, { name: 'Ana María', role: SUPERVISOR_ROLE_ID, active: true }))
-assert.deepEqual(await pinOwner('4821'), [`user:${ana.id}`], 'sin PIN nuevo conserva el que tenía')
+const luis = await tryCreate({})
+assert.equal(luis.pinLength, undefined, 'el PIN es opcional')
+assert.equal((await lite.query(`select 1 from private.pins where owner_id = $1`, [`user:${luis.id}`])).rows.length, 0)
+ok('el PIN para autorizar es opcional')
+
+const edited = await db.tx((q) => updateUsuario(q, owner, ana.id, { name: 'Ana María', role: SUPERVISOR_ROLE_ID, active: true }, accounts))
 assert.equal(edited.role, SUPERVISOR_ROLE_ID)
-const luis = await db.tx((q) => createUsuario(q, owner, { name: 'Luis', role: CAJERO_ROLE_ID, pin: '7310', active: true }))
-await refused(() => db.tx((q) => updateUsuario(q, owner, luis.id, { name: 'ana maría', role: CAJERO_ROLE_ID, active: true })), 409, /Ya hay un usuario/, 'renombrar a un nombre tomado')
-await refused(() => db.tx((q) => updateUsuario(q, owner, luis.id, { name: 'Luis', role: CAJERO_ROLE_ID, pin: '4821', active: true })), 409, /ya lo usa/, 'cambiar a un PIN tomado')
-const samePin = await db.tx((q) => updateUsuario(q, owner, luis.id, { name: 'Luis', role: CAJERO_ROLE_ID, pin: '7310', active: false }))
+assert.equal(edited.email, 'ana@tienda.co', 'sin correo en el cambio conserva el suyo')
+assert.equal(accounts.passwords.get('ana@tienda.co'), 'cajera-2026', 'y su contraseña')
+assert.deepEqual(await pinOwner('4821'), [`user:${ana.id}`], 'y su PIN')
+const tryUpdate = (input: Record<string, unknown>) => db.tx((q) => updateUsuario(q, owner, luis.id, { ...LUIS, password: undefined, ...input }, accounts))
+await refused(() => tryUpdate({ name: 'ana maría' }), 409, /Ya hay un usuario/, 'renombrar a un nombre tomado')
+await refused(() => tryUpdate({ pin: '4821' }), 409, /ya lo usa/, 'cambiar a un PIN tomado')
+await refused(() => tryUpdate({ email: 'ana@tienda.co' }), 409, /ya lo usa Ana/, 'tomar el correo de otro')
+await refused(() => tryUpdate({ email: '' }), 400, /correo válido/, 'quitarle el correo')
+await tryUpdate({ email: 'luis.p@tienda.co' })
+assert.equal(accounts.passwords.has('luis@tienda.co'), false)
+assert.equal(accounts.passwords.get('luis.p@tienda.co'), 'luis-2026-ok', 'el correo nuevo se lleva la cuenta, con su contraseña')
+await refused(() => tryUpdate({ email: 'luis@tienda.co', password: 'rechazada-123' }), 400, /débil/, 'correo nuevo con una contraseña que Supabase rechaza')
+assert.equal(accounts.passwords.get('luis.p@tienda.co'), 'luis-2026-ok', 'la cuenta vuelve a su correo')
+assert.equal((await getRow<Usuario>(db, 'usuarios', 'id', luis.id))!.email, 'luis.p@tienda.co', 'y el usuario lo conserva')
+await tryUpdate({ email: 'luis.p@tienda.co', password: 'nueva-clave-9' })
+assert.equal(accounts.passwords.get('luis.p@tienda.co'), 'nueva-clave-9', 'cambiar la contraseña')
+await tryUpdate({ email: 'luis.p@tienda.co', pin: '7310' })
+const samePin = await tryUpdate({ email: 'luis.p@tienda.co', pin: '7310', active: false })
 assert.equal(samePin.active, false, 'volver a guardar su propio PIN no choca consigo mismo')
-await db.tx((q) => updateUsuario(q, owner, luis.id, { name: 'Luis', role: CAJERO_ROLE_ID, pin: '9047', active: true }))
+await tryUpdate({ email: 'luis.p@tienda.co', pin: '9047' })
 assert.deepEqual(await pinOwner('7310'), [], 'el PIN viejo deja de servir')
 assert.deepEqual(await pinOwner('9047'), [`user:${luis.id}`])
-ok('al editar: conserva el PIN si no se cambia, el nuevo reemplaza al viejo, y no deja tomar el nombre o el PIN de otro')
+ok('al editar: conserva correo, contraseña y PIN si no se cambian; el correo nuevo se lleva la cuenta (que vuelve si Supabase rechaza la contraseña); no deja tomar el nombre, el correo ni el PIN de otro')
+
+await lite.query(`insert into public.usuarios (id, data) values ('viejo', '{"id":"viejo","name":"Viejo","role":"cajero","active":true,"createdAt":"2026-01-01T00:00:00Z"}')`)
+await db.tx((q) => updateUsuario(q, owner, 'viejo', { name: 'Viejo', role: CAJERO_ROLE_ID, active: false }, accounts))
+await refused(() => db.tx((q) => updateUsuario(q, owner, 'viejo', { name: 'Viejo', role: CAJERO_ROLE_ID, email: 'viejo@tienda.co', active: true }, accounts)), 400, /contraseña/, 'correo sin contraseña')
+await db.tx((q) => updateUsuario(q, owner, 'viejo', { name: 'Viejo', role: CAJERO_ROLE_ID, email: 'viejo@tienda.co', password: 'viejo-2026-x', active: true }, accounts))
+assert.equal(accounts.passwords.get('viejo@tienda.co'), 'viejo-2026-x')
+ok('un usuario de antes, sin cuenta: se activa o desactiva igual, y recibe su cuenta con correo y contraseña')
+
+const noKey = fakeAccounts(false)
+const sinLlave = await db.tx((q) => createUsuario(q, owner, { name: 'Sin llave', role: CAJERO_ROLE_ID, email: 'sinllave@tienda.co', active: true }, noKey))
+assert.equal(sinLlave.email, 'sinllave@tienda.co')
+await refused(
+  () => db.tx((q) => createUsuario(q, owner, { name: 'Otra', role: CAJERO_ROLE_ID, email: 'otra@tienda.co', password: 'una-clave-123', active: true }, noKey)),
+  503,
+  /Supabase/,
+  'sin la llave no pone contraseñas',
+)
+await db.tx((q) => deleteUsuario(q, owner, sinLlave.id, noKey))
+ok('sin la llave secreta de Supabase: guarda el correo (la cuenta se crea en el panel de Supabase) y no acepta contraseñas')
+
+const gerenteRow = await db.tx((q) => createUsuario(q, owner, { name: 'Gerente', role: ADMIN_ROLE_ID, email: 'gerente@tienda.co', password: 'gerente-2026', active: true }, accounts))
+const gerente = actor(gerenteRow.id, ADMIN_ROLE_ID)
+const selfEdit = (input: Record<string, unknown>) => db.tx((q) => updateUsuario(q, gerente, gerenteRow.id, { name: 'Gerente', role: ADMIN_ROLE_ID, active: true, ...input }, accounts))
+await refused(() => selfEdit({ active: false }), 409, /desactivar tu propio/, 'desactivarse')
+await refused(() => selfEdit({ role: SUPERVISOR_ROLE_ID }), 409, /Administrador/, 'quitarse el rol')
+await refused(() => db.tx((q) => deleteUsuario(q, gerente, gerenteRow.id, accounts)), 409, /eliminar tu propio/, 'eliminarse')
+await selfEdit({ password: 'gerente-nueva-1' })
+assert.equal(accounts.passwords.get('gerente@tienda.co'), 'gerente-nueva-1', 'sí puede cambiar su propia contraseña')
+ok('un administrador no puede dejarse por fuera: ni desactivarse, ni quitarse el rol, ni eliminarse')
 
 // Roles saved through the settings
 await refused(() => db.tx((q) => applySettingsPatch(q, supervisor, { roles: DEFAULT_ROLES })), 403, /administrador/, 'un Supervisor no edita roles')
@@ -178,20 +254,17 @@ assert.equal((await settings()).theme, 'dark', 'el tema sí lo cambia cualquiera
 await db.tx((q) => applySettingsPatch(q, owner, { roles: [...DEFAULT_ROLES, { id: 'bodega', name: 'Bodega', permissions: ['stock.entradas', 'inventado' as Permission] }] }))
 const storedBodega = (await settings()).roles!.find((r) => r.id === 'bodega')!
 assert.deepEqual(storedBodega.permissions, ['stock.ver', 'stock.entradas'], 'el servidor limpia los permisos que guarda')
-const pedro = await db.tx((q) => createUsuario(q, owner, { name: 'Pedro', role: 'bodega', pin: '5096', active: true }))
+const pedro = await db.tx((q) => createUsuario(q, owner, { name: 'Pedro', role: 'bodega', email: 'pedro@tienda.co', password: 'pedro-2026-x', active: true }, accounts))
 assert.equal(pedro.role, 'bodega', 'un rol propio sirve en cuanto existe')
 await refused(() => db.tx((q) => applySettingsPatch(q, owner, { roles: DEFAULT_ROLES })), 409, /Pedro/, 'quitar un rol que alguien tiene')
 assert.ok((await settings()).roles!.some((r) => r.id === 'bodega'), 'el rol sigue ahí')
-await db.tx((q) => applySettingsPatch(q, owner, { access: { mode: 'abierto', counterRole: 'bodega', autoLockMinutes: 10 } }))
-assert.equal((await settings()).access!.counterRole, 'bodega')
-await db.tx((q) => updateUsuario(q, owner, pedro.id, { name: 'Pedro', role: CAJERO_ROLE_ID, active: true }))
+await db.tx((q) => updateUsuario(q, owner, pedro.id, { name: 'Pedro', role: CAJERO_ROLE_ID, active: true }, accounts))
 await db.tx((q) => applySettingsPatch(q, owner, { roles: DEFAULT_ROLES }))
 assert.ok(!(await settings()).roles!.some((r) => r.id === 'bodega'), 'ya nadie lo tenía: se pudo quitar')
-assert.equal((await settings()).access!.counterRole, CAJERO_ROLE_ID, 'el mostrador que usaba ese rol vuelve a Cajero')
-ok('los roles se guardan limpios y solo los edita el Administrador; un rol con usuarios no se puede quitar, y el mostrador nunca queda con un rol borrado')
+ok('los roles se guardan limpios y solo los edita el Administrador; un rol con usuarios no se puede quitar')
 
-await db.tx((q) => applySettingsPatch(q, owner, { access: { mode: 'pin', counterRole: ADMIN_ROLE_ID, autoLockMinutes: 15 } }))
-assert.deepEqual((await settings()).access, { mode: 'pin', counterRole: CAJERO_ROLE_ID, autoLockMinutes: 15 })
+await db.tx((q) => applySettingsPatch(q, owner, { access: { idleSignOutMinutes: 15, mode: 'pin', counterRole: 'admin' } }))
+assert.deepEqual((await settings()).access, { idleSignOutMinutes: 15 })
 for (const key of ['pinHash', 'pinLength', 'cajaBase', 'lastCajero', 'pinLockedUntil']) {
   await refused(() => db.tx((q) => applySettingsPatch(q, owner, { [key]: 1 })), 400, /no se cambia aquí/, `${key} no se cambia por los ajustes`)
 }
@@ -199,11 +272,12 @@ await db.tx((q) => applySettingsPatch(q, owner, { storeName: '  Plastimax  ', bu
 const after = await settings()
 assert.equal(after.storeName, 'Plastimax')
 assert.deepEqual(after.business, { nit: '900.1', phone: '', address: '', receiptFooter: '' })
-ok('el modo de acceso se guarda limpio; el PIN, la base de la caja y el último cajero no se tocan por los ajustes')
+ok('el cierre por inactividad se guarda limpio; el PIN, la base de la caja y el último cajero no se tocan por los ajustes')
 
-await db.tx((q) => deleteUsuario(q, owner, luis.id))
+await db.tx((q) => deleteUsuario(q, owner, luis.id, accounts))
 assert.deepEqual(await pinOwner('9047'), [], 'borrar un usuario borra su PIN')
-ok('borrar un usuario se lleva su PIN')
+assert.equal(accounts.passwords.has('luis.p@tienda.co'), false, 'y su cuenta')
+ok('borrar un usuario se lleva su PIN y su cuenta')
 
 await db.end()
 console.log(`\nTodo en orden: ${n} comprobaciones de roles y usuarios pasaron.`)

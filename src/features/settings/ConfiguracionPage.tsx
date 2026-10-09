@@ -13,7 +13,7 @@ const SECTIONS = [
   { id: 'negocio', label: 'Negocio', hint: 'Nombre y datos del recibo', icon: Store },
   { id: 'usuarios', label: 'Usuarios', hint: 'Quién trabaja en la tienda', icon: Users },
   { id: 'roles', label: 'Roles y permisos', hint: 'Qué ve y hace cada uno', icon: ShieldCheck },
-  { id: 'seguridad', label: 'Seguridad', hint: 'Acceso, bloqueo y PIN', icon: Lock },
+  { id: 'seguridad', label: 'Seguridad', hint: 'Sesiones y PIN maestro', icon: Lock },
   { id: 'dispositivo', label: 'Este dispositivo', hint: 'Lector, atajos y cuenta', icon: MonitorSmartphone },
 ] as const
 
@@ -27,7 +27,8 @@ export function ConfiguracionPage() {
   const current: SectionId = SECTIONS.find((s) => s.id === params.get('seccion'))?.id ?? 'negocio'
   const [rolesDirty, setRolesDirty] = useState(false)
   const confirm = useConfirm()
-  // Asked to the server: no device can read the PINs (the master PIN still being "1234" included).
+  // Asked to the server: no device can read the PINs (the master PIN still being "1234" included),
+  // nor which accounts are the owner's.
   const security = useSecurityInfo()
   const defaultPin = !!security?.ownerPinDefault
 
@@ -52,7 +53,7 @@ export function ConfiguracionPage() {
         <div role="alert" className="mb-4 flex flex-wrap items-center gap-3 rounded-2xl border border-red/30 bg-red/10 px-4 py-3">
           <AlertTriangle size={18} className="flex-shrink-0 text-red" />
           <p className="min-w-0 flex-1 text-[13px] text-txt">
-            <b className="text-red">El PIN del propietario sigue siendo 1234.</b> Cualquiera lo conoce: cámbialo para que los permisos sirvan de algo.
+            <b className="text-red">El PIN maestro sigue siendo 1234.</b> Cualquiera lo conoce, así que no sirve para autorizar nada hasta que lo cambies.
           </p>
           {current !== 'seguridad' && (
             <button onClick={() => go('seguridad')} className="rounded-[10px] bg-red px-3.5 py-1.5 text-[12px] font-bold text-on-solid">

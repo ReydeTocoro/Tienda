@@ -1,4 +1,5 @@
 import express, { type RequestHandler } from 'express'
+import { noAccounts, type Accounts } from './accounts'
 import type { Db } from './db'
 import { refreshCounterPerms } from './domain/counter'
 import { cashRouter } from './routes/cash'
@@ -17,10 +18,10 @@ import { usuariosRouter } from './routes/usuarios'
 
 /** The write API under /api — reads don't come through here: the app reads Supabase directly
  * (src/sync), where RLS only serves the secret tables to whoever may see them. Every route checks
- * the permission of whoever is working on the requesting device (server/domain/counter.ts). Shared
- * by the local dev server (server/index.ts) and the Firebase Function (functions/index.js, via
- * server/serverApp.ts). */
-export function createApp(db: Db, auth: RequestHandler) {
+ * the permission of whoever is signed in on the requesting device (server/domain/counter.ts).
+ * `accounts` manages the sign-in accounts of the users (server/accounts.ts). Shared by the local dev
+ * server (server/index.ts) and the Firebase Function (functions/index.js, via server/serverApp.ts). */
+export function createApp(db: Db, auth: RequestHandler, accounts: Accounts = noAccounts) {
   const app = express()
   app.disable('x-powered-by')
   // Answers can carry purchase prices or who is signed in: never kept by a browser or a proxy cache.
@@ -30,9 +31,9 @@ export function createApp(db: Db, auth: RequestHandler) {
   })
   app.use(express.json({ limit: '5mb' }))
 
-  // The open counter's permissions as RLS sees them follow the current roles (they're kept in step
-  // on every change; this catches up a database that was just migrated).
-  db.tx(refreshCounterPerms).catch((err) => console.error('No se pudieron preparar los permisos del mostrador', err))
+  // The permissions RLS reads for each signed-in session follow the current roles (they're kept in
+  // step on every change; this catches up a database that was just migrated).
+  db.tx(refreshCounterPerms).catch((err) => console.error('No se pudieron preparar los permisos de las sesiones', err))
 
   // Open and cheap: the app pings it when it starts, so a cold Function (and its database
   // connection) is warm by the first sale. Answers 503 when the database can't be reached.
@@ -46,7 +47,7 @@ export function createApp(db: Db, auth: RequestHandler) {
   })
 
   app.use('/api', auth)
-  app.use('/api/counter', counterRouter(db))
+  app.use('/api/counter', counterRouter(db, accounts))
   app.use('/api/products', productsRouter(db))
   app.use('/api/customers', customersRouter(db))
   app.use('/api/sales', salesRouter(db))
@@ -54,7 +55,7 @@ export function createApp(db: Db, auth: RequestHandler) {
   app.use('/api/entradas', entradasRouter(db))
   app.use('/api/settings', settingsRouter(db))
   app.use('/api/inventory', inventoryOpsRouter(db))
-  app.use('/api/usuarios', usuariosRouter(db))
+  app.use('/api/usuarios', usuariosRouter(db, accounts))
   app.use('/api/cash', cashRouter(db))
   app.use('/api/suppliers', suppliersRouter(db))
   app.use('/api/purchaseOrders', purchaseOrdersRouter(db))

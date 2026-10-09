@@ -4,9 +4,11 @@ const { onRequest } = require('firebase-functions/v2/https')
 const { defineSecret } = require('firebase-functions/params')
 const { createServerApp } = require('./lib/server.js')
 
-// The Supabase database URL (it carries the password) lives in Secret Manager:
-//   firebase functions:secrets:set SUPABASE_DB_URL
+// Both live in Secret Manager, and both must exist before a deploy:
+//   firebase functions:secrets:set SUPABASE_DB_URL      (the database URL, it carries the password)
+//   firebase functions:secrets:set SUPABASE_SECRET_KEY  (creates the users' sign-in accounts)
 const SUPABASE_DB_URL = defineSecret('SUPABASE_DB_URL')
+const SUPABASE_SECRET_KEY = defineSecret('SUPABASE_SECRET_KEY')
 
 let app
 
@@ -16,7 +18,7 @@ exports.api = onRequest(
     region: 'us-east4',
     // Reachable from the browser through Hosting; the API itself demands a staff session.
     invoker: 'public',
-    secrets: [SUPABASE_DB_URL],
+    secrets: [SUPABASE_DB_URL, SUPABASE_SECRET_KEY],
     memory: '512MiB',
     timeoutSeconds: 60,
     maxInstances: 2,
@@ -27,6 +29,7 @@ exports.api = onRequest(
       dbUrl: SUPABASE_DB_URL.value(),
       supabaseUrl: process.env.SUPABASE_URL,
       publishableKey: process.env.SUPABASE_PUBLISHABLE_KEY,
+      secretKey: SUPABASE_SECRET_KEY.value(),
     })
     return app(req, res)
   },

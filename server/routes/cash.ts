@@ -6,8 +6,6 @@ import { actorOf, allowed, requireNeed } from '../domain/counter'
 import { handle } from './http'
 import { openCaja, registerMovement, transferFunds, type MovementInput, type TransferInput } from '../domain/cash'
 
-const name = (v: unknown): string => (typeof v === 'string' ? v.trim().slice(0, 40) : '')
-
 /** What someone who counts blind may learn about the session they just opened: not what the system
  * expected, nor the difference. */
 function blindSession(s: CashSession): Partial<CashSession> {
@@ -26,7 +24,7 @@ export function cashRouter(db: Db) {
       const input = (req.body ?? {}) as MovementInput
       return db.tx(async (q) => {
         const by = await requireNeed(q, await actorOf(q, authOf(req)), 'caja.gestionar')
-        return registerMovement(q, { ...input, by: by ?? name(input.by) })
+        return registerMovement(q, { ...input, by })
       })
     }, 201),
   )
@@ -37,7 +35,7 @@ export function cashRouter(db: Db) {
       const input = (req.body ?? {}) as TransferInput
       return db.tx(async (q) => {
         const by = await requireNeed(q, await actorOf(q, authOf(req)), 'caja.gestionar')
-        return transferFunds(q, { ...input, by: by ?? name(input.by) })
+        return transferFunds(q, { ...input, by })
       })
     }, 201),
   )
@@ -47,12 +45,12 @@ export function cashRouter(db: Db) {
   router.post(
     '/open',
     handle(async (req) => {
-      const { countedCash, by, mayorInitial } = (req.body ?? {}) as { countedCash: number; by: string; mayorInitial?: number }
+      const { countedCash, mayorInitial } = (req.body ?? {}) as { countedCash: number; mayorInitial?: number }
       return db.tx(async (q) => {
         const actor = await actorOf(q, authOf(req))
-        const approver = await requireNeed(q, actor, 'caja.abrir')
+        await requireNeed(q, actor, 'caja.abrir')
         if (Number(mayorInitial) > 0) await requireNeed(q, actor, 'caja.gestionar')
-        const session = await openCaja(q, { countedCash, by: actor.operator?.name ?? (name(by) || approver || ''), mayorInitial })
+        const session = await openCaja(q, { countedCash, by: actor.operator.name, mayorInitial })
         return allowed(actor, 'caja.verEsperado') ? session : blindSession(session)
       })
     }, 201),

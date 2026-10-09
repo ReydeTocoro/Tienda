@@ -2,7 +2,6 @@ import { useEffect, useRef } from 'react'
 import type { RefObject } from 'react'
 import { useScannerStore } from '../../store/useScannerStore'
 import { usePinStore } from '../../store/usePinStore'
-import { useSessionStore } from '../../store/useSessionStore'
 
 const MIN_LEN = 4 // minimum chars to consider a barcode
 const MAX_INTERVAL = 50 // ms max between keystrokes from a real scanner
@@ -61,8 +60,8 @@ export function useHidScanner({ onScan, exceptRef, enabled = true }: UseHidScann
 
     function onKeydown(e: KeyboardEvent) {
       if (isTypingTarget(e.target, exceptRef?.current)) return
-      // Digits typed into a PIN pad (dialog or lock screen) are a PIN, never a barcode — even when typed fast.
-      if (usePinStore.getState().request || useSessionStore.getState().locked) return
+      // Digits typed into the PIN pad are a PIN, never a barcode — even when typed fast.
+      if (usePinStore.getState().request) return
 
       const key = e.key
       const now = Date.now()

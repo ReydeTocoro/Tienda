@@ -36,7 +36,6 @@ const ALL = '__all__'
 /** The purchase prices this device holds right now — for an export that runs right after signing
  * someone in, before the screen has re-rendered with the costs that just arrived. */
 const freshCosts = () => new Map(secureRows('productCosts').map((r) => [r.code, Number(r.cost) || 0]))
-const EXPORT_NOTE = 'El archivo incluye los precios de compra: requiere permiso.'
 
 export function InventarioPage() {
   const stored = useLiveQuery(() => db.products.toArray(), [], []) as Product[]
@@ -45,7 +44,7 @@ export function InventarioPage() {
   const products = useMemo(() => withCosts(stored, costs), [stored, costs])
   const settings = useLiveQuery(() => getSettings())
   const confirm = useConfirm()
-  const { can, signInFor, requirePermission } = usePermission()
+  const { can, requirePermission } = usePermission()
 
   // The create/edit form lives in a dialog: opened by the floating "+" or a row's edit action.
   const [formOpen, setFormOpen] = useState(false)
@@ -53,10 +52,10 @@ export function InventarioPage() {
   const [formSeed, setFormSeed] = useState<{ code: string; token: number } | null>(null)
   const [packageCode, setPackageCode] = useState<string | null>(null)
 
-  // List view: search + category filter + column sort. Purchase prices stay hidden until someone
-  // allowed to see them asks (a shared screen) — which signs them in, so the server sends the costs
-  // to this device — and go back to hidden whenever the page is left or they sign out. The
-  // inventory's total value is a separate permission (ganancias.ver) on top of that.
+  // List view: search + category filter + column sort. Purchase prices only exist for whoever may
+  // see them (the server sends them to this device only then), and even so stay hidden until they
+  // ask — a shared screen — going back to hidden whenever the page is left. The inventory's total
+  // value is a separate permission (ganancias.ver) on top of that.
   const [search, setSearch] = useState('')
   const [cat, setCat] = useState(ALL)
   const [sort, setSort] = useState<SortState>(DEFAULT_SORT)
@@ -188,16 +187,15 @@ export function InventarioPage() {
       setSort((s) => (COST_SORT_KEYS.has(s.key) ? DEFAULT_SORT : s))
       return
     }
-    const ok = await signInFor('costos.ver', 'Precios de compra', 'Ver a cómo se compra cada producto requiere permiso. Ingresa el PIN de alguien que pueda verlos: quedará ingresado.')
-    if (!ok) return
+    if (!can('costos.ver')) return
     if (!(await whenSecureLoaded('productCosts'))) toast('Los precios de compra aún no llegan: revisa la conexión', 'orange')
     setShowCosts(true)
   }
 
-  /** Exports carry purchase prices, so whoever exports must be signed in here (the costs only reach
-   * this device for them). */
-  async function exportWithCosts(title: string, run: () => void) {
-    if (!(await signInFor('stock.importar', title, EXPORT_NOTE))) return
+  /** Exports carry purchase prices: only for whoever may import and export the catalog (which
+   * includes seeing them), once the prices have reached this device. */
+  async function exportWithCosts(run: () => void) {
+    if (!can('stock.importar')) return
     if (!(await whenSecureLoaded('productCosts'))) {
       toast('Los precios de compra aún no llegan: revisa la conexión e inténtalo de nuevo', 'orange')
       return
@@ -277,6 +275,7 @@ export function InventarioPage() {
             {summary.outStock > 0 && <Chip tone="red">{summary.outStock} sin stock</Chip>}
             {summary.lowStock > 0 && <Chip tone="orange">{summary.lowStock} stock bajo</Chip>}
           </div>
+          {can('costos.ver') && (
           <button
             onClick={toggleCosts}
             className="ml-auto flex items-center gap-1.5 rounded-[10px] border border-br2 bg-s1 px-3 py-1.5 text-[12px] font-semibold text-txt2 transition-colors hover:bg-s3 hover:text-txt"
@@ -284,6 +283,7 @@ export function InventarioPage() {
             {costsVisible ? <EyeOff size={15} /> : <Lock size={15} />}
             {costsVisible ? 'Ocultar costos' : can('ganancias.ver') ? 'Ver costos e inversión' : 'Ver precios de compra'}
           </button>
+          )}
         </div>
 
         {showValue && (
@@ -312,15 +312,14 @@ export function InventarioPage() {
               onClick={() => guarded('stock.entradas', 'Entrada de mercancía', 'Registrar mercancía que llega requiere permiso.', () => setEntradaOpen(true))}
               className="border-lime/30 bg-lime/10 text-lime hover:bg-lime/15"
             />
-            <ToolButton icon={FileSpreadsheet} label="Excel" onClick={() => exportWithCosts('Exportar a Excel', () => exportExcel(withCosts(stored, freshCosts()), storeName))} iconClassName="text-green" />
-            <ToolButton icon={FileText} label="CSV" onClick={() => exportWithCosts('Exportar a CSV', () => exportCSV(withCosts(stored, freshCosts()), storeName))} iconClassName="text-blue" />
-            <ToolButton icon={Download} label="Plantilla" onClick={() => exportWithCosts('Plantilla de importación', () => downloadImportTemplate(withCosts(stored, freshCosts()), storeName))} />
-            <ToolButton
-              icon={Upload}
-              label="Importar"
-              onClick={() => guarded('stock.importar', 'Importar catálogo', 'Importar productos requiere permiso.', () => fileInputRef.current?.click())}
-              iconClassName="text-purple"
-            />
+            {can('stock.importar') && (
+              <>
+                <ToolButton icon={FileSpreadsheet} label="Excel" onClick={() => exportWithCosts(() => exportExcel(withCosts(stored, freshCosts()), storeName))} iconClassName="text-green" />
+                <ToolButton icon={FileText} label="CSV" onClick={() => exportWithCosts(() => exportCSV(withCosts(stored, freshCosts()), storeName))} iconClassName="text-blue" />
+                <ToolButton icon={Download} label="Plantilla" onClick={() => exportWithCosts(() => downloadImportTemplate(withCosts(stored, freshCosts()), storeName))} />
+                <ToolButton icon={Upload} label="Importar" onClick={() => fileInputRef.current?.click()} iconClassName="text-purple" />
+              </>
+            )}
             <ToolButton icon={ClipboardCheck} label="Conteo cíclico" onClick={() => setCyclicOpen(true)} iconClassName="text-orange" />
             <ToolButton icon={ScrollText} label="Auditoría" onClick={() => setAuditOpen(true)} />
           </div>
@@ -336,7 +335,7 @@ export function InventarioPage() {
             products={rows}
             byCode={byCode}
             showCosts={costsVisible}
-            onRevealCosts={toggleCosts}
+            onRevealCosts={can('costos.ver') ? toggleCosts : undefined}
             sort={sort}
             onSort={handleSort}
             resetKey={`${search}|${activeCat}|${sort.key}|${sort.dir}`}

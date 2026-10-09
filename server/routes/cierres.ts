@@ -17,8 +17,8 @@ export function cierresRouter(db: Db) {
       return db.tx(async (q) => {
         const actor = await actorOf(q, authOf(req))
         await requireNeed(q, actor, 'caja.cerrar')
-        // Signed in: the cierre is theirs. The open counter types who closes.
-        const cierre = await confirmCierre(q, { ...input, cajero: actor.operator?.name ?? input.cajero })
+        // The cierre is signed by whoever is working, whatever the browser says.
+        const cierre = await confirmCierre(q, { ...input, cajero: actor.operator.name })
         if (allowed(actor, 'caja.verEsperado')) return cierre
         return { id: cierre.id, tipo: cierre.tipo, fecha: cierre.fecha, cajero: cierre.cajero, cerradoEn: cierre.cerradoEn }
       })

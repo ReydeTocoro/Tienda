@@ -149,8 +149,8 @@ export async function finalizeSale(sql: Sql, actor: Actor, input: FinalizeSaleIn
     dayKey: dayKeyOf(date),
     notes: text(input.notes, 300) || undefined,
     // Who sold it is whoever is signed in on this device — not what the browser says.
-    sellerId: actor.operator?.id,
-    sellerName: actor.operator?.name,
+    sellerId: actor.operator.id,
+    sellerName: actor.operator.name,
   }
   // The table's trigger moves `ganancia` and the item costs out of the row everyone reads.
   const sale = await insertAutoRow(sql, TABLE, saleData)

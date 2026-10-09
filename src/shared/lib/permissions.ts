@@ -3,8 +3,8 @@
  * database's RLS policies look up, with the exact same catalog the Configuración screen offers.
  *
  * - `Administrador` is built in, fixed and has every permission plus what no other role can be
- *   granted: Configuración, users, roles and security. The owner's master PIN always signs in as it,
- *   so the store can never be locked out by a bad role edit.
+ *   granted: Configuración, users, roles and security. The owner's account (public.staff) always
+ *   signs in as it, so the store can never be locked out by a bad role edit.
  * - `Supervisor` and `Cajero` are built in too (they can't be deleted) but their permissions are
  *   editable; custom roles can be added. The edited list lives in `settings.roles`. */
 
@@ -172,7 +172,8 @@ export const BUILT_IN_ROLE_IDS = new Set([ADMIN_ROLE_ID, SUPERVISOR_ROLE_ID, CAJ
 
 export const ADMIN_ROLE: Role = { id: ADMIN_ROLE_ID, name: 'Administrador', permissions: ALL_PERMISSIONS }
 
-/** The owner's master PIN always signs in as this "person", with the Administrador role. */
+/** The owner's account always signs in as this "person", with the Administrador role (and the
+ * master PIN authorizes as it). */
 export const OWNER_ID = 'owner'
 export const OWNER_NAME = 'Propietario'
 
@@ -311,29 +312,24 @@ export function needsOfRole(roles: Role[], roleId: string | undefined | null): N
 }
 
 /** How the app is used at the counter — `settings.access`. */
+/** How sessions behave. Each person signs in with their own account (email and password), whose role
+ * decides what they see and do. */
 export interface AccessSettings {
-  /** 'abierto': the app opens straight into Venta with the counter role's permissions; anything
-   * beyond them asks for the PIN of someone allowed. 'pin': everyone signs in with their own PIN
-   * and the screen locks after inactivity. */
-  mode: 'abierto' | 'pin'
-  /** Role the open counter works with while nobody is signed in (mode 'abierto'). Never the Administrador. */
-  counterRole: string
-  /** Minutes without touching the screen before whoever signed in is signed out (0 = never). */
-  autoLockMinutes: number
+  /** Minutes without touching the screen before the session closes by itself and the login shows
+   * again (0 = never). */
+  idleSignOutMinutes: number
 }
 
-export const AUTO_LOCK_CHOICES = [0, 2, 5, 10, 15, 30, 60]
+export const IDLE_SIGN_OUT_CHOICES = [0, 5, 10, 15, 30, 60, 120]
 
-export const DEFAULT_ACCESS: AccessSettings = { mode: 'abierto', counterRole: CAJERO_ROLE_ID, autoLockMinutes: 5 }
+export const DEFAULT_ACCESS: AccessSettings = { idleSignOutMinutes: 0 }
 
-/** Same idea as `sanitizeRoles`, for `settings.access`: unknown values fall back to the defaults,
- * and a counter role that doesn't exist (or is the Administrador) becomes the Cajero. */
-export function sanitizeAccess(input: unknown, roles: Role[]): AccessSettings {
+/** Same idea as `sanitizeRoles`, for `settings.access`: unknown values fall back to the defaults (and
+ * what earlier versions kept there — the open counter, the PIN lock — is dropped). */
+export function sanitizeAccess(input: unknown): AccessSettings {
   const a = (input && typeof input === 'object' ? input : {}) as Partial<AccessSettings>
-  const mode = a.mode === 'pin' ? 'pin' : 'abierto'
-  const counterRole = typeof a.counterRole === 'string' && a.counterRole !== ADMIN_ROLE_ID && roles.some((r) => r.id === a.counterRole) ? a.counterRole : CAJERO_ROLE_ID
-  const autoLockMinutes = AUTO_LOCK_CHOICES.includes(Number(a.autoLockMinutes)) ? Number(a.autoLockMinutes) : DEFAULT_ACCESS.autoLockMinutes
-  return { mode, counterRole, autoLockMinutes }
+  const minutes = Number(a.idleSignOutMinutes)
+  return { idleSignOutMinutes: IDLE_SIGN_OUT_CHOICES.includes(minutes) ? minutes : DEFAULT_ACCESS.idleSignOutMinutes }
 }
 
 /** A short, readable id for a new custom role ("Bodega" → "bodega", then "bodega-2"…). */

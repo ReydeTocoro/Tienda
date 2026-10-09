@@ -1,32 +1,30 @@
-import { useEffect, useState, type ReactNode } from 'react'
-import { LogOut } from 'lucide-react'
-import { supabase } from '../../../api/supabase'
+import type { ReactNode } from 'react'
+import { LogOut, Users } from 'lucide-react'
 import { updateSettings } from '../../../db/repositories/settings'
 import { useConfirm } from '../../../store/useConfirmStore'
 import { useScannerStore } from '../../../store/useScannerStore'
 import { toast } from '../../../store/useToastStore'
 import { signOut } from '../../auth/session'
-import { Card, Row, SectionHeader, Switch, dangerButton } from './ui'
+import { useAccountEmail } from '../../auth/useAccountEmail'
+import { useChangeUser } from '../../auth/useChangeUser'
+import { Card, Row, SectionHeader, Switch, dangerButton, secondaryButton } from './ui'
 
 const SHORTCUTS: Array<[string, string]> = [
   ['F1 – F6', 'Ir a Venta, Stock, Clientes, Fiados, Facturas o Reporte'],
   ['/  o  F7', 'Escribir en el buscador de productos de Venta'],
   ['F8', 'Activar o desactivar el lector de códigos'],
-  ['0 – 9', 'Escribir el PIN cuando se pide'],
+  ['0 – 9', 'Escribir el PIN cuando se pide una autorización'],
   ['Esc', 'Cerrar la ventana del PIN'],
 ]
 
 /** What belongs to this device rather than to the store: the barcode reader, the keyboard
- * shortcuts and the store account signed in here. */
+ * shortcuts and the account signed in here. */
 export function DispositivoSection() {
   const scannerEnabled = useScannerStore((s) => s.enabled)
   const setScannerEnabled = useScannerStore((s) => s.setEnabled)
-  const [email, setEmail] = useState<string>()
+  const email = useAccountEmail()
+  const changeUser = useChangeUser()
   const confirm = useConfirm()
-
-  useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => setEmail(data.session?.user.email))
-  }, [])
 
   async function toggleScanner(next: boolean) {
     setScannerEnabled(next)
@@ -40,12 +38,17 @@ export function DispositivoSection() {
 
   async function handleSignOut() {
     const ok = await confirm({
-      title: 'Cerrar la cuenta en este dispositivo',
-      message: 'Este dispositivo dejará de mostrar la tienda hasta que alguien vuelva a iniciar sesión con el correo y la contraseña. Los datos siguen guardados en la nube.',
-      confirmLabel: 'Cerrar sesión',
+      title: 'Dejar de usar este dispositivo',
+      message: 'Se cierra tu sesión y se borra la copia de los datos de la tienda que guarda este equipo. Los datos siguen en la nube: quien vuelva a entrar aquí los descarga de nuevo.',
+      confirmLabel: 'Cerrar sesión y borrar',
       danger: true,
     })
-    if (ok) await signOut()
+    if (!ok) return
+    try {
+      await signOut({ forget: true })
+    } catch (err) {
+      toast(err instanceof Error ? err.message : String(err), 'red')
+    }
   }
 
   return (
@@ -67,11 +70,17 @@ export function DispositivoSection() {
         ))}
       </Card>
 
-      <Card title="Cuenta de la tienda" description="Con ella se abrió la tienda en este dispositivo. Es distinta de los usuarios y sus PIN.">
+      <Card title="Tu cuenta" description="Con ella entraste en este dispositivo.">
         <Row label="Conectado como" hint={email ?? '…'}>
+          <button type="button" onClick={() => void changeUser()} className={`${secondaryButton} flex items-center gap-1.5`}>
+            <Users size={15} />
+            Cambiar de usuario
+          </button>
+        </Row>
+        <Row label="Dejar de usar este dispositivo" hint="Cierra la sesión y borra la copia de los datos guardada en este equipo.">
           <button type="button" onClick={handleSignOut} className={`${dangerButton} flex items-center gap-1.5`}>
             <LogOut size={15} />
-            Cerrar sesión
+            Cerrar sesión y borrar
           </button>
         </Row>
       </Card>

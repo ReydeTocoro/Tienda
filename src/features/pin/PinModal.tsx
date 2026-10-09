@@ -3,8 +3,8 @@ import { useFitHeight } from '../../shared/hooks/useFitHeight'
 import { usePinStore } from '../../store/usePinStore'
 import { PinPad } from './PinPad'
 
-/** The single PIN dialog for the whole app — legacy `#pin-modal` (index.html L7643-7689). Each
- * `ask()` decides what the PIN must prove (see usePermission); this only collects it. */
+/** The single PIN dialog for the whole app — legacy `#pin-modal` (index.html L7643-7689): someone
+ * allowed authorizes one step on this session (see usePermission); this only collects the PIN. */
 export function PinModal() {
   const request = usePinStore((s) => s.request)
   const settle = usePinStore((s) => s.settle)
@@ -36,7 +36,7 @@ export function PinModal() {
     >
       <div ref={cardRef} className={`w-full max-w-[340px] rounded-[24px] border border-br bg-s1 px-[26px] pb-[26px] pt-[30px] text-center shadow-lg ${shake ? 'animate-[pinShake_0.45s_ease]' : ''}`}>
         <div className="mb-3.5 inline-flex items-center gap-1.5 rounded-full border border-lime/30 bg-lime/10 px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-lime">
-          Acceso protegido
+          Autorización
         </div>
         <div className="mb-1 font-display text-[19px] font-bold leading-tight">{request.title}</div>
         <div className="mb-4.5 text-[11px] leading-relaxed text-muted">{request.subtitle}</div>

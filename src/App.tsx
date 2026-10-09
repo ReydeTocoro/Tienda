@@ -4,7 +4,7 @@ import { AuthGate } from './features/auth/AuthGate'
 
 function App() {
   return (
-    <AuthGate>
+    <AuthGate onSignedOut={() => void router.navigate('/', { replace: true })}>
       <RouterProvider router={router} />
     </AuthGate>
   )

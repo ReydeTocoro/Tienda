@@ -1,24 +1,28 @@
 import { useEffect, useRef, useState } from 'react'
-import { ChevronDown, Lock, LogIn, LogOut, UserRound, Users } from 'lucide-react'
+import { ChevronDown, KeyRound, Lock, LogOut, UserRound } from 'lucide-react'
 import { initials } from '../shared/lib/text'
-import { useSessionStore } from '../store/useSessionStore'
-import { toast } from '../store/useToastStore'
 import { usePermission } from '../features/pin/usePermission'
-import { counterSignOut } from '../features/pin/counterSession'
+import { idleLabel } from '../features/pin/useSessionGuard'
+import { ChangePasswordModal } from '../features/auth/ChangePasswordModal'
+import { useAccountEmail } from '../features/auth/useAccountEmail'
+import { useChangeUser } from '../features/auth/useChangeUser'
 import { useCaja } from '../features/cash/hooks/useCaja'
 import { CierreZModal } from '../features/reports/components/CierreZModal'
 import { todayKey } from '../shared/lib/currency'
 
-/** Who is working at this counter, in the nav bar's corner: their name and role, and the way to
- * sign in, hand over to someone else, sign out or — for whoever may — close the caja (the end of
- * a cashier's shift doesn't need the Cajas module). In PIN mode signing out locks the screen. */
+/** Who is working on this device — the person whose account is signed in — in the nav bar's
+ * corner: their name and role, their own password, handing over to someone else ("Cambiar de
+ * usuario": sign out, and the next person enters with their own account) and — for whoever may —
+ * closing the caja (the end of a cashier's shift doesn't need the Cajas module). */
 export function OperatorMenu() {
-  const { operator, role, access, can, signInAny } = usePermission()
+  const { operator, role, access, can } = usePermission()
+  const email = useAccountEmail()
+  const changeUser = useChangeUser()
   const { session: openSession } = useCaja()
   const [open, setOpen] = useState(false)
   const [cierreOpen, setCierreOpen] = useState(false)
+  const [passwordOpen, setPasswordOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
-  const pinMode = access.mode === 'pin'
 
   useEffect(() => {
     if (!open) return
@@ -36,20 +40,9 @@ export function OperatorMenu() {
     }
   }, [open])
 
-  async function signIn(title: string) {
-    setOpen(false)
-    if (await signInAny(title, 'Ingresa tu PIN')) toast(`Hola, ${useSessionStore.getState().operator?.name}`, 'lime')
-  }
-
-  function signOut() {
-    setOpen(false)
-    const name = operator?.name
-    void counterSignOut()
-    toast(pinMode ? 'Pantalla bloqueada' : `${name ?? 'Sesión'}: salió`, 'muted')
-  }
-
-  const name = operator?.name ?? 'Mostrador'
+  const name = operator?.name ?? 'Conectando…'
   const item = 'flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-[13px] font-semibold text-txt transition-colors hover:bg-s2'
+  const minutes = access.idleSignOutMinutes
 
   return (
     <div ref={ref} className="relative">
@@ -57,7 +50,7 @@ export function OperatorMenu() {
         onClick={() => setOpen((o) => !o)}
         aria-haspopup="menu"
         aria-expanded={open}
-        title={operator ? `${name} · ${role?.name ?? ''}` : `Mostrador — sin usuario (permisos de ${role?.name ?? '—'})`}
+        title={operator ? `${name} · ${role?.name ?? ''}` : 'Conectando con el servidor…'}
         className="flex items-center gap-2 rounded-lg py-1 pl-1 pr-1.5 text-nav-fg transition-colors hover:bg-nav-hover focus-visible:outline-yellow"
       >
         <span
@@ -69,7 +62,7 @@ export function OperatorMenu() {
         </span>
         <span className="hidden min-w-0 text-left leading-tight lg:block">
           <span className="block max-w-[9rem] truncate text-[12px] font-semibold">{name}</span>
-          <span className="block max-w-[9rem] truncate text-[10px] text-nav-fg-dim">{role?.name ?? 'Sin permisos'}</span>
+          <span className="block max-w-[9rem] truncate text-[10px] text-nav-fg-dim">{role?.name ?? '—'}</span>
         </span>
         <ChevronDown size={14} className="hidden text-nav-fg-dim lg:block" />
       </button>
@@ -78,7 +71,8 @@ export function OperatorMenu() {
         <div role="menu" className="absolute right-0 top-full z-[60] mt-1.5 w-64 rounded-xl border border-br bg-s1 p-1.5 text-txt shadow-lg">
           <div className="mb-1 border-b border-br px-2.5 pb-2 pt-1">
             <div className="truncate text-[13px] font-bold">{name}</div>
-            <div className="text-[11px] text-muted">{operator ? role?.name : `Sin usuario · permisos de ${role?.name ?? '—'}`}</div>
+            <div className="text-[11px] text-muted">{role?.name ?? '—'}</div>
+            {email && <div className="mt-0.5 truncate text-[11px] text-muted">{email}</div>}
           </div>
 
           {openSession && can('caja.cerrar') && (
@@ -94,32 +88,34 @@ export function OperatorMenu() {
               Cerrar caja (fin del día)
             </button>
           )}
-          {!operator ? (
-            <button role="menuitem" className={item} onClick={() => signIn('Ingresar')}>
-              <LogIn size={15} className="text-lime" />
-              Ingresar con mi PIN
-            </button>
-          ) : (
-            <>
-              {!pinMode && (
-                <button role="menuitem" className={item} onClick={() => signIn('Cambiar de usuario')}>
-                  <Users size={15} className="text-blue" />
-                  Cambiar de usuario
-                </button>
-              )}
-              <button role="menuitem" className={item} onClick={signOut}>
-                {pinMode ? <Lock size={15} className="text-orange" /> : <LogOut size={15} className="text-orange" />}
-                {pinMode ? 'Bloquear (cambiar de usuario)' : 'Salir'}
-              </button>
-            </>
-          )}
-          {access.autoLockMinutes > 0 && operator && (
-            <p className="px-2.5 pb-1 pt-1.5 text-[11px] leading-snug text-muted">Se sale solo tras {access.autoLockMinutes} min sin uso.</p>
-          )}
+          <button
+            role="menuitem"
+            className={item}
+            onClick={() => {
+              setOpen(false)
+              setPasswordOpen(true)
+            }}
+          >
+            <KeyRound size={15} className="text-blue" />
+            Cambiar mi contraseña
+          </button>
+          <button
+            role="menuitem"
+            className={item}
+            onClick={() => {
+              setOpen(false)
+              void changeUser()
+            }}
+          >
+            <LogOut size={15} className="text-orange" />
+            Cambiar de usuario
+          </button>
+          {minutes > 0 && <p className="px-2.5 pb-1 pt-1.5 text-[11px] leading-snug text-muted">La sesión se cierra sola tras {idleLabel(minutes)} sin uso.</p>}
         </div>
       )}
 
       <CierreZModal open={cierreOpen} dayKey={openSession?.dayKey ?? todayKey()} onClose={() => setCierreOpen(false)} onClosed={() => setCierreOpen(false)} />
+      <ChangePasswordModal open={passwordOpen} onClose={() => setPasswordOpen(false)} />
     </div>
   )
 }

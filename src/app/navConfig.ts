@@ -19,13 +19,12 @@ export interface NavItem {
   badgeKey?: 'lowStock' | 'fiados' | 'payables'
   /** Permission needed to enter (see src/shared/lib/permissions.ts); absent = everyone (Venta). */
   need?: Need
-  /** Full name for the PIN prompt, when `label` is abbreviated. */
+  /** Full name (the "no access" message), when `label` is abbreviated. */
   title?: string
 }
 
 /** Shared between `BottomNav` (mobile) and `DesktopTabs` (desktop) so both chromes stay in sync,
- * and by the router's `ModuleGate`s. Every module is listed for everyone; one the current person
- * can't enter shows a lock and asks for the PIN of someone who can. */
+ * and by the router's `ModuleGate`s. Each person's nav lists only the modules their role opens. */
 export const NAV_ITEMS: NavItem[] = [
   { to: '/', label: 'Venta', icon: ShoppingCart, end: true },
   { to: '/inventario', label: 'Stock', icon: Package, badgeKey: 'lowStock', need: 'stock.ver' },
@@ -37,15 +36,6 @@ export const NAV_ITEMS: NavItem[] = [
   { to: '/reporte', label: 'Reporte', icon: BarChart3, need: 'reportes.ver' },
   { to: '/configuracion', label: 'Config.', title: 'Configuración', icon: Settings, need: 'admin' },
 ]
-
-/** Text of the PIN prompt shown when someone without access opens a module. */
-export function gateText(item: NavItem): { title: string; subtitle: string } {
-  const name = item.title ?? item.label
-  return {
-    title: name,
-    subtitle: item.need === 'admin' ? `${name} es solo para el Administrador. Ingresa tu PIN.` : `Para entrar a ${name}, ingresa el PIN de alguien con permiso.`,
-  }
-}
 
 /** Live low-stock / pending-fiado counts used for nav badges in both chromes. */
 export function useNavBadges() {

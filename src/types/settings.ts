@@ -25,6 +25,6 @@ export interface Settings {
   /** Editable roles (everything but the fixed Administrador). Absent = the defaults. Read it through
    * `resolveRoles()`, never directly. */
   roles?: Role[]
-  /** Counter access mode, counter role and auto-lock. Read it through `sanitizeAccess()`. */
+  /** How sessions behave (closing after inactivity). Read it through `sanitizeAccess()`. */
   access?: AccessSettings
 }

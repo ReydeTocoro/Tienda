@@ -11,15 +11,14 @@ import { ConfiguracionPage } from './features/settings/ConfiguracionPage'
 import { CajasPage } from './features/cash/CajasPage'
 import { ProveedoresPage } from './features/suppliers/ProveedoresPage'
 import { ModuleGate } from './features/pin/ModuleGate'
-import { NAV_ITEMS, gateText } from './app/navConfig'
+import { NAV_ITEMS } from './app/navConfig'
 
 /** A module behind the permission its nav item declares (Venta has none). */
 function gated(to: string, page: ReactNode): ReactNode {
   const item = NAV_ITEMS.find((i) => i.to === to)
   if (!item?.need) return page
-  const { title, subtitle } = gateText(item)
   return (
-    <ModuleGate need={item.need} title={title} subtitle={subtitle}>
+    <ModuleGate need={item.need} title={item.title ?? item.label}>
       {page}
     </ModuleGate>
   )
