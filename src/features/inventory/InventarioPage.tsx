@@ -120,8 +120,19 @@ export function InventarioPage() {
       entradaRef.current?.applyScannedCode(code)
       return
     }
-    setFormSeed({ code, token: Date.now() })
     const existing = products.find((p) => p.code.toLowerCase() === code.toLowerCase())
+    // With a product's form open, the scan is for its code field — how a placeholder code gets its real
+    // barcode. A code another product already has is reported instead of opening that one over this form.
+    if (formOpen && editing) {
+      if (existing && existing.code !== editing.code) {
+        toast(`Ese código ya es de "${existing.name}"`, 'orange')
+        return
+      }
+      setFormSeed({ code, token: Date.now() })
+      toast('Código leído: ' + code, 'lime')
+      return
+    }
+    setFormSeed({ code, token: Date.now() })
     if (existing) {
       setEditing(existing)
       toast('Editando: ' + existing.name, 'lime')

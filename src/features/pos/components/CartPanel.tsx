@@ -14,6 +14,7 @@ import { CartLine } from './CartLine'
 import { BILLS } from '../../../shared/lib/bills'
 import { usePermission } from '../../pin/usePermission'
 import { countItems } from '../lib/cartCount'
+import { priceOptions } from '../../../shared/lib/prices'
 
 interface CartPanelProps {
   products: Product[]
@@ -31,6 +32,7 @@ const PAY_METHODS: Array<{ key: 'efectivo' | 'transferencia' | 'fiado'; label: s
 export function CartPanel({ products, onEditMeasured, onOpenDiscount, onCheckout }: CartPanelProps) {
   const items = useActiveCart((c) => c.items)
   const changeQty = useCartStore((s) => s.changeQty)
+  const setItemPrice = useCartStore((s) => s.setItemPrice)
   const removeItem = useCartStore((s) => s.removeItem)
   const clear = useCartStore((s) => s.clear)
   const payMethod = useActiveCart((c) => c.payMethod)
@@ -57,7 +59,7 @@ export function CartPanel({ products, onEditMeasured, onOpenDiscount, onCheckout
   const { pts: loyaltyPts } = useSelectedCustomerLoyalty()
   const { subtotal, discount, discountLabel, total, chargeAmount, roundingAdjustment } = useCartTotals(loyaltyPts)
 
-  const stockByCode = useMemo(() => new Map(products.map((p) => [p.code, p.stock])), [products])
+  const productByCode = useMemo(() => new Map(products.map((p) => [p.code, p])), [products])
   const totalItems = countItems(items)
 
   const discLabel = discountLabel === 'manual' ? `Desc. manual (${manualDiscountPct}%)` : discountLabel === 'loyalty' ? `Desc. cliente (${formatQty(loyaltyPts)} pts)` : ''
@@ -113,15 +115,21 @@ export function CartPanel({ products, onEditMeasured, onOpenDiscount, onCheckout
             <p className="text-[11px]">Toca un producto o escanea un código</p>
           </div>
         ) : (
-          items.map((item, i) => (
-            <CartLine
-              key={i}
-              item={item}
-              onChangeQty={(delta) => changeQty(i, delta, stockByCode.get(item.code))}
-              onRemove={() => removeItem(i)}
-              onEditMeasured={() => onEditMeasured(i)}
-            />
-          ))
+          items.map((item, i) => {
+            const product = productByCode.get(item.code)
+            return (
+              <CartLine
+                key={i}
+                item={item}
+                // The product's own prices as they are now: a line can be charged at any of them.
+                prices={product && !item.isFree ? priceOptions(product) : undefined}
+                onChangePrice={(price) => setItemPrice(i, price)}
+                onChangeQty={(delta) => changeQty(i, delta, product?.stock)}
+                onRemove={() => removeItem(i)}
+                onEditMeasured={() => onEditMeasured(i)}
+              />
+            )
+          })
         )}
       </div>
 

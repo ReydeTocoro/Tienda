@@ -9,6 +9,9 @@ export interface ParsedImportRow {
   cat: string
   unit: string
   price: number
+  /** Precio 2 / Precio 3; 0 = the file has none (an update then leaves the stored ones alone). */
+  price2: number
+  price3: number
   cost: number
   stock: number
   min: number
@@ -88,7 +91,11 @@ export function buildParsedRows(rawRows: Record<string, string>[], existingProdu
     if (seenCodes.has(finalCode)) errors.push(`Fila ${rowNum}: código duplicado en el archivo "${finalCode}"`)
     seenCodes.add(finalCode)
 
-    let price = parseFloat(get(row, 'precio venta', 'precio_venta', 'price', 'precio', 'sale price', 'venta').replace(',', '.')) || 0
+    // "Precio Venta" and "Precio 1" are the same price: the old column name and the one the new
+    // exports and template use. "Precio 2" / "Precio 3" are the optional extra selling prices.
+    let price = parseFloat(get(row, 'precio venta', 'precio_venta', 'price', 'precio', 'sale price', 'venta', 'precio 1', 'precio1', 'price 1', 'price1').replace(',', '.')) || 0
+    const price2 = parseFloat(get(row, 'precio 2', 'precio2', 'price 2', 'price2').replace(',', '.')) || 0
+    const price3 = parseFloat(get(row, 'precio 3', 'precio3', 'price 3', 'price3').replace(',', '.')) || 0
     const cost = parseFloat(get(row, 'precio compra', 'precio_compra', 'cost', 'costo', 'compra').replace(',', '.')) || 0
     const marginStr = get(row, '% margen', 'margen', 'margin', '% ganancia', 'ganancia')
     if (!price && cost && marginStr) price = cost * (1 + parseFloat(marginStr) / 100)
@@ -120,6 +127,8 @@ export function buildParsedRows(rawRows: Record<string, string>[], existingProdu
       cat: get(row, 'categoría', 'categoria', 'category', 'cat'),
       unit,
       price,
+      price2,
+      price3,
       cost,
       stock,
       min,

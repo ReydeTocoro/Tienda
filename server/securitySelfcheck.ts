@@ -351,6 +351,52 @@ assert.equal(r.body.sellerName, 'Pepe', 'y es venta de Pepe')
 needs(await post(PEPE, '/api/sales/finalize', { ...sale([{ code: 'B2', price: 5000, qty: 1 }]), discount: 500, total: 4500 }), 'ventas.descuentos', 'la autorización se gastó en esa venta')
 ok('Ventas: precio, totales y stock se verifican en el servidor; descuento, cambio de total, fiado y producto libre piden permiso o autorización, que se gasta en una sola venta; la ganancia y el vendedor los pone el servidor')
 
+// Up to three selling prices: Precio 2 and 3 are kept on the product and a sale line may be charged at
+// any of the product's prices (the cashier picks on the cart line) — with no permission, since the
+// Administrador registered them all — but never at one that isn't registered or was removed.
+const stockOf = async (code: string) => (await row<{ s: number }>(`select (data ->> 'stock')::float8 as s from products where code = $1`, [code]))!.s
+const extras = async (code: string) => (await row<{ p2: number | null; p3: number | null }>(`select (data ->> 'price2')::int as p2, (data ->> 'price3')::int as p3 from products where code = $1`, [code]))!
+const ponchera = async (more: Record<string, unknown>) => ({ code: 'B2', name: 'Ponchera', price: 5000, stock: await stockOf('B2'), min: 0, unit: 'unidad', esPaquete: false, ...more })
+r = await put(OWNER, '/api/products/B2', await ponchera({ price2: 4500, price3: 4000 }))
+okStatus(r, 'el dueño le pone Precio 2 y Precio 3')
+assert.deepEqual([r.body.price2, r.body.price3], [4500, 4000])
+assert.deepEqual(await extras('B2'), { p2: 4500, p3: 4000 })
+r = await put(BETO, '/api/products/B2', { code: 'B2', name: 'Ponchera', price: 5000, min: 0, unit: 'unidad', esPaquete: false })
+okStatus(r, 'una pantalla que no conoce los precios extra guarda el producto')
+assert.deepEqual(await extras('B2'), { p2: 4500, p3: 4000 }, 'y no los borra')
+r = await post(ANA, '/api/sales/finalize', sale([{ code: 'B2', price: 4500, qty: 1 }]))
+okStatus(r, 'la cajera cobra al Precio 2 sin pedir permiso')
+assert.equal(r.body.total, 4500)
+assert.equal((r.body.items as Array<{ price: number }>)[0].price, 4500)
+assert.equal((await row<{ g: number }>(`select (data ->> 'ganancia')::int as g from profits where key = $1`, [`sale:${r.body.id}`]))!.g, 4500 - 3000, 'la ganancia sale del precio al que se cobró')
+r = await post(PEPE, '/api/sales/finalize', sale([{ code: 'B2', price: 4000, qty: 2 }]))
+okStatus(r, 'y quien no tiene ningún permiso, al Precio 3')
+assert.equal(r.body.total, 8000)
+r = await post(ANA, '/api/sales/finalize', sale([{ code: 'B2', price: 4200, qty: 1 }]))
+assert.equal(r.status, 400, 'un precio que no es de los tres, no')
+assert.match(String(r.body.error), /precio de "Ponchera" cambió/)
+r = await post(ANA, '/api/sales/finalize', sale([{ code: 'B2', price: 4500, qty: 1 }, { code: 'B2', price: 4200, qty: 1 }]))
+assert.equal(r.status, 400, 'ni una línea suelta entre las buenas')
+needs(await post(PEPE, '/api/sales/finalize', { ...sale([{ code: 'B2', price: 4000, qty: 1 }]), total: 3500 }), 'ventas.cambiarTotal', 'el Precio 3 no regala cambiar el total')
+r = await put(OWNER, '/api/products/B2', await ponchera({ price2: 0 }))
+okStatus(r, 'el dueño quita el Precio 2')
+assert.equal('price2' in r.body, false)
+assert.deepEqual(await extras('B2'), { p2: null, p3: 4000 }, 'y el 3 sigue')
+r = await post(ANA, '/api/sales/finalize', sale([{ code: 'B2', price: 4500, qty: 1 }]))
+assert.equal(r.status, 400, 'ya no se cobra a un precio que se quitó')
+r = await put(OWNER, '/api/products/B2', await ponchera({ price2: -1 }))
+assert.equal(r.status, 400, 'un precio negativo no vale')
+r = await put(OWNER, '/api/products/B2', await ponchera({ price3: 'abc' }))
+assert.equal(r.status, 400, 'ni un texto')
+assert.deepEqual(await extras('B2'), { p2: null, p3: 4000 }, 'y lo rechazado no cambia nada')
+r = await post(OWNER, '/api/inventory/import', { parsed: [{ code: 'B2', name: 'Ponchera', price: 0, price2: 4400, price3: 0, cost: 0, stock: 0, min: 0 }], dupAction: 'update' })
+okStatus(r, 'la importación trae Precio 2')
+assert.deepEqual(await extras('B2'), { p2: 4400, p3: 4000 }, 'se pone el Precio 2 y lo que el archivo no trae se queda')
+assert.equal((await row<{ p: number }>(`select (data ->> 'price')::int as p from products where code = 'B2'`))!.p, 5000)
+okStatus(await put(OWNER, '/api/products/B2', await ponchera({ price2: null, price3: '' })), 'se dejan sin precios extra, como estaban')
+assert.deepEqual(await extras('B2'), { p2: null, p3: null })
+ok('Varios precios: el producto guarda Precio 2 y 3 (y una pantalla que no los conoce no los borra); se cobra a cualquiera de sus precios sin permiso, a ningún otro, ni a uno ya quitado; lo inválido se rechaza; la importación los trae')
+
 r = await post(OWNER, '/api/sales/finalize', { ...sale([{ code: 'B2', price: 5000, qty: 1 }]), payMethod: 'fiado', fiadoName: 'Don José' })
 okStatus(r, 'el dueño fía')
 const fiadoId = r.body.id as number
@@ -448,6 +494,116 @@ assert.equal(r.status, 400, 'una foto inválida no deja crear al usuario')
 assert.equal(accounts.passwords.has('mala@x.com'), false, 'ni su cuenta')
 okStatus(await call(OWNER, 'DELETE', `/api/usuarios/${lola.body.id}`), 'se borra el de prueba')
 ok('el nombre del propietario sale de staff o de lo que escribe en Configuración, y firma sus ventas y autorizaciones; las fotos (suyas y de los usuarios) se validan en el servidor')
+
+// ─── 8c. Changing a product's code ──────────────────────────────────────────────────────────────
+// Everything that points at the code follows it — the cost (unseen by whoever may not see costs), the sales that
+// sold the product, the purchase orders still open (not the ones already received), a package and its loose
+// unit — in one step; the old code is announced to every device as deleted, can be used again, and the change
+// is signed in the audit trail.
+const salesRows = async () => (await lite.query<{ id: number; data: unknown }>(`select id, data from sales order by id`)).rows
+const profitRows = async () => (await lite.query(`select key, data from profits order by key`)).rows
+const itemsWith = async (code: string) => (await row<{ n: number }>(`select count(*)::int as n from sales s, jsonb_array_elements(s.data -> 'items') i where i ->> 'code' = $1`, [code]))!.n
+const tombstones = async (pk: string) => (await lite.query<{ table_name: string }>(`select table_name from deletions where pk = $1 order by table_name`, [pk])).rows.map((x) => x.table_name)
+const costFor = async (code: string) => (await row<{ c: number }>(`select (data ->> 'cost')::int as c from "productCosts" where code = $1`, [code]))?.c
+const exists = async (code: string) => (await row(`select 1 from products where code = $1`, [code])) !== undefined
+const auditCount = async () => (await row<{ n: number }>(`select count(*)::int as n from "auditLog"`))!.n
+const supplierId = (await row<{ id: string }>(`select id from suppliers limit 1`))!.id
+const orderLines = async (id: unknown) => (await row<{ codes: string[] }>(`select array(select l ->> 'code' from jsonb_array_elements(data -> 'lines') l) as codes from "purchaseOrders" where id = $1`, [id]))!.codes
+const stockB2 = await stockOf('B2')
+const full = (more: Record<string, unknown>) => ({ code: 'B2', name: 'Ponchera', price: 5000, stock: stockB2, min: 0, unit: 'unidad', esPaquete: false, ...more })
+
+const closedOrder = (await row<{ id: number }>(`select id from "purchaseOrders" order by id limit 1`))!.id
+r = await post(CARLA, '/api/purchaseOrders', { supplierId, lines: [{ code: 'B2', qty: 5, unitCost: 3100 }], send: true })
+okStatus(r, 'un pedido enviado (abierto) que pide la ponchera')
+const openOrder = r.body.id
+r = await post(CARLA, '/api/purchaseOrders', { supplierId, lines: [{ code: 'B2', qty: 2, unitCost: 3100 }] })
+okStatus(r, 'y un borrador')
+const draftOrder = r.body.id
+const salesBefore = await salesRows()
+const profitsBefore = await profitRows()
+const soldB2 = await itemsWith('B2')
+assert.ok(soldB2 >= 3, 'la ponchera ya se vendió varias veces')
+assert.equal((await row<{ n: number }>(`select count(*)::int as n from sales where data -> 'items' @> '[{"code":"B2"}]'`))!.n, soldB2, 'una línea de B2 por venta: filas y líneas coinciden')
+const costB2 = (await costFor('B2'))!
+assert.ok(costB2 > 0)
+const audits = await auditCount()
+
+needs(await put(ANA, '/api/products/B2', full({ code: 'B2-NUEVO' })), 'stock.editar', 'una cajera no cambia códigos')
+r = await put(BETO, '/api/products/B2', full({ code: '  ' }))
+assert.equal(r.status, 400, 'un código vacío no vale')
+r = await put(BETO, '/api/products/B2', full({ code: 'X'.repeat(61) }))
+assert.equal(r.status, 400, 'ni uno que no cabe (no se corta: podría ser el de otro producto)')
+r = await put(BETO, '/api/products/B2', full({ code: 'A1' }))
+assert.equal(r.status, 409, 'ni el de otro producto')
+assert.match(String(r.body.error), /código ya existe/)
+r = await put(BETO, '/api/products/B2', full({ code: 'a1' }))
+assert.equal(r.status, 409, 'ni cambiando solo mayúsculas: el lector no las distingue')
+assert.equal(await auditCount(), audits, 'y lo rechazado no deja huella ni cambia nada')
+assert.equal(await exists('B2'), true)
+r = await put(BETO, '/api/products/B2', { name: 'Ponchera', price: 5000, min: 0, unit: 'unidad', esPaquete: false })
+okStatus(r, 'una pantalla que no manda el código guarda el producto')
+assert.equal(await exists('B2'), true, 'y no lo cambia')
+r = await put(BETO, '/api/products/B2', full({ code: 'B2' }))
+okStatus(r, 'con el mismo código tampoco')
+assert.equal(await auditCount(), audits)
+
+r = await put(BETO, '/api/products/B2', full({ code: '  B2-NUEVO  ' }))
+okStatus(r, 'bodega cambia el código (se recorta)')
+assert.equal(r.body.code, 'B2-NUEVO')
+assert.equal('cost' in r.body, false, 'sin mostrarle el costo que no puede ver')
+assert.equal(await exists('B2'), false, 'el código viejo ya no existe')
+assert.equal(await stockOf('B2-NUEVO'), stockB2, 'las existencias siguen')
+assert.equal(await costFor('B2-NUEVO'), costB2, 'el costo se fue con el producto, sin que nadie lo viera')
+assert.equal(await costFor('B2'), undefined, 'y no queda uno huérfano')
+assert.equal(await itemsWith('B2'), 0, 'ninguna venta apunta al código viejo')
+assert.equal(await itemsWith('B2-NUEVO'), soldB2, 'todas las ventas siguen al nuevo')
+assert.deepEqual(await salesRows(), salesBefore.map((s) => ({ id: s.id, data: JSON.parse(JSON.stringify(s.data).replaceAll('"code":"B2"', '"code":"B2-NUEVO"')) })), 'y de las ventas solo cambió el código')
+assert.deepEqual(await profitRows(), profitsBefore, 'las ganancias de esas ventas quedan como estaban')
+assert.deepEqual(await orderLines(openOrder), ['B2-NUEVO'], 'el pedido abierto pide el código nuevo')
+assert.deepEqual(await orderLines(draftOrder), ['B2-NUEVO'], 'el borrador también')
+assert.deepEqual(await orderLines(closedOrder), ['B2'], 'el pedido ya recibido es historia y no cambia')
+assert.deepEqual(await tombstones('B2'), ['productCosts', 'products'], 'cada equipo se entera de que el código viejo se fue (y su costo)')
+assert.deepEqual(await tombstones('B2-NUEVO'), [], 'y del nuevo no se borra nada')
+const changed = (await row<{ data: Record<string, unknown> }>(`select data from "auditLog" order by id desc limit 1`))!.data
+assert.deepEqual({ ...changed, id: undefined, date: undefined }, { type: 'cambio_codigo', oldCode: 'B2', code: 'B2-NUEVO', name: 'Ponchera', user: 'Beto', ventas: soldB2, pedidos: 2, id: undefined, date: undefined }, 'queda firmado por quien lo hizo')
+assert.equal(await auditCount(), audits + 1)
+okStatus(await post(CARLA, `/api/purchaseOrders/${openOrder}/receive`, { payment: { mode: 'credito' } }), 'el pedido abierto se recibe con el código nuevo')
+assert.equal(await stockOf('B2-NUEVO'), stockB2 + 5, 'y las existencias suben al producto de siempre')
+await lite.query(`update products set data = jsonb_set(data, '{stock}', to_jsonb($1::float8)) where code = 'B2-NUEVO'`, [stockB2])
+
+// the old code is free again, for another product, and a device that catches up late won't forget it
+r = await post(OWNER, '/api/products', { code: 'B2', name: 'Otra cosa', price: 100, stock: 1 })
+okStatus(r, 'el código viejo se puede usar de nuevo')
+assert.deepEqual(await tombstones('B2'), [], 'sin dejar el aviso de borrado, que haría desaparecer lo nuevo en un equipo atrasado')
+okStatus(await call(OWNER, 'DELETE', '/api/products/B2'), 'se quita el de prueba')
+
+// the package and its loose unit point at each other by code
+okStatus(await post(OWNER, '/api/products', { code: 'PQ1', name: 'Paquete', price: 600, stock: 3, esPaquete: true, unidadesPor: 6, codigoSuelta: 'PQ1-S', nombreSuelta: 'Suelta', precioSuelta: 120 }), 'se crea un paquete')
+r = await post(OWNER, '/api/products', { code: 'pq1-s', name: 'Intruso', price: 1 })
+assert.equal(r.status, 409, 'el código que un paquete guarda para su unidad suelta no se da a otro producto')
+assert.match(String(r.body.error), /reservado/)
+r = await put(OWNER, '/api/products/B2-NUEVO', full({ code: 'PQ1-S' }))
+assert.equal(r.status, 409, 'tampoco cambiando el código de uno')
+okStatus(await post(OWNER, '/api/inventory/open-package', { code: 'PQ1', qty: 1 }), 'se abre un paquete')
+assert.equal((await row<{ p: string }>(`select data ->> 'codigoPaquete' as p from products where code = 'PQ1-S'`))!.p, 'PQ1')
+okStatus(await put(OWNER, '/api/products/PQ1', { code: 'PQ9', name: 'Paquete', price: 600, stock: 2, esPaquete: true, unidadesPor: 6, codigoSuelta: 'PQ1-S', nombreSuelta: 'Suelta', precioSuelta: 120 }), 'se cambia el código del paquete')
+assert.equal((await row<{ p: string }>(`select data ->> 'codigoPaquete' as p from products where code = 'PQ1-S'`))!.p, 'PQ9', 'su unidad suelta lo sigue')
+okStatus(await put(OWNER, '/api/products/PQ1-S', { code: 'PQ9-S', name: 'Suelta', price: 120, stock: 6, unit: 'unidad', esPaquete: false }), 'y el de la unidad suelta')
+assert.equal((await row<{ s: string }>(`select data ->> 'codigoSuelta' as s from products where code = 'PQ9'`))!.s, 'PQ9-S', 'el paquete la sigue')
+for (const code of ['PQ9', 'PQ9-S']) okStatus(await call(OWNER, 'DELETE', `/api/products/${code}`), `se quita ${code}`)
+
+// back to the first code, now with the owner's typed cost, which replaces the stored one
+r = await put(OWNER, '/api/products/B2-NUEVO', full({ code: 'B2', cost: costB2 + 50 }))
+okStatus(r, 'el dueño devuelve el código de antes')
+assert.equal(r.body.cost, costB2 + 50, 'ella sí ve el costo')
+assert.equal(await itemsWith('B2-NUEVO'), 0)
+assert.deepEqual(await salesRows(), salesBefore, 'las ventas quedan exactamente como al principio')
+assert.deepEqual(await orderLines(draftOrder), ['B2'], 'el borrador, que sigue abierto, vuelve con él')
+assert.deepEqual(await orderLines(openOrder), ['B2-NUEVO'], 'y el que se recibió con el código nuevo es historia: se queda como se recibió')
+assert.equal(await costFor('B2'), costB2 + 50, 'el costo que ella escribe reemplaza al guardado')
+assert.deepEqual(await tombstones('B2'), [], 'y el código que vuelve no queda marcado como borrado')
+assert.deepEqual(await tombstones('B2-NUEVO'), ['productCosts', 'products'])
+ok('Cambiar el código de un producto: el costo, las ventas, los pedidos abiertos y el paquete con su unidad suelta lo siguen en un solo paso; se rechaza el vacío, el largo, el de otro producto (con o sin mayúsculas) y el reservado de una unidad suelta; el código viejo queda libre, los equipos se enteran y queda firmado')
 
 // ─── 9. Permissions follow every change at once ─────────────────────────────────────────────────
 assert.equal(await browserRows(CARLA, 'productCosts'), 2, 'Compras recibe los costos (C3 se creó sin costo)')

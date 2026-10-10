@@ -22,6 +22,9 @@ export function ImportPreviewModal({ open, fileName, parsed, errors, onClose, on
   const newCount = parsed.filter((r) => r.isNew).length
   const updateCount = total - newCount
   const warnCount = parsed.filter((r) => r.warnings.length).length
+  // Precio 2 / Precio 3 only get their columns when the file has any, so a plain file looks as before.
+  const hasExtra = parsed.some((r) => r.price2 > 0 || r.price3 > 0)
+  const headers = ['Estado', 'Código', 'Nombre', hasExtra ? 'Precio 1' : 'Precio', ...(hasExtra ? ['Precio 2', 'Precio 3'] : []), 'Costo', 'Stock', 'Categoría']
 
   return (
     <BottomSheet open={open} onClose={onClose} maxWidthClass="max-w-[720px]">
@@ -55,7 +58,7 @@ export function ImportPreviewModal({ open, fileName, parsed, errors, onClose, on
         <table className="w-full text-[12px]">
           <thead className="sticky top-0 bg-s2">
             <tr>
-              {['Estado', 'Código', 'Nombre', 'Precio', 'Costo', 'Stock', 'Categoría'].map((h) => (
+              {headers.map((h) => (
                 <th key={h} className="whitespace-nowrap border-b border-br px-2.5 py-1.5 text-left field-label">
                   {h}
                 </th>
@@ -73,6 +76,12 @@ export function ImportPreviewModal({ open, fileName, parsed, errors, onClose, on
                   {r.warnings.length > 0 && <div className="text-[10px] text-orange">{r.warnings.join(', ')}</div>}
                 </td>
                 <td className="border-b border-br px-2.5 py-1.5 font-mono text-lime">{formatMoney(r.price)}</td>
+                {hasExtra && (
+                  <>
+                    <td className="border-b border-br px-2.5 py-1.5 font-mono text-lime">{r.price2 > 0 ? formatMoney(r.price2) : '—'}</td>
+                    <td className="border-b border-br px-2.5 py-1.5 font-mono text-lime">{r.price3 > 0 ? formatMoney(r.price3) : '—'}</td>
+                  </>
+                )}
                 <td className="border-b border-br px-2.5 py-1.5 font-mono text-muted">{formatMoney(r.cost)}</td>
                 <td className="border-b border-br px-2.5 py-1.5 font-mono">{formatQty(r.stock)}</td>
                 <td className="border-b border-br px-2.5 py-1.5 text-txt2">{r.cat || '—'}</td>
@@ -80,7 +89,7 @@ export function ImportPreviewModal({ open, fileName, parsed, errors, onClose, on
             ))}
             {parsed.length > 80 && (
               <tr>
-                <td colSpan={7} className="px-2.5 py-2 text-center text-muted">
+                <td colSpan={headers.length} className="px-2.5 py-2 text-center text-muted">
                   ... y {parsed.length - 80} más
                 </td>
               </tr>

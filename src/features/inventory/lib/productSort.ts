@@ -1,6 +1,6 @@
 import type { Product } from '../../../types/product'
 
-export type SortKey = 'code' | 'name' | 'cat' | 'stock' | 'price' | 'cost' | 'margin' | 'invested'
+export type SortKey = 'code' | 'name' | 'cat' | 'stock' | 'price' | 'price2' | 'price3' | 'cost' | 'margin' | 'invested'
 export interface SortState {
   key: SortKey
   dir: 'asc' | 'desc'
@@ -24,6 +24,10 @@ function sortValue(p: Product, key: SortKey): string | number {
       return p.stock || 0
     case 'price':
       return p.price || 0
+    case 'price2':
+      return p.price2 || 0
+    case 'price3':
+      return p.price3 || 0
     case 'cost':
       return p.cost || 0
     case 'margin':

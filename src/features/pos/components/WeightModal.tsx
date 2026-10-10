@@ -3,6 +3,7 @@ import type { Product } from '../../../types/product'
 import { getUnitConversions, convert } from '../../../types/unit'
 import { unitShortLabel } from '../../../shared/lib/units'
 import { formatMoney, formatQty } from '../../../shared/lib/currency'
+import { samePrice, sellingPrices } from '../../../shared/lib/prices'
 import { NumericKeypad } from '../../../shared/components/NumericKeypad'
 import { BottomSheet } from '../../../shared/components/BottomSheet'
 import { selectActiveCart, useCartStore } from '../../../store/useCartStore'
@@ -26,7 +27,12 @@ export function WeightModal({ product: p, editIndex, onClose }: WeightModalProps
   const addWeightedItem = useCartStore((s) => s.addWeightedItem)
 
   const conversions = useMemo(() => getUnitConversions(baseUnit), [baseUnit])
-  const pricePer = p.price || 0
+  // A product with several prices keeps the one the cashier picked on its cart line when more is
+  // added or the weight is edited (the line is the same product); a new line starts at Precio 1.
+  const [pricePer] = useState(() => {
+    const line = selectActiveCart(useCartStore.getState()).items.find((i) => i.code === p.code)
+    return line && sellingPrices(p).some((x) => samePrice(x, line.price)) ? line.price : p.price || 0
+  })
 
   const raw = parseFloat(val) || 0
   const qtyInBase = unit === baseUnit ? raw : convert(raw, unit, baseUnit) ?? raw

@@ -5,6 +5,7 @@ import type { ParsedImportRow, DupAction } from '../../src/features/inventory/li
 import type { Db } from '../db'
 import { authOf } from '../auth'
 import { actorOf, requireNeed } from '../domain/counter'
+import { reviveKey } from '../domain/productCode'
 import { looseUnitCost } from '../domain/secrets'
 import { getRow, putRow, insertAutoRow, roundQty } from './generic'
 import { HttpError, handle } from './http'
@@ -164,6 +165,8 @@ export function inventoryOpsRouter(db: Db) {
             cat: text(raw?.cat, 60),
             unit: text(raw?.unit, 20),
             price: nonNegative(raw?.price),
+            price2: nonNegative(raw?.price2),
+            price3: nonNegative(raw?.price3),
             cost: nonNegative(raw?.cost),
             stock: nonNegative(raw?.stock),
             min: nonNegative(raw?.min),
@@ -204,6 +207,8 @@ export function inventoryOpsRouter(db: Db) {
             if (row.cat) merged.cat = row.cat
             if (row.unit && row.unit !== 'unidad') merged.unit = row.unit
             if (row.price > 0) merged.price = row.price
+            if (row.price2 > 0) merged.price2 = row.price2
+            if (row.price3 > 0) merged.price3 = row.price3
             if (row.cost > 0) merged.cost = row.cost
             if (row.stock > 0) merged.stock = row.stock
             if (row.min > 0) merged.min = row.min
@@ -221,6 +226,8 @@ export function inventoryOpsRouter(db: Db) {
               cat: row.cat,
               unit: row.unit || 'unidad',
               price: row.price,
+              ...(row.price2 > 0 ? { price2: row.price2 } : {}),
+              ...(row.price3 > 0 ? { price3: row.price3 } : {}),
               cost: row.cost,
               stock: row.stock,
               min: row.min,
@@ -228,6 +235,7 @@ export function inventoryOpsRouter(db: Db) {
               createdAt: new Date().toISOString(),
             }
             await putRow(q, 'products', 'code', row.code, newProduct)
+            await reviveKey(q, row.code)
             added++
           }
         }

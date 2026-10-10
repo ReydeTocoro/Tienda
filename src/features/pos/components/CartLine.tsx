@@ -1,10 +1,16 @@
 import { X } from 'lucide-react'
 import type { CartItem } from '../../../types/cartItem'
 import { formatMoney, formatQty } from '../../../shared/lib/currency'
+import type { PriceOption } from '../../../shared/lib/prices'
 import { unitShortLabel, isMeasuredUnit } from '../../../shared/lib/units'
+import { PricePicker } from './PricePicker'
 
 interface CartLineProps {
   item: CartItem
+  /** The product's prices when it has more than one (Precio 1, 2, 3): the price gets a tab to pick
+   * another. Absent or a single price = the price is plain text. */
+  prices?: PriceOption[]
+  onChangePrice?: (price: number) => void
   onChangeQty: (delta: number) => void
   onRemove: () => void
   onEditMeasured: () => void
@@ -15,9 +21,10 @@ interface CartLineProps {
  * Sized by the cart card's own width (a container query, the card is the `@container`), not the
  * window's: in a narrow cart — a phone — it falls back to two rows, remove top-right and the
  * stepper with the total underneath. */
-export function CartLine({ item, onChangeQty, onRemove, onEditMeasured }: CartLineProps) {
+export function CartLine({ item, prices, onChangePrice, onChangeQty, onRemove, onEditMeasured }: CartLineProps) {
   const measured = isMeasuredUnit(item.unit)
   const ul = measured ? unitShortLabel(item.unit) : null
+  const pickable = !item.isFree && !!prices && prices.length > 1 && !!onChangePrice
 
   return (
     <div className="grid grid-cols-[1fr_auto] items-center gap-x-2 gap-y-1 border-b border-br px-3 py-1.5 @sm:grid-cols-[1fr_auto_minmax(5.5rem,auto)_auto]">
@@ -28,10 +35,19 @@ export function CartLine({ item, onChangeQty, onRemove, onEditMeasured }: CartLi
           </span>
           {item.isFree && <span className="flex-shrink-0 rounded border border-orange/30 bg-orange/10 px-1 py-px text-[9px] font-bold text-orange">LIBRE</span>}
         </div>
-        <div className="truncate font-mono text-[10px] leading-tight text-muted">
-          {formatMoney(item.price)}
-          {measured ? `/${ul}` : ''} · {item.isFree ? 'Sin código' : item.code}
-          {item.brand ? ' · ' + item.brand : ''}
+        <div className="flex items-center gap-1 font-mono text-[10px] leading-tight text-muted">
+          {pickable ? (
+            <PricePicker current={item.price} options={prices} per={measured ? `/${ul}` : ''} onPick={onChangePrice} />
+          ) : (
+            <span className="flex-shrink-0">
+              {formatMoney(item.price)}
+              {measured ? `/${ul}` : ''}
+            </span>
+          )}
+          <span className="min-w-0 truncate">
+            · {item.isFree ? 'Sin código' : item.code}
+            {item.brand ? ' · ' + item.brand : ''}
+          </span>
         </div>
       </div>
 

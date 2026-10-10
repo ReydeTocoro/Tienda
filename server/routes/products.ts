@@ -4,6 +4,7 @@ import { UNITS } from '../../src/types/unit'
 import type { Db } from '../db'
 import { authOf } from '../auth'
 import { actorOf, allowed, requireNeed } from '../domain/counter'
+import { MAX_CODE, assertCodeFree, renameProduct, reviveKey } from '../domain/productCode'
 import { getRow, putRow, deleteRow, roundQty } from './generic'
 import { HttpError, handle } from './http'
 
@@ -15,6 +16,23 @@ function amount(v: unknown, label: string): number {
   const n = typeof v === 'number' ? v : Number(v)
   if (!Number.isFinite(n) || n < 0 || n > 1e9) throw new HttpError(400, `${label} no es válido`)
   return n
+}
+
+/** A product code as typed: trimmed, there, and not longer than the column allows (never cut short, which could make it someone else's). */
+function codeOf(v: unknown): string {
+  const code = typeof v === 'string' ? v.trim() : typeof v === 'number' ? String(v) : ''
+  if (!code) throw new HttpError(400, 'Escribe el código')
+  if (code.length > MAX_CODE) throw new HttpError(400, `El código es muy largo (máximo ${MAX_CODE} caracteres)`)
+  return code
+}
+
+/** Precio 2 / Precio 3: an amount sets it; null, '' or 0 clears it. Absent keeps what's stored — a
+ * screen from before these prices existed doesn't send them and must not wipe them by saving. */
+function extraPrice(v: unknown, kept: number | undefined, label: string): number | undefined {
+  if (v === undefined) return kept
+  if (v === null || v === '') return undefined
+  const n = amount(v, label)
+  return n > 0 ? n : undefined
 }
 
 /** A product as the form sends it, reduced to the fields a product has. The loose-unit link
@@ -29,6 +47,8 @@ function cleanProduct(raw: Record<string, unknown>, code: string, existing?: Pro
     code,
     name,
     price: amount(raw.price ?? 0, 'El precio'),
+    price2: extraPrice(raw.price2, existing?.price2, 'El precio 2'),
+    price3: extraPrice(raw.price3, existing?.price3, 'El precio 3'),
     stock: roundQty(amount(raw.stock ?? 0, 'El stock')),
     min: amount(raw.min ?? 0, 'El mínimo'),
     cat: text(raw.cat, 60),
@@ -63,31 +83,37 @@ export function productsRouter(db: Db) {
       return db.tx(async (q) => {
         const actor = await actorOf(q, authOf(req))
         await requireNeed(q, actor, 'stock.editar')
-        if (await getRow<Product>(q, TABLE, 'code', code)) throw new HttpError(409, 'Ese código ya existe')
+        await assertCodeFree(q, code)
         const product = cleanProduct(raw, code)
         const withCost = 'cost' in raw && allowed(actor, 'costos.ver') ? { ...product, cost: amount(raw.cost, 'El precio de compra') } : product
         // The table's trigger files the cost in "productCosts", out of the row everyone reads.
         await putRow(q, TABLE, 'code', code, withCost)
+        await reviveKey(q, code)
         return withCost
       })
     }, 201),
   )
 
-  /** Full replace of an existing product; the code (the primary key) never changes. Without
-   * `stock.ajustar` the stock stays as stored, and without `costos.ver` so does the purchase price. */
+  /** Full replace of an existing product. A `code` in the body that differs from the one in the URL
+   * changes the product's code (everything that points at it follows: server/domain/productCode.ts);
+   * a body without one, or with the same, leaves it. Without `stock.ajustar` the stock stays as
+   * stored, and without `costos.ver` so does the purchase price. */
   router.put(
     '/:code',
     handle(async (req) => {
       const raw = (req.body ?? {}) as Record<string, unknown>
       return db.tx(async (q) => {
         const actor = await actorOf(q, authOf(req))
-        await requireNeed(q, actor, 'stock.editar')
+        const by = await requireNeed(q, actor, 'stock.editar')
         const existing = await getRow<Product>(q, TABLE, 'code', req.params.code)
         if (!existing) throw new HttpError(404, 'Producto no encontrado')
-        const product = cleanProduct(raw, existing.code, existing)
+        // The stored code as it is (an old one may carry spaces) is no change; anything else is a new code.
+        const code = raw.code === undefined || raw.code === existing.code ? existing.code : codeOf(raw.code)
+        const product = cleanProduct(raw, code, existing)
         if (!allowed(actor, 'stock.ajustar')) product.stock = existing.stock
         const withCost = 'cost' in raw && allowed(actor, 'costos.ver') ? { ...product, cost: amount(raw.cost, 'El precio de compra') } : product
-        await putRow(q, TABLE, 'code', existing.code, withCost)
+        if (code === existing.code) await putRow(q, TABLE, 'code', existing.code, withCost)
+        else await renameProduct(q, by, existing, withCost, code)
         return withCost
       })
     }),

@@ -49,7 +49,7 @@ export function ProductTable({ products, byCode, showCosts, onRevealCosts, sort,
       {
         key: 'code',
         label: 'Código',
-        min: 118,
+        min: 112,
         sortKey: 'code',
         cell: (p) => (
           <span className="max-w-full truncate font-mono text-[11.5px] text-txt2" title={p.code}>
@@ -60,7 +60,7 @@ export function ProductTable({ products, byCode, showCosts, onRevealCosts, sort,
       {
         key: 'name',
         label: 'Producto',
-        min: 180,
+        min: 150,
         grow: true,
         sortKey: 'name',
         cell: (p) => (
@@ -80,7 +80,8 @@ export function ProductTable({ products, byCode, showCosts, onRevealCosts, sort,
       {
         key: 'cat',
         label: 'Categoría',
-        min: 96,
+        min: 70,
+        drop: 3,
         sortKey: 'cat',
         cell: (p) => (
           <span className="max-w-full truncate text-txt2" title={p.cat}>
@@ -88,11 +89,11 @@ export function ProductTable({ products, byCode, showCosts, onRevealCosts, sort,
           </span>
         ),
       },
-      { key: 'unit', label: 'Unidad', min: 60, cell: (p) => <span className="max-w-full truncate text-txt2">{unitFullName(p.unit || 'unidad')}</span> },
+      { key: 'unit', label: 'Unidad', min: 56, drop: 1, cell: (p) => <span className="max-w-full truncate text-txt2">{unitFullName(p.unit || 'unidad')}</span> },
       {
         key: 'stock',
         label: 'Stock',
-        min: 84,
+        min: 72,
         align: 'right',
         sortKey: 'stock',
         cell: (p) => {
@@ -108,13 +109,13 @@ export function ProductTable({ products, byCode, showCosts, onRevealCosts, sort,
           )
         },
       },
-      { key: 'min', label: 'Mín.', min: 48, align: 'right', cell: (p) => <span className="font-mono text-txt2">{formatQty(p.min)}</span> },
+      { key: 'min', label: 'Mín.', min: 42, drop: 2, align: 'right', cell: (p) => <span className="font-mono text-txt2">{formatQty(p.min)}</span> },
       // Only for someone who may see purchase prices: listed but masked (the header is a lock, not a
       // sort) until they reveal them — so the price has a place without showing on a shared screen.
       ...(onRevealCosts ? [{
         key: 'cost',
-        label: 'Precio de compra',
-        min: 128,
+        label: 'Compra',
+        min: 90,
         align: 'right',
         sortKey: 'cost',
         lock: showCosts ? undefined : { title: 'Ver precios de compra', onClick: onRevealCosts },
@@ -130,10 +131,12 @@ export function ProductTable({ products, byCode, showCosts, onRevealCosts, sort,
             </span>
           ),
       } satisfies DataColumn<Product, SortKey>] : []),
+      // Up to three selling prices: Precio 1 is the product's own price (what Margen is worked from),
+      // Precio 2 and 3 are optional and the cashier picks among them on the cart line.
       {
         key: 'price',
-        label: 'Precio de venta',
-        min: 120,
+        label: 'Precio 1',
+        min: 100,
         align: 'right',
         sortKey: 'price',
         cell: (p) => (
@@ -143,10 +146,31 @@ export function ProductTable({ products, byCode, showCosts, onRevealCosts, sort,
           </span>
         ),
       },
+      ...(['price2', 'price3'] as const).map(
+        (key) =>
+          ({
+            key,
+            label: key === 'price2' ? 'Precio 2' : 'Precio 3',
+            min: 100,
+            align: 'right',
+            sortKey: key,
+            cell: (p) =>
+              p[key] ? (
+                <span className="font-mono text-[12.5px] font-semibold text-lime">
+                  {formatMoney(p[key])}
+                  {isMeasuredUnit(p.unit) && <span className="text-[10px] font-normal text-muted">/{unitLabel(p)}</span>}
+                </span>
+              ) : (
+                <span className="font-mono text-muted/50" title="Sin este precio">
+                  —
+                </span>
+              ),
+          }) satisfies DataColumn<Product, SortKey>,
+      ),
       {
         key: 'margin',
         label: 'Margen',
-        min: 70,
+        min: 64,
         align: 'right',
         sortKey: 'margin',
         cell: (p) => <span className="font-mono text-green">{(p.cost ?? 0) > 0 ? `${(((p.price - p.cost!) / p.cost!) * 100).toFixed(1)}%` : '—'}</span>,
@@ -154,7 +178,7 @@ export function ProductTable({ products, byCode, showCosts, onRevealCosts, sort,
       {
         key: 'invested',
         label: 'Invertido',
-        min: 116,
+        min: 104,
         align: 'right',
         sortKey: 'invested',
         cell: (p) => <span className="font-mono font-semibold text-orange">{formatMoney((p.cost || 0) * (p.stock || 0))}</span>,
@@ -162,7 +186,8 @@ export function ProductTable({ products, byCode, showCosts, onRevealCosts, sort,
       {
         key: 'status',
         label: 'Estado',
-        min: 80,
+        min: 76,
+        drop: 4,
         align: 'center',
         cell: (p) => {
           const pill = STATUS_PILL[statusOf(p)]
@@ -172,7 +197,7 @@ export function ProductTable({ products, byCode, showCosts, onRevealCosts, sort,
       {
         key: 'actions',
         label: '',
-        min: 156,
+        min: 150,
         actions: true,
         cell: (p) => (
           <>
@@ -201,5 +226,5 @@ export function ProductTable({ products, byCode, showCosts, onRevealCosts, sort,
     return all.filter((c) => showCosts || (c.key !== 'margin' && c.key !== 'invested'))
   }, [showCosts, byCode, onRevealCosts, onEdit, onDelete, onQuickStock, onOpenPackage])
 
-  return <DataTable columns={columns} rows={products} rowKey={(p) => p.code} sort={sort} onSort={onSort} resetKey={resetKey} bottomSpace={80} />
+  return <DataTable columns={columns} rows={products} rowKey={(p) => p.code} sort={sort} onSort={onSort} resetKey={resetKey} bottomSpace={80} dense />
 }

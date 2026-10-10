@@ -15,9 +15,10 @@ export async function addProduct(product: Product): Promise<void> {
   await apiPost('/api/products', product)
 }
 
-/** Update an existing product in place (code is the primary key and cannot change). */
-export async function updateProduct(product: Product): Promise<void> {
-  await apiPut(`/api/products/${encodeURIComponent(product.code)}`, product)
+/** Update an existing product in place. `code` is the one it has now; if `product.code` is a different
+ * one, the server changes the product's code (its sales and open orders follow). */
+export async function updateProduct(code: string, product: Product): Promise<void> {
+  await apiPut(`/api/products/${encodeURIComponent(code)}`, product)
 }
 
 export async function upsertProduct(product: Product): Promise<void> {

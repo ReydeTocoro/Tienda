@@ -27,6 +27,8 @@ const EMPTY = {
   cost: '',
   margin: '',
   price: '',
+  price2: '',
+  price3: '',
   brand: '',
   unit: 'unidad',
   stock: '',
@@ -70,6 +72,8 @@ export function ProductForm({ product, showCosts, onSaved, onCancel, scanSeed, o
         cost: product.cost ? String(product.cost) : '',
         margin,
         price: product.price ? String(product.price) : '',
+        price2: product.price2 ? String(product.price2) : '',
+        price3: product.price3 ? String(product.price3) : '',
         brand: product.brand || '',
         unit: product.unit || 'unidad',
         stock: product.stock ? String(product.stock) : '',
@@ -128,10 +132,18 @@ export function ProductForm({ product, showCosts, onSaved, onCancel, scanSeed, o
     }))
   }
 
+  // Editing, the code can change too (its sales and open orders follow it). One that is only the stored code
+  // with its spaces trimmed is not a change: an old code stays as it is unless it was really edited.
+  const typedCode = f.code.trim()
+  const codeChange = editing && typedCode !== '' && typedCode !== product!.code.trim() ? typedCode : null
   const cost = parseFloat(f.cost) || 0
   const price = parseFloat(f.price) || 0
+  const price2 = parseFloat(f.price2) || 0
+  const price3 = parseFloat(f.price3) || 0
   const gain = price - cost
   const gainPct = cost > 0 ? (gain / cost) * 100 : 0
+  /** "+25.0% ganancia" under an extra price, for whoever sees purchase prices. */
+  const marginNote = (p: number) => (showCosts && cost > 0 && p > 0 ? `${p >= cost ? '+' : ''}${(((p - cost) / cost) * 100).toFixed(1)}% ganancia` : undefined)
 
   const unidadesPorNum = parseInt(f.unidadesPor) || 0
   const precioSueltaNum = parseFloat(f.precioSuelta) || 0
@@ -141,7 +153,7 @@ export function ProductForm({ product, showCosts, onSaved, onCancel, scanSeed, o
     e.preventDefault()
     const ok = await requirePermission('stock.editar', editing ? 'Editar producto' : 'Nuevo producto', 'Crear o editar productos requiere permiso.')
     if (!ok) return
-    const code = f.code.trim()
+    const code = editing && !codeChange ? product!.code : typedCode
     const name = f.name.trim()
     if (!name) {
       toast('Escribe el nombre', 'orange')
@@ -151,11 +163,20 @@ export function ProductForm({ product, showCosts, onSaved, onCancel, scanSeed, o
       toast('Escribe el código', 'orange')
       return
     }
-    if (cost > 0 && price > 0 && cost > price) {
+    if (codeChange) {
+      const clash = allProducts.find((p) => p.code.toLowerCase() === codeChange.toLowerCase() && p.code !== product!.code)
+      if (clash) {
+        toast(`Ese código ya es de "${clash.name}"`, 'orange')
+        return
+      }
+    }
+    // Any of the selling prices under what the product costs is worth a second look.
+    const underCost = cost > 0 ? [{ label: 'Precio 1', value: price }, { label: 'Precio 2', value: price2 }, { label: 'Precio 3', value: price3 }].filter((p) => p.value > 0 && cost > p.value) : []
+    if (underCost.length) {
       const ok = await confirm(
         showCosts
-          ? `El precio de compra ($${cost.toFixed(2)}) es mayor al precio de venta ($${price.toFixed(2)}). ¿Continuar de todas formas?`
-          : 'Con ese precio de venta el producto se vendería por debajo de lo que cuesta. ¿Continuar de todas formas?',
+          ? `El precio de compra ($${cost.toFixed(2)}) es mayor al ${underCost.map((p) => `${p.label} ($${p.value.toFixed(2)})`).join(' y al ')}. ¿Continuar de todas formas?`
+          : `Con ${underCost.length > 1 ? 'esos precios' : 'ese precio'} de venta el producto se vendería por debajo de lo que cuesta. ¿Continuar de todas formas?`,
       )
       if (!ok) return
     }
@@ -200,6 +221,9 @@ export function ProductForm({ product, showCosts, onSaved, onCancel, scanSeed, o
       code,
       name,
       price,
+      // 0 = this product has no Precio 2/3 (the server keeps the field out of the row).
+      price2,
+      price3,
       ...(showCosts ? { cost } : {}),
       stock: parseFloat(f.stock) || 0,
       min: parseFloat(f.min) || 0,
@@ -219,8 +243,8 @@ export function ProductForm({ product, showCosts, onSaved, onCancel, scanSeed, o
 
     try {
       if (editing) {
-        await updateProduct(prod)
-        toast('Producto actualizado', 'lime')
+        await updateProduct(product!.code, prod)
+        toast(codeChange ? `Producto actualizado · código nuevo: ${codeChange}` : 'Producto actualizado', 'lime')
       } else {
         await addProduct(prod)
         toast('Producto guardado', 'lime')
@@ -243,19 +267,28 @@ export function ProductForm({ product, showCosts, onSaved, onCancel, scanSeed, o
               className="input flex-1"
               value={f.code}
               onChange={(e) => set('code', e.target.value)}
+              // A barcode reader types the code and then presses Enter: that must not save the product by surprise.
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') e.preventDefault()
+              }}
               placeholder="001 o barcode"
-              disabled={editing}
             />
-            {onOpenCamera && !editing && (
+            {onOpenCamera && (
               <button
                 type="button"
                 onClick={onOpenCamera}
+                aria-label="Escanear el código"
                 className="flex h-[42px] w-11 flex-shrink-0 items-center justify-center rounded-[10px] border border-br2 bg-s2 text-lime"
               >
                 <Camera size={18} />
               </button>
             )}
           </div>
+          {codeChange && (
+            <p className="text-[11px] leading-snug text-muted">
+              Cambia de «{product!.code}» a «{codeChange}»: sus ventas y los pedidos abiertos pasan al código nuevo.
+            </p>
+          )}
         </Field>
         <Field label="Nombre *" cls="md:col-span-3">
           <input className="input" value={f.name} onChange={(e) => set('name', e.target.value)} placeholder="Nombre del producto" />
@@ -284,7 +317,7 @@ export function ProductForm({ product, showCosts, onSaved, onCancel, scanSeed, o
         <div className="col-span-2 rounded-xl border border-br2 bg-s2 p-3 md:col-span-6">
           <div className="mb-2 flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
             <label className="field-label">
-              {showCosts ? (isMeasured ? `Costo y Precio por ${unitLbl}` : 'Precio y Margen') : isMeasured ? `Precio de venta por ${unitLbl}` : 'Precio de venta'}
+              {showCosts ? (isMeasured ? `Costo y Precios por ${unitLbl}` : 'Precios y Margen') : isMeasured ? `Precios de venta por ${unitLbl}` : 'Precios de venta'}
             </label>
             {showCosts && cost > 0 && price > 0 && (
               <div className="flex items-center gap-2 rounded-lg bg-s1 px-2.5 py-1 text-[12px] text-muted">
@@ -296,14 +329,16 @@ export function ProductForm({ product, showCosts, onSaved, onCancel, scanSeed, o
               </div>
             )}
           </div>
-          <div className={`grid gap-2 ${showCosts ? 'grid-cols-3' : 'grid-cols-1'}`}>
+          <div className={`grid gap-2 ${showCosts ? 'grid-cols-3 md:grid-cols-5' : 'grid-cols-3'}`}>
             {showCosts && (
               <>
                 <NumField label={isMeasured ? `Costo /${unitLbl}` : 'Precio Compra'} value={f.cost} onChange={(v) => calcFromCost(v, f.margin)} />
                 <NumField label="% Ganancia" value={f.margin} onChange={(v) => calcFromCost(f.cost, v)} accent />
               </>
             )}
-            <NumField label={isMeasured ? `Venta /${unitLbl}` : 'Precio Venta'} value={f.price} onChange={calcFromPrice} />
+            <NumField label={isMeasured ? `Precio 1 /${unitLbl}` : 'Precio 1'} value={f.price} onChange={calcFromPrice} />
+            <NumField label={isMeasured ? `Precio 2 /${unitLbl}` : 'Precio 2'} value={f.price2} onChange={(v) => set('price2', v)} note={marginNote(price2)} />
+            <NumField label={isMeasured ? `Precio 3 /${unitLbl}` : 'Precio 3'} value={f.price3} onChange={(v) => set('price3', v)} note={marginNote(price3)} />
           </div>
           <div className={`mt-2.5 flex-wrap gap-1.5 ${showCosts ? 'flex' : 'hidden'}`}>
             {MARGIN_PRESETS.map((p) => (
@@ -319,6 +354,8 @@ export function ProductForm({ product, showCosts, onSaved, onCancel, scanSeed, o
               </button>
             ))}
           </div>
+
+          <p className="mt-2 text-[11px] leading-snug text-muted">Precio 2 y Precio 3 son opcionales (por mayor, cliente frecuente…): en el carrito se elige cuál cobrar.</p>
         </div>
 
         <Field label="Stock actual" cls="md:col-span-3">
@@ -432,7 +469,7 @@ function Field({ label, children, span2, cls = '' }: { label: string; children: 
   )
 }
 
-function NumField({ label, value, onChange, accent }: { label: string; value: string; onChange: (v: string) => void; accent?: boolean }) {
+function NumField({ label, value, onChange, accent, note }: { label: string; value: string; onChange: (v: string) => void; accent?: boolean; note?: string }) {
   return (
     <div>
       <div className="mb-1 field-label">{label}</div>
@@ -445,6 +482,7 @@ function NumField({ label, value, onChange, accent }: { label: string; value: st
         onChange={(e) => onChange(e.target.value)}
         placeholder="0.00"
       />
+      {note && <div className="mt-0.5 text-[10.5px] text-muted">{note}</div>}
     </div>
   )
 }

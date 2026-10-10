@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import type { CartItem } from '../types/cartItem'
 import type { PayMethod } from '../types/sale'
 import { generateId } from '../shared/lib/id'
+import { samePrice } from '../shared/lib/prices'
 import { toast } from './useToastStore'
 
 interface AddUnitSource {
@@ -48,6 +49,9 @@ interface CartState {
   addWeightedItem: (item: CartItem, stock: number, editIndex?: number | null) => void
   addFreeItem: (desc: string, price: number, qty: number) => void
   changeQty: (index: number, delta: number, maxStock?: number) => void
+  /** Charges a line at another of its product's prices (Precio 1, 2 or 3 — the caller offers only
+   * those); free lines keep the price they were typed at. */
+  setItemPrice: (index: number, price: number) => void
   removeItem: (index: number) => void
   setCustomer: (id: string | null, name: string | null) => void
   setPayMethod: (m: PayMethod) => void
@@ -197,6 +201,15 @@ export const useCartStore = create<CartState>((set, get) => {
       }
       const next = [...items]
       next[index] = { ...item, qty: nextQty }
+      patchActive({ items: next })
+    },
+
+    setItemPrice: (index, price) => {
+      const items = active().items
+      const item = items[index]
+      if (!item || item.isFree || !Number.isFinite(price) || price < 0 || samePrice(item.price, price)) return
+      const next = [...items]
+      next[index] = { ...item, price }
       patchActive({ items: next })
     },
 

@@ -5,6 +5,7 @@ import type { Product } from '../../src/types/product'
 import type { FiadoPago, PayMethod, Sale } from '../../src/types/sale'
 import { dayKeyOf, formatMoney } from '../../src/shared/lib/currency'
 import { loyaltyDiscount } from '../../src/shared/lib/loyalty'
+import { samePrice, sellingPrices } from '../../src/shared/lib/prices'
 import type { Sql } from '../db'
 import { getRow, insertAutoRow, putRow, roundQty } from '../routes/generic'
 import { HttpError } from '../routes/http'
@@ -47,8 +48,8 @@ async function loyaltyPoints(sql: Sql, customerId: string): Promise<number> {
   return Math.floor(Number(row?.spent ?? 0) / 10)
 }
 
-/** The cart lines as they'll be saved: inventory products at their current price, name and unit;
- * free-form lines as typed (they need `ventas.productoLibre`). */
+/** The cart lines as they'll be saved: inventory products at one of their current prices (Precio 1,
+ * 2 or 3), with their current name and unit; free-form lines as typed (they need `ventas.productoLibre`). */
 async function priceLines(sql: Sql, items: unknown): Promise<{ lines: CartItem[]; products: Map<string, Product>; hasFree: boolean }> {
   if (!Array.isArray(items) || items.length === 0) throw new Error('Carrito vacío')
   if (items.length > 500) throw new Error('Demasiados productos en una sola venta')
@@ -71,8 +72,12 @@ async function priceLines(sql: Sql, items: unknown): Promise<{ lines: CartItem[]
     const p = products.get(code) ?? (await getRow<Product>(sql, 'products', 'code', code))
     if (!p) throw new Error(`"${text(raw?.name, 80) || code}" ya no existe en el inventario: quítalo del carrito`)
     products.set(code, p)
-    if (!(Math.abs(price - p.price) < 0.005)) throw new Error(`El precio de "${p.name}" cambió a ${formatMoney(p.price)}: quítalo del carrito y agrégalo de nuevo`)
-    lines.push({ code: p.code, name: p.name, price: p.price, cost: 0, qty, brand: p.brand || '', unit: p.unit || 'unidad', isFree: false })
+    // The line may be charged at any of the product's registered prices (Precio 1, 2 or 3): the
+    // cashier chooses on the cart line, and none of them needs a permission because the Administrador
+    // set them all. Anything else is a price the browser made up (or one that changed since).
+    const charged = sellingPrices(p).find((x) => samePrice(price, x))
+    if (charged === undefined) throw new Error(`El precio de "${p.name}" cambió a ${formatMoney(p.price)}: quítalo del carrito y agrégalo de nuevo`)
+    lines.push({ code: p.code, name: p.name, price: charged, cost: 0, qty, brand: p.brand || '', unit: p.unit || 'unidad', isFree: false })
   }
   return { lines, products, hasFree }
 }

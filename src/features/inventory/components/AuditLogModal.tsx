@@ -14,6 +14,7 @@ const TYPE_LABEL: Record<string, string> = {
   ajuste: 'Ajuste',
   importacion: 'Importación',
   correccion_venta: 'Corrección de venta',
+  cambio_codigo: 'Cambio de código',
 }
 
 /** Read-only audit trail viewer — legacy `renderAuditList()` (index.html L5830-5862). */
@@ -56,6 +57,27 @@ export function AuditLogModal({ open, onClose }: AuditLogModalProps) {
                     <span className="text-muted">
                       Antes: ${a.before.total.toFixed(2)} Después: ${a.after.total.toFixed(2)}
                     </span>
+                  </div>
+                </>
+              ) : a.type === 'cambio_codigo' ? (
+                <>
+                  <div className="mb-1.5 flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <div className="truncate text-[13px] font-bold">{a.name}</div>
+                      <div className="font-mono text-[11px] text-muted">
+                        {a.oldCode} → <b className="text-txt2">{a.code}</b>
+                      </div>
+                    </div>
+                    <span className="flex-shrink-0 rounded-full bg-s2 px-2 py-0.5 text-[10px] font-bold text-txt2">{TYPE_LABEL[a.type]}</span>
+                  </div>
+                  <div className="flex flex-wrap items-center justify-between gap-1.5">
+                    <span className="text-[12px] text-txt2">
+                      Pasaron al código nuevo {a.ventas} venta{a.ventas !== 1 ? 's' : ''} y {a.pedidos} pedido{a.pedidos !== 1 ? 's' : ''} abierto{a.pedidos !== 1 ? 's' : ''}
+                    </span>
+                    <div className="text-[10px] text-muted">
+                      {formatDateTime(a.date)}
+                      {a.user ? ' · ' + a.user : ''}
+                    </div>
                   </div>
                 </>
               ) : (
