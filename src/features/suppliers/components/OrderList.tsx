@@ -1,78 +1,76 @@
 import { useMemo, useState } from 'react'
-import { useSecureTable } from '../../../db/secure'
-import { formatDateTime, formatMoney } from '../../../shared/lib/currency'
-import { formatOrderId } from '../../../shared/lib/id'
-import type { OrderStatus, PurchaseOrder } from '../../../types/purchaseOrder'
-import { ORDER_STATUS } from '../lib/orderStatus'
+import { AddFab } from '../../../shared/components/AddFab'
+import { SearchInput } from '../../../shared/components/SearchInput'
+import { nextSort, type SortState } from '../../../shared/lib/sortRows'
+import type { PurchaseOrder } from '../../../types/purchaseOrder'
+import { countByStatus, DEFAULT_ORDER_SORT, filterOrders, sortOrders, type OrderRow, type OrderSortKey, type OrderStatusFilter } from '../lib/orderRows'
 import { OrderDetailSheet } from './OrderDetailSheet'
+import { OrderTable } from './OrderTable'
 import { ReceiveOrderSheet } from './ReceiveOrderSheet'
 
-const FILTERS: Array<{ key: OrderStatus | 'todos'; label: string }> = [
-  { key: 'pedido', label: 'Por recibir' },
-  { key: 'borrador', label: 'Borradores' },
-  { key: 'recibido', label: 'Recibidos' },
-  { key: 'cancelado', label: 'Cancelados' },
-  { key: 'todos', label: 'Todos' },
+const FILTERS: Array<{ key: OrderStatusFilter; label: string; empty: string }> = [
+  { key: 'pedido', label: 'Por recibir', empty: 'No hay pedidos por recibir.' },
+  { key: 'borrador', label: 'Borradores', empty: 'No hay borradores.' },
+  { key: 'recibido', label: 'Recibidos', empty: 'Aún no has recibido ningún pedido.' },
+  { key: 'cancelado', label: 'Cancelados', empty: 'No hay pedidos cancelados.' },
+  { key: 'todos', label: 'Todos', empty: '' },
 ]
 
 interface OrderListProps {
+  rows: OrderRow[]
+  /** Opens the new-order tab (the floating "+"). */
+  onNew: () => void
   onEditDraft: (o: PurchaseOrder) => void
 }
 
-export function OrderList({ onEditDraft }: OrderListProps) {
-  const orders = useSecureTable('purchaseOrders')
-  const [filter, setFilter] = useState<OrderStatus | 'todos'>('pedido')
+/** The Pedidos tab: every purchase order in a table, by default the ones still to arrive. */
+export function OrderList({ rows: all, onNew, onEditDraft }: OrderListProps) {
+  const [search, setSearch] = useState('')
+  const [status, setStatus] = useState<OrderStatusFilter>('pedido')
+  const [sort, setSort] = useState<SortState<OrderSortKey>>(DEFAULT_ORDER_SORT)
   const [detailId, setDetailId] = useState<number | null>(null)
   const [receiving, setReceiving] = useState<PurchaseOrder | null>(null)
 
-  const counts = useMemo(() => {
-    const c: Record<string, number> = { todos: orders.length }
-    for (const o of orders) c[o.status] = (c[o.status] ?? 0) + 1
-    return c
-  }, [orders])
-  const shown = useMemo(() => orders.filter((o) => filter === 'todos' || o.status === filter).sort((a, b) => (b.id ?? 0) - (a.id ?? 0)), [orders, filter])
+  const counts = useMemo(() => countByStatus(all), [all])
+  const rows = useMemo(() => sortOrders(filterOrders(all, search, status), sort), [all, search, status, sort])
   // Looked up live so the sheet reflects changes (e.g. just received) instead of a stale copy.
-  const detail = detailId !== null ? orders.find((o) => o.id === detailId) ?? null : null
+  const detail = detailId !== null ? (all.find((r) => r.id === detailId)?.order ?? null) : null
+  const emptyText = FILTERS.find((f) => f.key === status)?.empty
 
   return (
-    <div>
-      <div className="mb-3 flex flex-wrap gap-1.5">
-        {FILTERS.map((f) => (
-          <button
-            key={f.key}
-            onClick={() => setFilter(f.key)}
-            className={`rounded-full border px-3 py-1 text-[12px] font-semibold transition-colors ${filter === f.key ? 'border-lime bg-lime/15 text-lime' : 'border-br2 text-txt2 hover:bg-s2'}`}
-          >
-            {f.label} ({counts[f.key] ?? 0})
-          </button>
-        ))}
+    <>
+      <div className="flex flex-wrap items-center gap-2">
+        <SearchInput value={search} onChange={setSearch} historyKey="pedidos" placeholder="Buscar pedido, proveedor o producto..." />
+        <select value={status} onChange={(e) => setStatus(e.target.value as OrderStatusFilter)} aria-label="Filtrar por estado" className="input w-auto min-w-[170px] py-2">
+          {FILTERS.map((f) => (
+            <option key={f.key} value={f.key}>
+              {f.label} ({counts[f.key]})
+            </option>
+          ))}
+        </select>
       </div>
 
-      {!shown.length ? (
-        <div className="rounded-xl border border-dashed border-br2 p-10 text-center text-[13px] text-muted">No hay pedidos en esta vista.</div>
-      ) : (
-        <div className="grid gap-2.5 md:grid-cols-2 xl:grid-cols-3">
-          {shown.map((o) => (
-            <button key={o.id} onClick={() => setDetailId(o.id ?? null)} className="rounded-xl border border-br bg-s1 p-3.5 text-left shadow-xs transition-colors hover:border-br2 hover:bg-s2">
-              <div className="flex items-start justify-between gap-2">
-                <div className="min-w-0">
-                  <div className="font-mono text-[12px] text-lime">{formatOrderId(o.id)}</div>
-                  <div className="truncate text-[14px] font-bold">{o.supplierName}</div>
-                </div>
-                <span className={`flex-shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-semibold ${ORDER_STATUS[o.status].cls}`}>{ORDER_STATUS[o.status].label}</span>
-              </div>
-              <div className="mt-2 flex items-end justify-between">
-                <div className="text-[11px] text-muted">
-                  {o.lines.length} producto{o.lines.length !== 1 ? 's' : ''}
-                  <br />
-                  {formatDateTime(o.receivedAt ?? o.orderedAt ?? o.createdAt)}
-                </div>
-                <div className="font-mono text-[16px] font-bold">{formatMoney(o.status === 'recibido' ? (o.receivedTotal ?? o.total) : o.total)}</div>
-              </div>
-            </button>
-          ))}
+      {rows.length === 0 ? (
+        <div className="flex flex-1 items-center justify-center rounded-xl border border-dashed border-br2 p-10 text-center text-[13px] text-muted">
+          {all.length === 0
+            ? 'Aún no hay pedidos — usa el botón + para hacer el primero.'
+            : !search.trim() && emptyText
+              ? emptyText
+              : 'Ningún pedido coincide con la búsqueda o el filtro.'}
         </div>
+      ) : (
+        <OrderTable
+          rows={rows}
+          sort={sort}
+          onSort={(key) => setSort((s) => nextSort(s, key))}
+          resetKey={`${search}|${status}|${sort.key}|${sort.dir}`}
+          onOpen={(o) => setDetailId(o.id ?? null)}
+          onReceive={setReceiving}
+          onEdit={onEditDraft}
+        />
       )}
+
+      <AddFab label="Nuevo pedido" onClick={onNew} />
 
       <OrderDetailSheet
         order={detail}
@@ -87,6 +85,6 @@ export function OrderList({ onEditDraft }: OrderListProps) {
         }}
       />
       <ReceiveOrderSheet order={receiving} onClose={() => setReceiving(null)} onReceived={() => setReceiving(null)} />
-    </div>
+    </>
   )
 }

@@ -19,6 +19,7 @@ import {
   filterInvoices,
   INVOICE_PERIODS,
   METHOD_LABEL,
+  periodPhrase,
   sortInvoices,
   type InvoiceKind,
   type InvoicePeriod,
@@ -38,7 +39,12 @@ export function FacturasPage() {
   const [search, setSearch] = useState('')
   const [kind, setKind] = useState<'todas' | InvoiceKind>('todas')
   const [method, setMethod] = useState<'todos' | PayMethod>('todos')
-  const [period, setPeriod] = useState<InvoicePeriod>('todo')
+  // Opens on today's invoices. The days behind "Elegir un día" and "Rango de fechas" start on today
+  // too, so choosing either keeps today's list until a date is picked.
+  const [period, setPeriod] = useState<InvoicePeriod>('hoy')
+  const [day, setDay] = useState(todayKey)
+  const [from, setFrom] = useState(todayKey)
+  const [to, setTo] = useState(todayKey)
   const [sort, setSort] = useState<SortState<InvoiceSortKey>>(DEFAULT_INVOICE_SORT)
   const { can, requirePermission } = usePermission()
   // Purchase invoices show what each product cost: only for whoever may see purchase prices.
@@ -55,9 +61,19 @@ export function FacturasPage() {
   const today = todayKey()
   const shownKind = canSeePurchases ? kind : 'todas'
   const rows = useMemo(
-    () => sortInvoices(filterInvoices(all, { search, kind: shownKind, method, period }, today), sort),
-    [all, search, shownKind, method, period, today, sort],
+    () => sortInvoices(filterInvoices(all, { search, kind: shownKind, method, period, day, from, to }, today), sort),
+    [all, search, shownKind, method, period, day, from, to, today, sort],
   )
+
+  // The list opens on today, so an empty one is usually just a day without sales: say which days
+  // came up empty (when the dates are all that narrows the list) rather than blame the filters.
+  const periodText = periodPhrase({ period, day, from, to }, today)
+  const emptyMessage =
+    all.length === 0
+      ? 'Sin facturas aún — se crean al vender.'
+      : periodText && !search.trim() && shownKind === 'todas' && method === 'todos'
+        ? `No hay facturas ${periodText}. Cambia la fecha para ver otros días.`
+        : 'Ninguna factura coincide con la búsqueda o los filtros.'
 
   // Totals of what the filters leave on screen, like the sum in a spreadsheet's status bar.
   const totals = useMemo(() => {
@@ -92,7 +108,7 @@ export function FacturasPage() {
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          <SearchInput value={search} onChange={setSearch} placeholder={canSeePurchases ? 'Buscar número, cliente, proveedor o producto...' : 'Buscar número, cliente o producto...'} />
+          <SearchInput value={search} onChange={setSearch} historyKey="facturas" placeholder={canSeePurchases ? 'Buscar número, cliente, proveedor o producto...' : 'Buscar número, cliente o producto...'} />
           {canSeePurchases && (
             <select value={kind} onChange={(e) => setKind(e.target.value as 'todas' | InvoiceKind)} aria-label="Filtrar por tipo" className="input w-auto py-2">
               <option value="todas">Ventas y compras</option>
@@ -115,18 +131,33 @@ export function FacturasPage() {
               </option>
             ))}
           </select>
+          {period === 'dia' && (
+            <input type="date" value={day} max={today} onChange={(e) => setDay(e.target.value)} aria-label="Día de las facturas" className="input w-auto py-2" />
+          )}
+          {period === 'rango' && (
+            <>
+              <label className="flex items-center gap-1.5 field-label">
+                Desde
+                <input type="date" value={from} max={to || today} onChange={(e) => setFrom(e.target.value)} className="input w-auto py-2" />
+              </label>
+              <label className="flex items-center gap-1.5 field-label">
+                Hasta
+                <input type="date" value={to} min={from} max={today} onChange={(e) => setTo(e.target.value)} className="input w-auto py-2" />
+              </label>
+            </>
+          )}
         </div>
 
         {rows.length === 0 ? (
           <div className="flex flex-1 items-center justify-center rounded-xl border border-dashed border-br2 p-10 text-center text-[13px] text-muted">
-            {all.length === 0 ? 'Sin facturas aún — se crean al vender.' : 'Ninguna factura coincide con la búsqueda o los filtros.'}
+            {emptyMessage}
           </div>
         ) : (
           <InvoiceTable
             rows={rows}
             sort={sort}
             onSort={(key) => setSort((s) => nextSort(s, key))}
-            resetKey={`${search}|${shownKind}|${method}|${period}|${sort.key}|${sort.dir}`}
+            resetKey={`${search}|${shownKind}|${method}|${period}|${day}|${from}|${to}|${sort.key}|${sort.dir}`}
             onViewSale={setReceiptSale}
             onCorrectSale={requestCorrection}
             onViewOrder={setViewOrder}

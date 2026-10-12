@@ -24,6 +24,9 @@
   /* Líneas: `br` es el filete que separa zonas; `br2` el contorno de un control. */
   --color-br: #e4e7ec;
   --color-br2: #cfd5de;
+  /* Las líneas de las tablas (celdas, filas, encabezado): más marcadas que `br`, para que la
+   * cuadrícula se lea de un vistazo, como las de una hoja de cálculo. */
+  --color-grid: #aeb8c6;
   --color-txt: #172033;
   --color-txt2: #475467;
   --color-muted: #5f6a79;
@@ -83,6 +86,7 @@
   --color-s3: #1f2638;
   --color-br: #262f42;
   --color-br2: #343e55;
+  --color-grid: #4a5673;
   --color-txt: #e7ecf3;
   --color-txt2: #a2adc0;
   --color-muted: #8894a8;

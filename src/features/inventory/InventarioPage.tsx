@@ -307,7 +307,7 @@ export function InventarioPage() {
         )}
 
         <div className="flex flex-wrap items-center gap-2">
-          <SearchInput value={search} onChange={setSearch} placeholder="Buscar nombre, código, marca..." />
+          <SearchInput value={search} onChange={setSearch} historyKey="stock" placeholder="Buscar nombre, código, marca..." />
           <select value={activeCat} onChange={(e) => setCat(e.target.value)} aria-label="Filtrar por categoría" className="input w-auto min-w-[190px] py-2">
             <option value={ALL}>Todas las categorías ({listed.length})</option>
             {categories.map((c) => (

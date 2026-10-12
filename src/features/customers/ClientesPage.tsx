@@ -87,7 +87,7 @@ export function ClientesPage() {
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          <SearchInput value={search} onChange={setSearch} placeholder="Buscar nombre, cédula o teléfono..." />
+          <SearchInput value={search} onChange={setSearch} historyKey="clientes" placeholder="Buscar nombre, cédula o teléfono..." />
           <select value={tierFilter} onChange={(e) => setTierFilter(e.target.value as TierKey | 'todos')} aria-label="Filtrar por nivel" className="input w-auto min-w-[170px] py-2">
             <option value="todos">Todos los niveles ({list.length})</option>
             {TIERS.map((t) => (

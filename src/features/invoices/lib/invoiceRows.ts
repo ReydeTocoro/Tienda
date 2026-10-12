@@ -1,7 +1,7 @@
 import type { PurchaseOrder } from '../../../types/purchaseOrder'
 import type { PayMethod, Sale } from '../../../types/sale'
 import { getFiadoDebt } from '../../../db/repositories/sales'
-import { addDaysToKey } from '../../../shared/lib/cash'
+import { addDaysToKey, formatDayKey } from '../../../shared/lib/cash'
 import { dayKeyOf, formatQty } from '../../../shared/lib/currency'
 import { formatOrderId, formatSaleId } from '../../../shared/lib/id'
 import { sortRows, type SortState } from '../../../shared/lib/sortRows'
@@ -136,28 +136,72 @@ export function sortInvoices(rows: InvoiceRow[], { key, dir }: SortState<Invoice
   return sortRows(rows, (r) => sortValue(r, key), dir, (a, b) => (a.date < b.date ? 1 : -1))
 }
 
-export type InvoicePeriod = 'todo' | 'hoy' | 'semana' | 'mes'
+/** Which days the list covers: today (where it opens), the last week or month, everything, one
+ * chosen day (`dia`) or from one day to another (`rango`). */
+export type InvoicePeriod = 'hoy' | 'semana' | 'mes' | 'todo' | 'dia' | 'rango'
 
+/** `days` only matters for the presets that count back from today; `dia` and `rango` take their
+ * days from the pickers (`InvoiceFilters.day` / `from` / `to`). */
 export const INVOICE_PERIODS: Record<InvoicePeriod, { label: string; days: number | null }> = {
-  todo: { label: 'Todo el tiempo', days: null },
   hoy: { label: 'Hoy', days: 0 },
   semana: { label: 'Últimos 7 días', days: 7 },
   mes: { label: 'Últimos 30 días', days: 30 },
+  todo: { label: 'Todo el tiempo', days: null },
+  dia: { label: 'Elegir un día', days: null },
+  rango: { label: 'Rango de fechas', days: null },
 }
 
-export interface InvoiceFilters {
+/** The day pickers' part of the filters: 'YYYY-MM-DD' keys, '' = not set. */
+export interface InvoiceDays {
+  period: InvoicePeriod
+  /** The day, for `dia`. */
+  day: string
+  /** The two ends, for `rango`. */
+  from: string
+  to: string
+}
+
+export interface InvoiceFilters extends InvoiceDays {
   search: string
   kind: 'todas' | InvoiceKind
   method: 'todos' | PayMethod
-  period: InvoicePeriod
+}
+
+/** First and last day an invoice may fall on ('YYYY-MM-DD', both included); null = no limit on that
+ * side. A date left empty never limits, and the two ends of a range may come in either order. */
+export function periodBounds(f: InvoiceDays, today: string): { since: string | null; until: string | null } {
+  if (f.period === 'dia') return { since: f.day || null, until: f.day || null }
+  if (f.period === 'rango') {
+    const [since, until] = f.from && f.to && f.from > f.to ? [f.to, f.from] : [f.from, f.to]
+    return { since: since || null, until: until || null }
+  }
+  const days = INVOICE_PERIODS[f.period].days
+  return { since: days === null ? null : addDaysToKey(today, -days), until: null }
+}
+
+/** The period as the end of a sentence — "No hay facturas hoy" — or '' when it limits nothing. */
+export function periodPhrase(f: InvoiceDays, today: string): string {
+  const days = INVOICE_PERIODS[f.period].days
+  if (days === 0) return 'hoy'
+  if (days !== null) return `en los últimos ${days} días`
+  const { since, until } = periodBounds(f, today)
+  if (since && since === until) return `el ${formatDayKey(since)}`
+  if (since && until) return `entre el ${formatDayKey(since)} y el ${formatDayKey(until)}`
+  if (since) return `desde el ${formatDayKey(since)}`
+  if (until) return `hasta el ${formatDayKey(until)}`
+  return ''
 }
 
 export function filterInvoices(rows: InvoiceRow[], f: InvoiceFilters, today: string): InvoiceRow[] {
   // "#0012" and "0012" find the same invoice.
   const q = f.search.trim().toLowerCase().replace(/^#/, '')
-  const days = INVOICE_PERIODS[f.period].days
-  const since = days === null ? null : addDaysToKey(today, -days)
+  const { since, until } = periodBounds(f, today)
   return rows.filter(
-    (r) => (f.kind === 'todas' || r.kind === f.kind) && (f.method === 'todos' || r.method === f.method) && (since === null || r.dayKey >= since) && (!q || r.haystack.includes(q)),
+    (r) =>
+      (f.kind === 'todas' || r.kind === f.kind) &&
+      (f.method === 'todos' || r.method === f.method) &&
+      (since === null || r.dayKey >= since) &&
+      (until === null || r.dayKey <= until) &&
+      (!q || r.haystack.includes(q)),
   )
 }

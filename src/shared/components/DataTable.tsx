@@ -41,7 +41,7 @@ interface DataTableProps<T, K extends string> {
   dense?: boolean
 }
 
-/** Spreadsheet-style list shared by Stock, Clientes, Fiados and Facturas: sticky header, grid lines,
+/** Spreadsheet-style list shared by Stock, Clientes, Fiados, Facturas, Proveedores and Venta: sticky header, grid lines,
  * sortable columns. Rows are virtualized — only the ones near the viewport exist in the DOM,
  * which keeps a 1000+ row list smooth (rendering all of them at once is what made the old card
  * grids janky). Built from CSS-grid rows instead of a `<table>` because a table can't absolutely
@@ -74,16 +74,16 @@ export function DataTable<T, K extends string>({ columns, rows, rowKey, sort, on
   }, [resetKey])
 
   function cellClass(col: DataColumn<T, K>) {
-    const base = `flex min-w-0 border-r border-br/70 ${px} last:border-r-0`
+    const base = `flex min-w-0 border-r border-grid ${px} last:border-r-0`
     if (col.actions) return `${base} flex-row items-center justify-end gap-1`
     const align = col.align === 'right' ? 'items-end text-right' : col.align === 'center' ? 'items-center text-center' : 'items-start'
     return `${base} flex-col justify-center ${align}`
   }
 
   return (
-    <div ref={scrollRef} role="table" aria-rowcount={rows.length + 1} className="min-h-0 flex-1 overflow-auto rounded-xl border border-br bg-s1 shadow-xs">
+    <div ref={scrollRef} role="table" aria-rowcount={rows.length + 1} className="min-h-0 flex-1 overflow-auto rounded-xl border border-grid bg-s1 shadow-xs">
       <div style={{ minWidth }}>
-        <div role="row" aria-rowindex={1} className="sticky top-0 z-10 grid border-b border-br bg-s2" style={{ gridTemplateColumns: template }}>
+        <div role="row" aria-rowindex={1} className="sticky top-0 z-10 grid border-b border-grid bg-s2" style={{ gridTemplateColumns: template }}>
           {shown.map((col) => {
             const active = !col.lock && !!col.sortKey && sort.key === col.sortKey
             const justify = col.align === 'right' ? 'justify-end' : col.align === 'center' ? 'justify-center' : 'justify-start'
@@ -92,7 +92,7 @@ export function DataTable<T, K extends string>({ columns, rows, rowKey, sort, on
                 key={col.key}
                 role="columnheader"
                 aria-sort={active ? (sort.dir === 'asc' ? 'ascending' : 'descending') : undefined}
-                className="flex min-w-0 border-r border-br last:border-r-0"
+                className="flex min-w-0 border-r border-grid last:border-r-0"
               >
                 {col.lock ? (
                   <button
@@ -140,7 +140,7 @@ export function DataTable<T, K extends string>({ columns, rows, rowKey, sort, on
                     : undefined
                 }
                 tabIndex={onRowClick ? 0 : undefined}
-                className={`absolute left-0 right-0 grid border-b border-br text-[12px] transition-colors hover:bg-s3/60 ${vRow.index % 2 ? 'bg-s2' : ''} ${
+                className={`absolute left-0 right-0 grid border-b border-grid text-[12px] transition-colors hover:bg-s3/60 ${vRow.index % 2 ? 'bg-s2' : ''} ${
                   onRowClick ? 'cursor-pointer focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-lime' : ''
                 } ${rowClassName?.(row) ?? ''}`}
                 style={{ height: rowHeight, transform: `translateY(${vRow.start}px)`, gridTemplateColumns: template }}

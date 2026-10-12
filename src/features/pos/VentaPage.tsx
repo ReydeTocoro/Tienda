@@ -12,7 +12,7 @@ import { ScanFlashOverlay } from '../../shared/components/ScanFlashOverlay'
 import { ReceiptSheet } from '../../shared/components/ReceiptSheet'
 import { toast } from '../../store/useToastStore'
 import { searchMatches } from './lib/search'
-import { ProductGrid } from './components/ProductGrid'
+import { ProductPicker } from './components/ProductPicker'
 import { CartPanel } from './components/CartPanel'
 import { SearchDropdown } from './components/SearchDropdown'
 import { WeightModal } from './components/WeightModal'
@@ -154,7 +154,7 @@ export function VentaPage() {
 
   return (
     <div className="mx-auto flex h-full max-w-[1800px] flex-col">
-      {/* Left column carries everything that finds products (KPIs, search, grid); the cart is a
+      {/* Left column carries everything that finds products (KPIs, search, table); the cart is a
        * standalone card in the right column spanning the full height — it's the thing the cashier
        * watches the whole time, so it owns its title, customer and Cobrar button. */}
       <div className="flex min-h-0 flex-1 overflow-hidden">
@@ -205,7 +205,7 @@ export function VentaPage() {
           )}
 
           <div className="min-h-0 flex-1 border-t border-br">
-            <ProductGrid
+            <ProductPicker
               products={products}
               cart={items}
               search={search}

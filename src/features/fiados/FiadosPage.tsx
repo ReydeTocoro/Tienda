@@ -53,7 +53,7 @@ export function FiadosPage() {
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          <SearchInput value={search} onChange={setSearch} placeholder="Buscar nombre, cédula o teléfono..." />
+          <SearchInput value={search} onChange={setSearch} historyKey="fiados" placeholder="Buscar nombre, cédula o teléfono..." />
           <select value={status} onChange={(e) => setStatus(e.target.value as FiadoStatusFilter)} aria-label="Filtrar por estado" className="input w-auto min-w-[170px] py-2">
             <option value="todos">Todos ({all.length})</option>
             <option value="deuda">Con deuda ({pending.length})</option>

@@ -1,5 +1,6 @@
 import { supabase } from '../../api/supabase'
 import { clearLocalData, setSecurePerms, stopSync } from '../../sync'
+import { clearSearchHistory } from '../../shared/lib/searchHistory'
 import { useSessionStore } from '../../store/useSessionStore'
 import { endCounterSession, forgetRemembered, refreshCounterSession } from '../pin/counterSession'
 
@@ -14,8 +15,9 @@ export function takeSignOutNotice(): string | undefined {
 
 /** Ends this person's session on this device ("Cambiar de usuario"): the server forgets who was
  * working here, the secret data they could see goes, and the login shows for whoever comes next.
- * The store's data stays on the device — every account sees the same — unless `forget` (a device
- * that stops being used). Only this device: the same person may be signed in on another. */
+ * The store's data (and the recent searches of the search boxes) stays on the device — every account
+ * sees the same — unless `forget` (a device that stops being used). Only this device: the same
+ * person may be signed in on another. */
 export async function signOut({ forget = false, notice }: { forget?: boolean; notice?: string } = {}): Promise<void> {
   pendingNotice = notice
   await endCounterSession()
@@ -29,8 +31,10 @@ export async function signOut({ forget = false, notice }: { forget?: boolean; no
   useSessionStore.getState().clear()
   forgetRemembered()
   await stopSync()
-  if (forget) await clearLocalData()
-  else setSecurePerms([])
+  if (forget) {
+    clearSearchHistory()
+    await clearLocalData()
+  } else setSecurePerms([])
 }
 
 // The last time someone used this device (per device, a convenience): with the inactivity sign-out

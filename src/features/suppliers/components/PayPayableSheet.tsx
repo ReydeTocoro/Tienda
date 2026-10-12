@@ -15,7 +15,8 @@ interface PayPayableSheetProps {
   onClose: () => void
 }
 
-/** Pay (all or part of) what is owed to a supplier. Comes out of the Caja Mayor by default. */
+/** Pay (all or part of) what is owed to a supplier. Comes out of the Caja Mayor by default. Once the
+ * account is settled it only shows what was paid, and when. */
 export function PayPayableSheet({ payable, onClose }: PayPayableSheetProps) {
   return (
     <BottomSheet open={!!payable} onClose={onClose} maxWidthClass="max-w-[460px]">
@@ -28,6 +29,7 @@ function PayForm({ payable, onClose }: { payable: Payable; onClose: () => void }
   const { menor, mayor, balancesKnown } = useCaja()
   const actor = useActorName()
   const balance = payableBalance(payable)
+  const settled = balance <= 0
   const [amount, setAmount] = useState(balance)
   const [caja, setCaja] = useState<CajaId>('mayor')
   const [busy, setBusy] = useState(false)
@@ -58,7 +60,7 @@ function PayForm({ payable, onClose }: { payable: Payable; onClose: () => void }
 
   return (
     <>
-      <div className="mb-0.5 font-display text-[18px] font-bold">Pagar a {payable.supplierName}</div>
+      <div className="mb-0.5 font-display text-[18px] font-bold">{settled ? `Cuenta con ${payable.supplierName}` : `Pagar a ${payable.supplierName}`}</div>
       <div className="mb-3.5 text-[12px] text-muted">
         Pedido {formatOrderId(payable.orderId)} · vence {formatDayKey(payable.dueDate)}
       </div>
@@ -66,27 +68,33 @@ function PayForm({ payable, onClose }: { payable: Payable; onClose: () => void }
       <div className="mb-3 grid grid-cols-3 gap-2 text-center">
         <Mini label="Total" value={formatMoney(payable.amount)} />
         <Mini label="Pagado" value={formatMoney(payable.paid)} />
-        <Mini label="Saldo" value={formatMoney(balance)} strong />
+        <Mini label="Saldo" value={formatMoney(balance)} strong={!settled} />
       </div>
 
-      <label className="mb-1 block field-label">Monto a pagar *</label>
-      <MoneyInput className="input mb-1.5 text-right font-mono text-[20px] font-bold" value={amount} onChange={(v) => setAmount(v ?? 0)} autoFocus />
-      <div className="mb-3 flex gap-3 text-[12px] font-semibold text-lime">
-        <button onClick={() => setAmount(balance)}>Todo el saldo</button>
-        <button onClick={() => setAmount(Math.round((balance / 2) * 100) / 100)}>Mitad</button>
-      </div>
-      {over && <div className="mb-2 rounded-lg bg-red/10 px-3 py-2 text-[12px] font-semibold text-red">El pago supera el saldo pendiente.</div>}
+      {settled ? (
+        <div className="mb-2 rounded-lg bg-green/10 px-3 py-2 text-[12px] font-semibold text-green">Esta cuenta ya está pagada completa.</div>
+      ) : (
+        <>
+          <label className="mb-1 block field-label">Monto a pagar *</label>
+          <MoneyInput className="input mb-1.5 text-right font-mono text-[20px] font-bold" value={amount} onChange={(v) => setAmount(v ?? 0)} autoFocus />
+          <div className="mb-3 flex gap-3 text-[12px] font-semibold text-lime">
+            <button onClick={() => setAmount(balance)}>Todo el saldo</button>
+            <button onClick={() => setAmount(Math.round((balance / 2) * 100) / 100)}>Mitad</button>
+          </div>
+          {over && <div className="mb-2 rounded-lg bg-red/10 px-3 py-2 text-[12px] font-semibold text-red">El pago supera el saldo pendiente.</div>}
 
-      <div className="mb-1.5 field-label">Sale de</div>
-      <div className="mb-2 flex gap-2">
-        {(['mayor', 'menor'] as const).map((c) => (
-          <button key={c} type="button" onClick={() => setCaja(c)} className={choice(caja === c)}>
-            <div className="text-[13px] font-bold">{CAJA_LABEL[c]}</div>
-            {balancesKnown && <div className={`font-mono text-[12px] ${balances[c] + 0.005 < amount ? 'text-red' : 'text-txt2'}`}>{formatMoney(balances[c])}</div>}
-          </button>
-        ))}
-      </div>
-      {insufficient && !over && <div className="mb-2 rounded-lg bg-red/10 px-3 py-2 text-[12px] font-semibold text-red">{CAJA_LABEL[caja]} no tiene saldo suficiente.</div>}
+          <div className="mb-1.5 field-label">Sale de</div>
+          <div className="mb-2 flex gap-2">
+            {(['mayor', 'menor'] as const).map((c) => (
+              <button key={c} type="button" onClick={() => setCaja(c)} className={choice(caja === c)}>
+                <div className="text-[13px] font-bold">{CAJA_LABEL[c]}</div>
+                {balancesKnown && <div className={`font-mono text-[12px] ${balances[c] + 0.005 < amount ? 'text-red' : 'text-txt2'}`}>{formatMoney(balances[c])}</div>}
+              </button>
+            ))}
+          </div>
+          {insufficient && !over && <div className="mb-2 rounded-lg bg-red/10 px-3 py-2 text-[12px] font-semibold text-red">{CAJA_LABEL[caja]} no tiene saldo suficiente.</div>}
+        </>
+      )}
 
       {payable.payments.length > 0 && (
         <div className="mb-3 mt-2 rounded-lg bg-s2 px-3 py-2 text-[11px] text-txt2">
@@ -103,11 +111,13 @@ function PayForm({ payable, onClose }: { payable: Payable; onClose: () => void }
 
       <div className="mt-3.5 flex gap-2">
         <button onClick={onClose} className="flex-1 rounded-[10px] border border-br2 py-2.5 text-[13px] text-txt2">
-          Cancelar
+          {settled ? 'Cerrar' : 'Cancelar'}
         </button>
-        <button disabled={busy || over || insufficient} onClick={submit} className="flex-[2] rounded-[10px] bg-lime py-2.5 text-[14px] font-bold text-on-solid disabled:opacity-50">
-          Registrar pago
-        </button>
+        {!settled && (
+          <button disabled={busy || over || insufficient} onClick={submit} className="flex-[2] rounded-[10px] bg-lime py-2.5 text-[14px] font-bold text-on-solid disabled:opacity-50">
+            Registrar pago
+          </button>
+        )}
       </div>
     </>
   )

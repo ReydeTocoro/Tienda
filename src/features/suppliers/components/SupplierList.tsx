@@ -1,16 +1,35 @@
-import { useState } from 'react'
-import { Pencil, Phone, Plus } from 'lucide-react'
-import { useSecureTable } from '../../../db/secure'
+import { useMemo, useState } from 'react'
+import { AddFab } from '../../../shared/components/AddFab'
+import { SearchInput } from '../../../shared/components/SearchInput'
+import { nextSort, type SortState } from '../../../shared/lib/sortRows'
 import type { Supplier } from '../../../types/supplier'
-import { termsLabel } from '../lib/terms'
+import { countSuppliers, DEFAULT_SUPPLIER_SORT, filterSuppliers, sortSuppliers, type SupplierFilter, type SupplierRow, type SupplierSortKey } from '../lib/supplierRows'
 import { SupplierFormSheet } from './SupplierFormSheet'
+import { SupplierTable } from './SupplierTable'
 
-export function SupplierList() {
-  const suppliers = useSecureTable('suppliers')
+const FILTERS: Array<{ key: SupplierFilter; label: string }> = [
+  { key: 'todos', label: 'Todos' },
+  { key: 'activos', label: 'Activos' },
+  { key: 'inactivos', label: 'Inactivos' },
+  { key: 'deuda', label: 'Con saldo por pagar' },
+]
+
+interface SupplierListProps {
+  rows: SupplierRow[]
+  /** Starts a new order addressed to this supplier. */
+  onOrder: (s: Supplier) => void
+}
+
+/** The Proveedores tab: who the shop buys from, with what is owed and what is on its way. */
+export function SupplierList({ rows: all, onOrder }: SupplierListProps) {
+  const [search, setSearch] = useState('')
+  const [filter, setFilter] = useState<SupplierFilter>('todos')
+  const [sort, setSort] = useState<SortState<SupplierSortKey>>(DEFAULT_SUPPLIER_SORT)
   const [editing, setEditing] = useState<Supplier | null>(null)
   const [formOpen, setFormOpen] = useState(false)
 
-  const sorted = [...suppliers].sort((a, b) => Number(b.active) - Number(a.active) || a.name.localeCompare(b.name, 'es'))
+  const counts = useMemo(() => countSuppliers(all), [all])
+  const rows = useMemo(() => sortSuppliers(filterSuppliers(all, search, filter), sort), [all, search, filter, sort])
 
   function openForm(s: Supplier | null) {
     setEditing(s)
@@ -18,45 +37,36 @@ export function SupplierList() {
   }
 
   return (
-    <div>
-      <div className="mb-3 flex items-center justify-between">
-        <div className="text-[13px] text-txt2">{suppliers.length} proveedor{suppliers.length !== 1 ? 'es' : ''}</div>
-        <button onClick={() => openForm(null)} className="flex items-center gap-1.5 rounded-[10px] bg-lime px-3.5 py-2 text-[13px] font-bold text-on-solid">
-          <Plus size={15} /> Nuevo proveedor
-        </button>
+    <>
+      <div className="flex flex-wrap items-center gap-2">
+        <SearchInput value={search} onChange={setSearch} historyKey="proveedores" placeholder="Buscar nombre, NIT, contacto o teléfono..." />
+        <select value={filter} onChange={(e) => setFilter(e.target.value as SupplierFilter)} aria-label="Filtrar proveedores" className="input w-auto min-w-[190px] py-2">
+          {FILTERS.map((f) => (
+            <option key={f.key} value={f.key}>
+              {f.label} ({counts[f.key]})
+            </option>
+          ))}
+        </select>
       </div>
 
-      {!sorted.length ? (
-        <div className="rounded-xl border border-dashed border-br2 p-10 text-center text-[13px] text-muted">Aún no tienes proveedores. Crea el primero para poder hacerle pedidos.</div>
-      ) : (
-        <div className="grid gap-2.5 md:grid-cols-2 xl:grid-cols-3">
-          {sorted.map((s) => (
-            <div key={s.id} className={`rounded-xl border border-br bg-s1 p-3.5 shadow-xs ${s.active ? '' : 'opacity-60'}`}>
-              <div className="flex items-start justify-between gap-2">
-                <div className="min-w-0">
-                  <div className="truncate text-[14px] font-bold">{s.name}</div>
-                  {s.nit && <div className="font-mono text-[11px] text-muted">{s.nit}</div>}
-                </div>
-                <button onClick={() => openForm(s)} title="Editar" aria-label="Editar proveedor" className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-md border border-br2 text-txt2 hover:border-lime/40 hover:text-lime">
-                  <Pencil size={14} />
-                </button>
-              </div>
-              <div className="mt-2 flex flex-wrap items-center gap-1.5">
-                <span className={`rounded-full border px-2 py-0.5 text-[11px] font-semibold ${s.paymentTerms.kind === 'credito' ? 'border-blue/30 bg-blue/10 text-blue' : 'border-green/30 bg-green/10 text-green'}`}>{termsLabel(s.paymentTerms)}</span>
-                {!s.active && <span className="rounded-full border border-br2 bg-s2 px-2 py-0.5 text-[11px] text-muted">Inactivo</span>}
-              </div>
-              {(s.contact || s.phone) && (
-                <div className="mt-2 flex items-center gap-1.5 text-[12px] text-txt2">
-                  <Phone size={12} className="flex-shrink-0 text-muted" />
-                  <span className="truncate">{[s.contact, s.phone].filter(Boolean).join(' · ')}</span>
-                </div>
-              )}
-            </div>
-          ))}
+      {rows.length === 0 ? (
+        <div className="flex flex-1 items-center justify-center rounded-xl border border-dashed border-br2 p-10 text-center text-[13px] text-muted">
+          {all.length === 0 ? 'Aún no tienes proveedores — usa el botón + para crear el primero y poder hacerle pedidos.' : 'Ningún proveedor coincide con la búsqueda o el filtro.'}
         </div>
+      ) : (
+        <SupplierTable
+          rows={rows}
+          sort={sort}
+          onSort={(key) => setSort((s) => nextSort(s, key))}
+          resetKey={`${search}|${filter}|${sort.key}|${sort.dir}`}
+          onEdit={openForm}
+          onOrder={onOrder}
+        />
       )}
 
+      <AddFab label="Nuevo proveedor" onClick={() => openForm(null)} />
+
       <SupplierFormSheet open={formOpen} supplier={editing} onClose={() => setFormOpen(false)} />
-    </div>
+    </>
   )
 }
