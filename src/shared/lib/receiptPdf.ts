@@ -1,16 +1,15 @@
 import logoSrc from '../../assets/logo.png'
 import { receiptText, type ReceiptData } from './receipt'
 
-/** jsPDF's standard fonts (incl. "courier", used below to keep `receiptText`'s manual column-spacing
- * intact) have no emoji glyphs — WinAnsi/StandardEncoding only — so they're stripped rather than left
- * to render as boxes/blanks in the PDF. */
+/** jsPDF's standard fonts (incl. "courier", used below to keep `receiptText`'s column-spacing intact — every
+ * space of it counts, so lines are not trimmed) have no emoji glyphs — WinAnsi/StandardEncoding only — so
+ * they're stripped rather than left to render as boxes/blanks in the PDF. */
 function stripEmojiForPdf(text: string): string[] {
   return text
     .replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/gu, '')
     .replace(/\u{FE0F}/gu, '')
     .replace(/━/g, '-')
     .split('\n')
-    .map((l) => l.trimStart())
 }
 
 /** Loaded once and reused: jsPDF's `addImage` accepts a decoded `HTMLImageElement` directly, no
@@ -33,8 +32,9 @@ function getLogoImage(): Promise<HTMLImageElement> {
 export async function buildReceiptPdfBlob(receipt: ReceiptData): Promise<Blob> {
   const { jsPDF } = await import('jspdf')
   const lines = stripEmojiForPdf(receiptText(receipt))
-  const fontSize = 9
-  const lineHeight = 4.2 // mm — comfortably clears 9pt courier's line advance
+  // 7.5 pt Courier is 1.59 mm per character: the 45 columns of `receiptText` take 71.4 mm of the 80 mm roll, inside its margins.
+  const fontSize = 7.5
+  const lineHeight = 3.6 // mm — clears 7.5pt courier's line advance
   const marginX = 4
   const marginY = 6
   const width = 80 // mm — standard thermal-receipt width

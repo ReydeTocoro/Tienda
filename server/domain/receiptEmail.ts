@@ -1,5 +1,5 @@
 import { businessLines, receiptFooter } from '../../src/shared/lib/business'
-import { formatMoney, formatQty } from '../../src/shared/lib/currency'
+import { formatMoney } from '../../src/shared/lib/currency'
 import { payMethodLabel, receiptQty, type ReceiptData } from '../../src/shared/lib/receipt'
 import { isMeasuredUnit, unitShortLabel } from '../../src/shared/lib/units'
 
@@ -30,14 +30,20 @@ export function receiptEmail(r: ReceiptData): ReceiptEmail {
     `<tr><td style="padding:3px 0;${extra}">${label}</td><td style="padding:3px 0;text-align:right;${extra}">${value}</td></tr>`
   const who = r.customerName || r.fiadoName
 
-  const rows = items
+  // Three columns — quantity | description | value — so the quantities stand in one straight column and a long name wraps
+  // inside its own cell.
+  const head = 'padding:4px 0;border-bottom:2px solid #172033;font-size:11px;color:#4a5468;text-transform:uppercase'
+  const rows =
+    `<tr><th style="${head};text-align:right;padding-right:10px;width:1%">Cant.</th><th style="${head};text-align:left">Descripción</th><th style="${head};text-align:right;padding-left:10px">P. unit.</th><th style="${head};text-align:right;padding-left:10px">Valor</th></tr>` +
+    items
     .map((i) => {
       const per = isMeasuredUnit(i.unit) ? `/${unitShortLabel(i.unit)}` : ' c/u'
       return `
     <tr>
-      <td style="padding:6px 0;border-bottom:1px solid #e3e8f0">${esc(isMeasuredUnit(i.unit) ? receiptQty(i) : `${formatQty(i.qty)} ×`)} ${esc(i.name)}<br>
-        <span style="color:#6b7487;font-size:12px">${esc(formatMoney(i.price))}${per}</span>${i.discount ? `<br><span style="color:#2e7d32;font-size:12px">Descuento −${esc(formatMoney(i.discount))}</span>` : ''}</td>
-      <td style="padding:6px 0;border-bottom:1px solid #e3e8f0;text-align:right;white-space:nowrap">${esc(formatMoney(i.price * i.qty))}</td>
+      <td style="padding:6px 10px 6px 0;border-bottom:1px solid #e3e8f0;text-align:right;vertical-align:top;white-space:nowrap;font-weight:bold">${esc(receiptQty(i, ''))}</td>
+      <td style="padding:6px 0;border-bottom:1px solid #e3e8f0;vertical-align:top">${esc(i.name)}${i.discount ? `<br><span style="color:#2e7d32;font-size:12px">Descuento −${esc(formatMoney(i.discount))}</span>` : ''}</td>
+      <td style="padding:6px 0 6px 10px;border-bottom:1px solid #e3e8f0;text-align:right;vertical-align:top;white-space:nowrap;color:#6b7487">${esc(formatMoney(i.price))}${per}</td>
+      <td style="padding:6px 0 6px 10px;border-bottom:1px solid #e3e8f0;text-align:right;vertical-align:top;white-space:nowrap;font-weight:bold">${esc(formatMoney(i.price * i.qty))}</td>
     </tr>`
     })
     .join('')

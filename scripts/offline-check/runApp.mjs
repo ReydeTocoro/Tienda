@@ -542,6 +542,62 @@ async function mainFlow(appUrl, webDir) {
     const restarted = await waitFor("window.__sigueAqui === undefined && !!document.querySelector('#venta-search-input')", 40000)
     check('10 al quedar el carrito vacío se reinicia sola y trae la versión nueva', restarted.ok && (await ev(scriptOf)) !== v1, { v1, ahora: await ev(scriptOf) })
 
+    // 11. The eye of the Caja Mayor: closed, it shows nothing of the Mayor and lets nothing move into it; opening asks for a PIN.
+    const jsonPost = (route, body) => fetch(apiUrl() + route, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }).then((r) => r.text())
+    await jsonPost('/api/counter/owner-pin', { pin: '4821', pinLength: 4 })
+    await jsonPost('/api/cash/transfer', { from: 'menor', to: 'mayor', amount: 1000 }) // so the Mayor has something to hide
+    await send('Page.reload')
+    await waitFor("!!document.querySelector('#venta-search-input')", 30000)
+    await ev(goto('Cajas'))
+    await waitFor("document.body.innerText.includes('Caja Mayor')", 15000)
+    const mayorCard = "[...document.querySelectorAll('section')].find((x) => x.innerText.startsWith('Caja Mayor'))"
+    const eye = "document.querySelector('button[aria-label*=\"la Caja Mayor\"]')"
+    const typePin = async (pin) => {
+      for (const d of pin) {
+        await keyOf(d, 48 + Number(d))
+        await sleep(80)
+      }
+    }
+    const mayorText = async () => ev(`${mayorCard}.innerText`)
+    const closedText = await mayorText()
+    check('11 la Caja Mayor empieza cerrada: sin saldo ni cifras (solo ••••••)', closedText.includes('••••••') && !/\$/.test(closedText), closedText)
+    await shot(c, '16-caja-mayor-cerrada')
+    const body11 = await ev('document.body.innerText')
+    check('11 y sus movimientos no se ven (el traslado aparece solo del lado de la Caja Menor)', body11.includes('Traslado a Caja Mayor') && !body11.includes('Traslado desde Caja Menor'), body11.slice(0, 600))
+    await ev(clickText('Trasladar a Caja Mayor'))
+    await sleep(400)
+    check('11 con la Caja Mayor cerrada no deja trasladar: avisa y no abre nada', (await ev("!document.querySelector('dialog[open]')")) === true && (await ev("document.body.innerText.includes('La Caja Mayor está cerrada')")) === true)
+    await ev(clickText('Registrar egreso'))
+    await sleep(300)
+    check('11 tampoco deja registrar egresos ni ingresos de la Caja Mayor', (await ev("!document.querySelector('dialog[open]')")) === true)
+    await ev(`${eye}.click()`)
+    check('11 el ojito pide el PIN', (await waitFor("(document.querySelector('dialog[open]')?.innerText||'').includes('Abrir la Caja Mayor')", 8000)).ok)
+    await typePin('0000')
+    check('11 un PIN equivocado no la abre', (await waitFor("(document.querySelector('dialog[open]')?.innerText||'').includes('PIN incorrecto')", 8000)).ok && (await mayorText()).includes('••••••'))
+    await typePin('4821')
+    check('11 con el PIN correcto se abre y muestra su saldo', (await waitFor(`!document.querySelector('dialog[open]') && !(${mayorCard}.innerText.includes('••••••'))`, 10000)).ok && /Saldo\n\$\d/.test(await mayorText()), await mayorText())
+    check('11 y sus movimientos aparecen', (await ev("document.body.innerText.includes('Traslado desde Caja Menor')")) === true)
+    await shot(c, '15-caja-mayor-abierta')
+    await ev(clickText('Trasladar a Caja Mayor'))
+    check('11 abierta, sí deja trasladar', (await waitFor("(document.querySelector('dialog[open]')?.innerText||'').includes('Trasladar fondos')", 8000)).ok)
+    await ev(clickText('Cancelar', "document.querySelector('dialog[open]')"))
+    await sleep(500)
+    await ev(`${eye}.click()`)
+    await sleep(400)
+    check('11 el ojito la vuelve a cerrar: otra vez sin cifras', (await mayorText()).includes('••••••') && !/\$/.test(await mayorText()))
+    // The closing of the day: its transfer to the Caja Mayor needs it open too.
+    await ev(clickText('Cerrar caja'))
+    await waitFor("(document.querySelector('dialog[open]')?.innerText||'').includes('Reporte Z')", 8000)
+    await ev(setInput('dialog[open] input[placeholder="0"]', '1000'))
+    await sleep(400)
+    const cz2 = await ev("document.querySelector('dialog[open]')?.innerText||''")
+    check('11 el Cierre Z con la Caja Mayor cerrada no ofrece trasladar: lo explica', cz2.includes('Caja Mayor cerrada') && (await ev("document.querySelector('dialog[open] input[type=checkbox]').checked")) === false, cz2)
+    await ev("document.querySelector('dialog[open] input[type=checkbox]').click()")
+    await sleep(300)
+    check('11 y la casilla de trasladar no se deja marcar', (await ev("document.querySelector('dialog[open] input[type=checkbox]').checked")) === false)
+    await ev(clickText('Cancelar', "document.querySelector('dialog[open]')"))
+    await sleep(400)
+
     const errors = c.logs.filter((l) => /EXC/.test(l))
     check('sin errores de JavaScript en toda la prueba', errors.length === 0, errors.slice(0, 5))
   } finally {

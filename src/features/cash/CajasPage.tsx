@@ -1,13 +1,16 @@
 import { useMemo, useState, type ReactNode } from 'react'
-import { ArrowLeftRight, Lock, LockOpen, Minus, Plus } from 'lucide-react'
+import { ArrowLeftRight, Eye, EyeOff, Lock, LockOpen, Minus, Plus } from 'lucide-react'
 import { addDaysToKey, CAJA_LABEL, round2 } from '../../shared/lib/cash'
 import { formatDateTime, formatMoney, todayKey } from '../../shared/lib/currency'
+import { useMayorStore } from '../../store/useMayorStore'
+import { toast } from '../../store/useToastStore'
 import type { CajaId, MovementType } from '../../types/cash'
 import { CierreZModal } from '../reports/components/CierreZModal'
 import { useCaja } from './hooks/useCaja'
 import { MovementList } from './components/MovementList'
 import { MovementFormSheet } from './components/MovementFormSheet'
 import { OpenCajaSheet } from './components/OpenCajaSheet'
+import { closeMayor, MAYOR_LOCKED, MAYOR_MASK, openMayor } from './mayorEye'
 import { TransferSheet } from './components/TransferSheet'
 
 type Sheet = { kind: 'open' } | { kind: 'move'; caja: CajaId; direction: 'in' | 'out' } | { kind: 'transfer'; from: CajaId } | null
@@ -39,16 +42,28 @@ export function CajasPage() {
   const [group, setGroup] = useState('todos')
   const [period, setPeriod] = useState('hoy')
   const [visible, setVisible] = useState(PAGE)
+  // The eye of the Caja Mayor: closed, its figures and movements are hidden and nothing can be moved into or out of it.
+  const mayorOpen = useMayorStore((s) => s.open)
+  const whenMayorOpen = (action: () => void) => () => {
+    if (mayorOpen) action()
+    else toast(MAYOR_LOCKED, 'orange')
+  }
+  async function toggleMayor() {
+    if (mayorOpen) {
+      closeMayor()
+      toast('Caja Mayor oculta', 'muted')
+    } else if (await openMayor()) toast('Caja Mayor abierta', 'green')
+  }
 
   const today = todayKey()
   const filtered = useMemo(() => {
     const types = GROUPS[group].types
     const days = PERIODS[period].days
     const sinceKey = days === null ? null : addDaysToKey(today, -days)
-    return movements
+    return (mayorOpen ? movements : movements.filter((m) => m.caja !== 'mayor'))
       .filter((m) => (cajaFilter === 'todas' || m.caja === cajaFilter) && (!types || types.includes(m.type)) && (days === 0 ? m.dayKey === today : sinceKey === null || m.dayKey >= sinceKey))
       .sort((a, b) => (a.date < b.date ? 1 : -1))
-  }, [movements, cajaFilter, group, period, today])
+  }, [movements, mayorOpen, cajaFilter, group, period, today])
 
   const todayStats = useMemo(() => {
     let ventas = 0
@@ -89,19 +104,36 @@ export function CajasPage() {
             )}
             <ActionButton icon={Minus} label="Egreso" onClick={() => open({ kind: 'move', caja: 'menor', direction: 'out' })} />
             <ActionButton icon={Plus} label="Ingreso" onClick={() => open({ kind: 'move', caja: 'menor', direction: 'in' })} />
-            <ActionButton icon={ArrowLeftRight} label="Trasladar a Caja Mayor" onClick={() => open({ kind: 'transfer', from: 'menor' })} />
+            <ActionButton icon={ArrowLeftRight} label="Trasladar a Caja Mayor" locked={!mayorOpen} onClick={whenMayorOpen(() => open({ kind: 'transfer', from: 'menor' }))} />
           </div>
         </CajaCard>
 
-        <CajaCard title="Caja Mayor" subtitle="Caja fuerte y bancos: recibe traslados y transferencias, y paga lo grande" balance={balancesKnown ? mayor : null} accent="text-lime">
+        <CajaCard
+          title="Caja Mayor"
+          subtitle={mayorOpen ? 'Caja fuerte y bancos: recibe traslados y transferencias, y paga lo grande' : 'Cerrada: toca el ojito y escribe el PIN para ver y mover la Caja Mayor'}
+          balance={balancesKnown ? mayor : null}
+          accent="text-lime"
+          masked={!mayorOpen}
+          eye={
+            <button
+              onClick={toggleMayor}
+              aria-label={mayorOpen ? 'Ocultar la Caja Mayor' : 'Mostrar la Caja Mayor (pide el PIN)'}
+              aria-pressed={mayorOpen}
+              title={mayorOpen ? 'Ocultar la Caja Mayor' : 'Mostrar la Caja Mayor (pide el PIN)'}
+              className={`flex h-7 w-7 items-center justify-center rounded-lg border transition-colors ${mayorOpen ? 'border-lime/40 bg-lime/10 text-lime' : 'border-br2 text-txt2 hover:bg-s2'}`}
+            >
+              {mayorOpen ? <Eye size={15} /> : <EyeOff size={15} />}
+            </button>
+          }
+        >
           <div className="mb-3 grid grid-cols-2 gap-2 text-[12px]">
-            <MiniStat label="Transferencias recibidas hoy" value={formatMoney(todayStats.transferencias)} color="text-blue" />
+            <MiniStat label="Transferencias recibidas hoy" value={mayorOpen ? formatMoney(todayStats.transferencias) : MAYOR_MASK} color={mayorOpen ? 'text-blue' : 'text-muted'} />
             <div className="rounded-lg bg-s2 px-3 py-2 text-[11px] text-txt2">Nómina, servicios, arriendo y pagos a proveedores salen de aquí.</div>
           </div>
           <div className="flex flex-wrap gap-2">
-            <ActionButton icon={Minus} label="Registrar egreso" onClick={() => open({ kind: 'move', caja: 'mayor', direction: 'out' })} />
-            <ActionButton icon={Plus} label="Ingreso" onClick={() => open({ kind: 'move', caja: 'mayor', direction: 'in' })} />
-            <ActionButton icon={ArrowLeftRight} label="Reponer Caja Menor" onClick={() => open({ kind: 'transfer', from: 'mayor' })} />
+            <ActionButton icon={Minus} label="Registrar egreso" locked={!mayorOpen} onClick={whenMayorOpen(() => open({ kind: 'move', caja: 'mayor', direction: 'out' }))} />
+            <ActionButton icon={Plus} label="Ingreso" locked={!mayorOpen} onClick={whenMayorOpen(() => open({ kind: 'move', caja: 'mayor', direction: 'in' }))} />
+            <ActionButton icon={ArrowLeftRight} label="Reponer Caja Menor" locked={!mayorOpen} onClick={whenMayorOpen(() => open({ kind: 'transfer', from: 'mayor' }))} />
           </div>
         </CajaCard>
       </div>
@@ -129,11 +161,18 @@ export function CajasPage() {
         </select>
       </div>
 
-      <MovementList movements={filtered.slice(0, visible)} showCaja={cajaFilter === 'todas'} />
-      {filtered.length > visible && (
-        <button onClick={() => setVisible((v) => v + PAGE)} className="mt-3 w-full rounded-[10px] border border-br2 py-2.5 text-[13px] font-semibold text-txt2 hover:bg-s2">
-          Ver más ({filtered.length - visible} restantes)
-        </button>
+      {!mayorOpen && cajaFilter === 'mayor' ? (
+        <div className="rounded-xl border border-dashed border-br2 p-8 text-center text-[13px] text-muted">La Caja Mayor está cerrada: abre el ojito de su tarjeta (con PIN) para ver sus movimientos.</div>
+      ) : (
+        <>
+          {!mayorOpen && <div className="mb-2 text-[11px] text-muted">Los movimientos de la Caja Mayor están ocultos mientras esté cerrada.</div>}
+          <MovementList movements={filtered.slice(0, visible)} showCaja={cajaFilter === 'todas'} />
+          {filtered.length > visible && (
+            <button onClick={() => setVisible((v) => v + PAGE)} className="mt-3 w-full rounded-[10px] border border-br2 py-2.5 text-[13px] font-semibold text-txt2 hover:bg-s2">
+              Ver más ({filtered.length - visible} restantes)
+            </button>
+          )}
+        </>
       )}
 
       <OpenCajaSheet open={sheet?.kind === 'open'} onClose={() => setSheet(null)} />
@@ -150,18 +189,43 @@ export function CajasPage() {
   )
 }
 
-/** `balance` null while the ledger is still arriving (right after signing in). */
-function CajaCard({ title, subtitle, balance, accent, children }: { title: string; subtitle: string; balance: number | null; accent: string; children: ReactNode }) {
+/** `balance` null while the ledger is still arriving (right after signing in); `masked`: the caja is closed and its figure is not shown. */
+function CajaCard({
+  title,
+  subtitle,
+  balance,
+  accent,
+  masked = false,
+  eye,
+  children,
+}: {
+  title: string
+  subtitle: string
+  balance: number | null
+  accent: string
+  masked?: boolean
+  eye?: ReactNode
+  children: ReactNode
+}) {
   return (
     <section className="rounded-[14px] border border-br bg-s1 p-4 shadow-xs">
       <div className="mb-3 flex items-start justify-between gap-3">
         <div>
-          <div className="text-[15px] font-bold">{title}</div>
+          <div className="flex items-center gap-2">
+            <div className="text-[15px] font-bold">{title}</div>
+            {eye}
+          </div>
           <div className="mt-0.5 text-[11px] text-muted">{subtitle}</div>
         </div>
         <div className="text-right">
           <div className="field-label">Saldo</div>
-          <div className={`font-mono text-[24px] font-bold leading-tight ${balance !== null && balance < 0 ? 'text-red' : accent}`}>{balance === null ? '…' : formatMoney(balance)}</div>
+          {masked ? (
+            <div aria-label="Saldo oculto" className="font-mono text-[24px] font-bold leading-tight text-muted">
+              {MAYOR_MASK}
+            </div>
+          ) : (
+            <div className={`font-mono text-[24px] font-bold leading-tight ${balance !== null && balance < 0 ? 'text-red' : accent}`}>{balance === null ? '…' : formatMoney(balance)}</div>
+          )}
         </div>
       </div>
       {children}
@@ -178,10 +242,11 @@ function MiniStat({ label, value, color }: { label: string; value: string; color
   )
 }
 
-function ActionButton({ icon: Icon, label, onClick, tone }: { icon: typeof Plus; label: string; onClick: () => void; tone?: 'red' | 'green' }) {
+/** `locked`: it works with the Caja Mayor open only — it still answers a click, by saying so. */
+function ActionButton({ icon: Icon, label, onClick, tone, locked = false }: { icon: typeof Plus; label: string; onClick: () => void; tone?: 'red' | 'green'; locked?: boolean }) {
   const toneClass = tone === 'red' ? 'border-red/30 bg-red/10 text-red hover:bg-red/15' : tone === 'green' ? 'border-green/30 bg-green/10 text-green hover:bg-green/15' : 'border-br2 bg-s2 text-txt2 hover:bg-s3'
   return (
-    <button onClick={onClick} className={`flex items-center gap-1.5 rounded-[10px] border px-3 py-2 text-[12px] font-semibold transition-colors ${toneClass}`}>
+    <button onClick={onClick} title={locked ? 'Abre la Caja Mayor para usarlo' : undefined} className={`flex items-center gap-1.5 rounded-[10px] border px-3 py-2 text-[12px] font-semibold transition-colors ${toneClass} ${locked ? 'opacity-50' : ''}`}>
       <Icon size={14} />
       {label}
     </button>

@@ -3,7 +3,8 @@ import { Download, Loader2, RotateCw } from 'lucide-react'
 import logoSrc from '../../assets/logo.png'
 import { businessLines, receiptFooter } from '../../shared/lib/business'
 import { formatDateTime, formatMoney } from '../../shared/lib/currency'
-import { payMethodLabel, receiptQty, type ReceiptData } from '../../shared/lib/receipt'
+import { ReceiptItems } from '../../shared/components/ReceiptItems'
+import { payMethodLabel, type ReceiptData } from '../../shared/lib/receipt'
 import { buildReceiptPdfBlob, downloadBlob, receiptPdfFilename } from '../../shared/lib/receiptPdf'
 import { SharedReceiptError, fetchSharedReceipt } from './sharedReceipt'
 
@@ -123,16 +124,7 @@ export default function PublicReceiptPage() {
         {r.customerName && <div className="text-center text-[11px] text-lime">{r.customerName}</div>}
         {r.fiadoName && <div className="text-center text-[11px] text-neutral-600">Fiado: {r.fiadoName}</div>}
         <div className="my-1.5 border-t border-dashed border-neutral-400" />
-        {r.items.map((i, k) => (
-          <div key={k} className="flex justify-between gap-2">
-            <span className="min-w-0 break-words">
-              {i.name}
-              {i.isFree ? ' [Libre]' : ''} {receiptQty(i, '×')}
-              {i.discount ? <span className="block text-[11px] text-neutral-600">Desc. −{formatMoney(i.discount)}</span> : null}
-            </span>
-            <span className="flex-shrink-0">{formatMoney(i.price * i.qty)}</span>
-          </div>
-        ))}
+        <ReceiptItems items={r.items} tone="public" />
         <div className="my-1.5 border-t border-dashed border-neutral-400" />
         {row('Subtotal', formatMoney(r.subtotal))}
         {r.discount > 0 && row('Descuento', '-' + formatMoney(r.discount))}

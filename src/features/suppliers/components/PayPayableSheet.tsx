@@ -5,10 +5,12 @@ import { payPayable } from '../../../db/repositories/purchaseOrders'
 import { CAJA_LABEL, formatDayKey, payableBalance } from '../../../shared/lib/cash'
 import { formatDateTime, formatMoney } from '../../../shared/lib/currency'
 import { formatOrderId } from '../../../shared/lib/id'
+import { useMayorStore } from '../../../store/useMayorStore'
 import { toast } from '../../../store/useToastStore'
 import type { CajaId } from '../../../types/cash'
 import type { Payable } from '../../../types/purchaseOrder'
 import { useActorName, useCaja } from '../../cash/hooks/useCaja'
+import { MAYOR_MASK } from '../../cash/mayorEye'
 
 interface PayPayableSheetProps {
   payable: Payable | null
@@ -35,9 +37,12 @@ function PayForm({ payable, onClose }: { payable: Payable; onClose: () => void }
   const [busy, setBusy] = useState(false)
 
   const balances = { menor, mayor }
+  // A closed Caja Mayor shows no balance (its eye, in Cajas); the server still checks the funds.
+  const mayorOpen = useMayorStore((s) => s.open)
+  const shows = (c: CajaId) => balancesKnown && (c !== 'mayor' || mayorOpen)
   const over = amount > balance + 0.001
   // Without "ver el efectivo esperado" the balances never reach this device: the server decides.
-  const insufficient = balancesKnown && amount > balances[caja] + 0.005
+  const insufficient = shows(caja) && amount > balances[caja] + 0.005
 
   async function submit() {
     if (!(amount > 0)) {
@@ -88,7 +93,11 @@ function PayForm({ payable, onClose }: { payable: Payable; onClose: () => void }
             {(['mayor', 'menor'] as const).map((c) => (
               <button key={c} type="button" onClick={() => setCaja(c)} className={choice(caja === c)}>
                 <div className="text-[13px] font-bold">{CAJA_LABEL[c]}</div>
-                {balancesKnown && <div className={`font-mono text-[12px] ${balances[c] + 0.005 < amount ? 'text-red' : 'text-txt2'}`}>{formatMoney(balances[c])}</div>}
+                {shows(c) ? (
+                  <div className={`font-mono text-[12px] ${balances[c] + 0.005 < amount ? 'text-red' : 'text-txt2'}`}>{formatMoney(balances[c])}</div>
+                ) : (
+                  balancesKnown && <div className="font-mono text-[12px] text-muted">{MAYOR_MASK}</div>
+                )}
               </button>
             ))}
           </div>

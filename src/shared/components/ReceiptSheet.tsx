@@ -6,9 +6,8 @@ import { getSettings } from '../../db/repositories/settings'
 import { BottomSheet } from './BottomSheet'
 import { PrintPortal } from './PrintPortal'
 import { PrintHeader } from './PrintHeader'
-import { formatMoney, formatDateTime, formatQty } from '../lib/currency'
+import { formatMoney, formatDateTime } from '../lib/currency'
 import { formatSaleId, isPendingSaleId } from '../lib/id'
-import { unitShortLabel, isMeasuredUnit } from '../lib/units'
 import { ACCOUNT_LABEL } from '../lib/transferAccounts'
 import { toast } from '../../store/useToastStore'
 import logoSrc from '../../assets/logo.png'
@@ -16,6 +15,7 @@ import { businessLines, receiptFooter } from '../lib/business'
 import { receiptFromSale, receiptText } from '../lib/receipt'
 import { buildReceiptPdfBlob, downloadBlob, receiptPdfFilename } from '../lib/receiptPdf'
 import { ShareReceiptPanel, type ShareChannel } from './ShareReceiptPanel'
+import { ReceiptItems } from './ReceiptItems'
 import { ReviewNotes } from './ReviewNotes'
 
 interface ReceiptSheetProps {
@@ -110,19 +110,7 @@ export function ReceiptSheet({ sale, onClose, onCorrect, onVoid }: ReceiptSheetP
         {sale.customerName && <div className="mt-0.5 text-center text-[11px] text-lime">{sale.customerName}</div>}
         {sale.fiadoName && !sale.customerId && <div className="text-center text-[11px] text-red">Fiado: {sale.fiadoName}</div>}
         <div className="my-1.5 border-t border-dashed border-br2" />
-        {sale.items.map((i, idx) => {
-          const ul = isMeasuredUnit(i.unit) ? unitShortLabel(i.unit) : null
-          return (
-            <div key={idx} className="flex justify-between">
-              <span>
-                {i.name}
-                {i.isFree ? ' [Libre]' : ''} {ul ? `${formatQty(i.qty)}${ul}` : `×${formatQty(i.qty)}`}
-                {i.discount ? <span className="block text-[11px] text-green">Desc. −{formatMoney(i.discount)}</span> : null}
-              </span>
-              <span>{formatMoney(i.price * i.qty)}</span>
-            </div>
-          )
-        })}
+        <ReceiptItems items={sale.items} tone="screen" />
         <div className="my-1.5 border-t border-dashed border-br2" />
         <div className="flex justify-between">
           <span>Subtotal</span>
@@ -187,19 +175,7 @@ export function ReceiptSheet({ sale, onClose, onCorrect, onVoid }: ReceiptSheetP
           {sale.customerName && <div className="text-center text-[10px]">{sale.customerName}</div>}
           {sale.fiadoName && !sale.customerId && <div className="text-center text-[10px]">Fiado: {sale.fiadoName}</div>}
           <div className="my-1 border-t border-dashed border-black" />
-          {sale.items.map((i, idx) => {
-            const ul = isMeasuredUnit(i.unit) ? unitShortLabel(i.unit) : null
-            return (
-              <div key={idx} className="flex justify-between gap-2">
-                <span>
-                  {i.name}
-                  {i.isFree ? ' [Libre]' : ''} {ul ? `${formatQty(i.qty)}${ul}` : `x${formatQty(i.qty)}`}
-                  {i.discount ? <span className="block text-[10px]">Desc. −{formatMoney(i.discount)}</span> : null}
-                </span>
-                <span className="flex-shrink-0">{formatMoney(i.price * i.qty)}</span>
-              </div>
-            )
-          })}
+          <ReceiptItems items={sale.items} tone="print" />
           <div className="my-1 border-t border-dashed border-black" />
           <div className="flex justify-between">
             <span>Subtotal</span>

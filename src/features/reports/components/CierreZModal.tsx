@@ -10,6 +10,8 @@ import { getSettings } from '../../../db/repositories/settings'
 import { round2 } from '../../../shared/lib/cash'
 import { toast } from '../../../store/useToastStore'
 import { useConnectionStore } from '../../../store/useConnectionStore'
+import { useMayorStore } from '../../../store/useMayorStore'
+import { MAYOR_LOCKED } from '../../cash/mayorEye'
 import { useOutboxCounts } from '../../../offline/outbox'
 import { processOutbox } from '../../../offline/outboxSync'
 import { formatMoney } from '../../../shared/lib/currency'
@@ -48,6 +50,8 @@ function CierreZForm({ dayKey, onClose, onClosed }: Omit<CierreZModalProps, 'ope
   const [cajero, setCajero] = useState('')
   const [efectivoFisico, setEfectivoFisico] = useState<number | null>(null)
   const [transferOn, setTransferOn] = useState(true)
+  // Moving money into the Caja Mayor needs its eye open (Cajas, with a PIN): closed, the closing goes without a transfer.
+  const mayorOpen = useMayorStore((s) => s.open)
   const [trasladarInput, setTrasladarInput] = useState<number | null>(null)
   const [notas, setNotas] = useState('')
   const [busy, setBusy] = useState(false)
@@ -71,7 +75,8 @@ function CierreZForm({ dayKey, onClose, onClosed }: Omit<CierreZModalProps, 'ope
   const diferencia = round2(fisico - menor)
   const base = settings?.cajaBase ?? 0
   const sugerido = Math.max(0, round2(fisico - base))
-  const trasladar = transferOn ? (trasladarInput ?? sugerido) : 0
+  const wantsTransfer = transferOn && mayorOpen
+  const trasladar = wantsTransfer ? (trasladarInput ?? sugerido) : 0
   const tooMuch = trasladar > fisico + 0.005
   const quedaEnCaja = round2(fisico - trasladar)
 
@@ -187,10 +192,22 @@ function CierreZForm({ dayKey, onClose, onClosed }: Omit<CierreZModalProps, 'ope
       {hasFisico && (
         <div className="mb-3.5 rounded-xl border border-br2 p-3.5">
           <label className="flex cursor-pointer items-center gap-2 text-[13px] font-semibold">
-            <input type="checkbox" checked={transferOn} onChange={(e) => setTransferOn(e.target.checked)} className="h-4 w-4 accent-lime" />
+            <input
+              type="checkbox"
+              checked={wantsTransfer}
+              onChange={(e) => {
+                if (e.target.checked && !mayorOpen) {
+                  toast(MAYOR_LOCKED, 'orange')
+                  return
+                }
+                setTransferOn(e.target.checked)
+              }}
+              className="h-4 w-4 accent-lime"
+            />
             Trasladar fondos a Caja Mayor
           </label>
-          {transferOn && (
+          {!mayorOpen && <div className="mt-1.5 text-[11px] text-muted">Caja Mayor cerrada: ábrela con el ojito de Cajas (con PIN) para trasladar.</div>}
+          {wantsTransfer && (
             <div className="mt-2.5">
               <div className="mb-1 field-label">Monto a trasladar</div>
               <MoneyInput className="input text-right font-mono font-bold" value={trasladar} onChange={(v) => setTrasladarInput(v ?? 0)} />

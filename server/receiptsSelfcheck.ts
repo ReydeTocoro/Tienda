@@ -22,7 +22,7 @@ import { noMailer, type MailMessage, type Mailer } from './mailer'
 import { pdfAttachment } from './routes/receipts'
 import { HttpError } from './routes/http'
 import { asBrowser, testDatabase } from './testDb'
-import { receiptText } from '../src/shared/lib/receipt'
+import { RECEIPT_COLS, receiptText, type ReceiptData } from '../src/shared/lib/receipt'
 
 let n = 0
 console.info = () => {} // the routes log who shared what; not needed here
@@ -71,7 +71,7 @@ const dump = JSON.stringify(receipt)
 for (const secret of ['cost', 'ganancia', 'nota interna', '1200', '2500,']) assert.equal(dump.includes(secret), false, `el recibo no debe llevar "${secret}"`)
 await assert.rejects(() => receiptOfSale(db, 999999), (e) => e instanceof HttpError && e.status === 404)
 assert.match(receiptText(receipt), /RECIBO DE VENTA #\d{4}/)
-assert.match(receiptText(receipt), /Cuerda 1,5m/, 'lo que se vende por medida lleva su unidad')
+assert.match(receiptText(receipt), /1,5m +Cuerda/, 'lo que se vende por medida lleva su unidad en la columna de cantidades')
 ok('el recibo sale de la venta guardada y no lleva costos, ganancia ni notas')
 
 // ─── 1b. What the customer reads: the discount of each product and the account a transfer came into ─────────────
@@ -89,14 +89,40 @@ const saleT = await insertSale({
 const receiptT = await receiptOfSale(db, saleT)
 assert.equal(receiptT.items[0].discount, 500)
 assert.equal(receiptT.transferAccount, 'nequi')
-assert.match(receiptText(receiptT), /Balde x2 {2}\$4\.000,00\n {4}Desc\. -\$500,00/, 'el texto (y el PDF, que lo dibuja) dice a qué producto se le descontó')
-assert.match(receiptText(receiptT), /Pago: Transferencia · Nequi/, 'y la cuenta de la transferencia')
+assert.match(receiptText(receiptT), / 2 +Balde +\$2\.000,00 +\$4\.000,00\n +Desc\. +-\$500,00/, 'el texto (y el PDF, que lo dibuja) dice a qué producto se le descontó')
+assert.match(receiptText(receiptT), /Pago +Transferencia · Nequi/, 'y la cuenta de la transferencia')
 const mailT = receiptEmail(receiptT)
 assert.match(mailT.html, /Descuento −\$500,00/)
 assert.match(mailT.html, /Transferencia · Nequi/)
 assert.match(mailT.text, /descuento -\$500,00/)
 assert.equal(JSON.stringify(receiptT).includes('ganancia'), false, 'y sigue sin llevar la ganancia')
 ok('el recibo del cliente (texto, PDF, correo, página de WhatsApp) dice el descuento de cada producto y la cuenta de una transferencia')
+
+// ─── 1c. The products in columns: quantities in a straight column, the values flush right, long names wrapped ───────
+const wide: ReceiptData = {
+  ...receiptT,
+  items: [
+    { name: 'LAPIZ ROJO PARA CONSTRUCCION', qty: 3, unit: 'unidad', price: 2000 },
+    { name: 'BOLSA EXTRA JUMBO PAQUETE X 10 NUNIDADES', qty: 12, unit: 'unidad', price: 9800 },
+    { name: 'CUERDA', qty: 1.5, unit: 'm', price: 4000 },
+    { name: 'ABCDEFGHIJKLMNOPQRSTUVWXYZABCDEFGHIJKLMNOPQRSTUVWXYZ', qty: 1, unit: 'unidad', price: 1000 },
+  ],
+  discount: 0,
+}
+const textW = receiptText(wide).split('\n')
+assert.ok(textW.every((l) => l.length <= RECEIPT_COLS), 'ninguna línea pasa del ancho del rollo')
+const header = textW.findIndex((l) => /^CANT +DESCRIPCIÓN +P\.UNIT +VALOR$/.test(l))
+assert.ok(header > 0, 'hay encabezado de columnas')
+const rows = textW.slice(header + 1, textW.findIndex((l, k) => k > header && /^-+$/.test(l)))
+const first = rows.filter((l) => /\$/.test(l))
+assert.equal(first.length, 4, 'cada producto tiene su valor en su primera línea')
+assert.ok(first.some((l) => /^ +3 +LAPIZ.* \$2\.000,00 +\$6\.000,00$/.test(l)), 'con el precio de una unidad ($2.000) y el valor de la línea ($6.000)')
+const qtyEnd = (l: string) => l.match(/^ *\S+/)![0].length // where the quantity of a row ends
+assert.ok(first.every((l) => qtyEnd(l) === qtyEnd(first[0])), 'las cantidades terminan todas en la misma columna (a la derecha)')
+assert.ok(first.every((l) => l.length === first[0].length), 'y los valores terminan todos en la misma columna (a la derecha)')
+const continued = rows.filter((l) => !/\$/.test(l))
+assert.ok(continued.length >= 2 && continued.every((l) => /^ {5}\S/.test(l)), 'los nombres largos siguen en la línea de abajo, dentro de su columna (debajo del nombre, no de la cantidad)')
+ok('el recibo en texto/PDF pone las cantidades en una columna recta, los valores alineados a la derecha y baja a otra línea los nombres largos, sin pasar del ancho del rollo')
 
 // ─── 2. The WhatsApp link ────────────────────────────────────────────────────────────────────────
 const link = await shareReceipt(db, saleId)

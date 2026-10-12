@@ -4,6 +4,7 @@ import { outboxCounts } from '../../offline/outbox'
 import { clearLocalData, setSecurePerms, stopSync } from '../../sync'
 import { clearSearchHistory } from '../../shared/lib/searchHistory'
 import { useConnectionStore } from '../../store/useConnectionStore'
+import { useMayorStore } from '../../store/useMayorStore'
 import { useSessionStore } from '../../store/useSessionStore'
 import { endCounterSession, forgetRemembered, refreshCounterSession } from '../pin/counterSession'
 
@@ -52,6 +53,7 @@ export async function signOut({ forget = false, notice }: { forget?: boolean; no
     throw new Error(NEEDS_INTERNET)
   }
   useSessionStore.getState().clear()
+  useMayorStore.getState().setOpen(false) // the next person finds the Caja Mayor closed
   forgetRemembered()
   await stopSync()
   if (forget) {

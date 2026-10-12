@@ -4,10 +4,12 @@ import { receiveOrder } from '../../../db/repositories/purchaseOrders'
 import { CAJA_LABEL, dueDateFrom, formatDayKey, round2 } from '../../../shared/lib/cash'
 import { formatMoney, formatQty } from '../../../shared/lib/currency'
 import { formatOrderId } from '../../../shared/lib/id'
+import { useMayorStore } from '../../../store/useMayorStore'
 import { toast } from '../../../store/useToastStore'
 import type { CajaId } from '../../../types/cash'
 import type { PurchaseOrder } from '../../../types/purchaseOrder'
 import { useActorName, useCaja } from '../../cash/hooks/useCaja'
+import { MAYOR_MASK } from '../../cash/mayorEye'
 import { termsLabel } from '../lib/terms'
 
 interface ReceiveOrderSheetProps {
@@ -39,8 +41,11 @@ function ReceiveForm({ order, onClose, onReceived }: { order: PurchaseOrder; onC
   const lines = order.lines.map((l) => ({ ...l, qtyReceived: parseFloat(qtys[l.code]) || 0, unitCost: parseFloat(costs[l.code]) || 0 }))
   const total = round2(lines.reduce((t, l) => t + l.qtyReceived * l.unitCost, 0))
   const balances = { menor, mayor }
+  // A closed Caja Mayor shows no balance (its eye, in Cajas); the server still checks the funds.
+  const mayorOpen = useMayorStore((s) => s.open)
+  const shows = (c: CajaId) => balancesKnown && (c !== 'mayor' || mayorOpen)
   // Without "ver el efectivo esperado" the balances never reach this device: the server decides.
-  const insufficient = balancesKnown && mode === 'contado' && total > 0 && balances[caja] + 0.005 < total
+  const insufficient = shows(caja) && mode === 'contado' && total > 0 && balances[caja] + 0.005 < total
   const dueKey = order.paymentTerms.kind === 'credito' ? dueDateFrom(new Date(), order.paymentTerms.days) : null
 
   async function submit() {
@@ -117,7 +122,11 @@ function ReceiveForm({ order, onClose, onReceived }: { order: PurchaseOrder; onC
             {(['mayor', 'menor'] as const).map((c) => (
               <button key={c} type="button" onClick={() => setCaja(c)} className={choice(caja === c)}>
                 <div className="text-[13px] font-bold">{CAJA_LABEL[c]}</div>
-                {balancesKnown && <div className={`font-mono text-[12px] ${balances[c] + 0.005 < total ? 'text-red' : 'text-txt2'}`}>{formatMoney(balances[c])}</div>}
+                {shows(c) ? (
+                  <div className={`font-mono text-[12px] ${balances[c] + 0.005 < total ? 'text-red' : 'text-txt2'}`}>{formatMoney(balances[c])}</div>
+                ) : (
+                  balancesKnown && <div className="font-mono text-[12px] text-muted">{MAYOR_MASK}</div>
+                )}
               </button>
             ))}
           </div>
