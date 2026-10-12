@@ -124,6 +124,9 @@ export async function clearLocalData(): Promise<void> {
   securePerms = new Set()
 }
 
+/** This device has downloaded the data at least once (a brand-new one is still on its first download). */
+export const hasSynced = (): boolean => readLocal(EPOCH_KEY) !== null
+
 /** Asks for a download of what changed on the server now (the connection just came back, or a batch of sales
  * was sent), instead of waiting for the next Realtime change. */
 export function syncNow(): void {

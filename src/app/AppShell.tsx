@@ -8,6 +8,7 @@ import { DesktopTabs } from './DesktopTabs'
 import { ToastHost } from '../shared/components/ToastHost'
 import { ConfirmDialog } from '../shared/components/ConfirmDialog'
 import { PinModal } from '../features/pin/PinModal'
+import { NotificationCenter } from '../features/notifications/NotificationCenter'
 import { useSessionGuard } from '../features/pin/useSessionGuard'
 import { useKeyboardShortcuts } from '../shared/hooks/useKeyboardShortcuts'
 import { getSettings } from '../db/repositories/settings'
@@ -82,6 +83,7 @@ export function AppShell() {
       <ToastHost />
       <ConfirmDialog />
       <PinModal />
+      <NotificationCenter />
     </div>
   )
 }

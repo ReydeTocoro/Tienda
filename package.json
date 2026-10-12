@@ -16,6 +16,7 @@
     "check:security": "tsx server/securitySelfcheck.ts",
     "check:receipts": "tsx server/receiptsSelfcheck.ts",
     "check:offline": "tsx server/offlineSelfcheck.ts",
+    "check:notices": "tsx server/noticesSelfcheck.ts",
     "check:offline-browser": "node scripts/offline-check/runModule.mjs",
     "check:offline-app": "node scripts/offline-check/runApp.mjs",
     "db:backup": "tsx server/scripts/dbBackup.ts",

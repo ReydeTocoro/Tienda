@@ -73,6 +73,8 @@ const closeSheet = async (c) => {
   await sleep(400)
 }
 const shot = (c, name) => (SHOTS ? c.shot(path.join(SHOTS, name + '.png')) : undefined)
+/** The store's day in the page, like todayKey(). */
+const TODAY_IN_PAGE = "new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Bogota', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date())"
 
 async function mainFlow(appUrl, webDir) {
   await control('/__test/reset', {})
@@ -83,6 +85,8 @@ async function mainFlow(appUrl, webDir) {
     // 1. Sign in, with internet.
     await send('Page.navigate', { url: appUrl })
     check('1 aparece la pantalla de ingreso', (await waitFor(`!!document.querySelector('#login-email')`, 30000)).ok)
+    // Today's "Pendientes de hoy" counts as seen, so it doesn't open in the middle of the steps below (step 12 is about it).
+    await ev(`localStorage.setItem('mtp-daily-notices', JSON.stringify({ owner: ${TODAY_IN_PAGE} }))`)
     await ev(setInput('#login-email', 'dueno@x.com'))
     await ev(setInput('#login-password', 'clave123'))
     await ev(clickText('Ingresar'))
@@ -597,6 +601,123 @@ async function mainFlow(appUrl, webDir) {
     check('11 y la casilla de trasladar no se deja marcar', (await ev("document.querySelector('dialog[open] input[type=checkbox]').checked")) === false)
     await ev(clickText('Cancelar', "document.querySelector('dialog[open]')"))
     await sleep(400)
+
+    // 12. The notices: "Pendientes de hoy" opens by itself once a day per person and the bell opens it again; after 3
+    // minutes without use the rest screen comes up — and the input that wakes it never reaches the page behind.
+    const jsonSend = (method, route, body) => fetch(apiUrl() + route, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }).then((r) => r.text())
+    await jsonSend('POST', '/api/products', { code: 'N1', name: 'Jarra', price: 3000, stock: 2, min: 5, cat: '', brand: '', unit: 'unidad', esPaquete: false })
+    await jsonSend('POST', '/api/products', { code: 'N2', name: 'Vaso', price: 1000, stock: 0, min: 4, cat: '', brand: '', unit: 'unidad', esPaquete: false })
+    // Goods received on credit (one due within the week, one later) and an order sent but not received yet.
+    const buyOnCredit = async (name, days, line, receive = true) => {
+      const supplier = JSON.parse(await jsonSend('POST', '/api/suppliers', { name, paymentTerms: { kind: 'credito', days } }))
+      const order = JSON.parse(await jsonSend('POST', '/api/purchaseOrders', { supplierId: supplier.id, lines: [line], send: true }))
+      if (receive) await jsonSend('POST', `/api/purchaseOrders/${order.id}/receive`, { payment: { mode: 'credito' } })
+    }
+    await buyOnCredit('Distribuidora Andina', 3, { code: 'C3', qty: 10, unitCost: 2500 })
+    await buyOnCredit('Plásticos del Valle', 30, { code: 'A1', qty: 20, unitCost: 1200 })
+    await buyOnCredit('Hogar y Más', 15, { code: 'B2', qty: 5, unitCost: 3000 }, false)
+    await ev(goto('Venta'))
+    await waitFor("!!document.querySelector('#venta-search-input')", 8000)
+    const bell = `[...document.querySelectorAll('button[aria-label="Notificaciones"]')].find((b) => b.offsetParent !== null)`
+    await ev("localStorage.removeItem('mtp-daily-notices')")
+    await send('Page.reload')
+    await waitFor("!!document.querySelector('#venta-search-input')", 30000)
+    const daily = await waitFor("(document.querySelector('dialog[open]')?.innerText||'').includes('Pendientes de hoy')", 20000)
+    const dailyText = await dialogText()
+    check('12 la primera vez del día "Pendientes de hoy" se abre sola con el detalle', daily.ok && dailyText.includes('Productos agotados') && dailyText.includes('Vaso') && dailyText.includes('Stock bajo') && dailyText.includes('Quedan 2 · mínimo 5'), dailyText)
+    check('12 con lo que se debe a cada proveedor y cuándo vence, y el pedido por recibir', /Pagos a proveedores[\s\S]*\$49\.000,00/.test(dailyText) && /Distribuidora Andina[\s\S]*Vence en 3 días[\s\S]*\$25\.000,00/.test(dailyText) && dailyText.includes('Pedidos por recibir') && dailyText.includes('Hogar y Más'), dailyText)
+    check('12 y queda anotado para esta persona y este día', (await ev(`JSON.parse(localStorage.getItem('mtp-daily-notices')||'{}').owner === ${TODAY_IN_PAGE}`)) === true)
+    // The system's monthly payment (day 13) is reminded to the Administrador from the 11th to the 13th: what this run
+    // sees depends on the real date (check:notices covers every date).
+    const reminderDue = await ev(`(() => { const d = Number(${TODAY_IN_PAGE}.slice(8)); return d >= 11 && d <= 13 })()`)
+    if (reminderDue) {
+      check('12 del 11 al 13 el pago mensual del sistema va primero, con "si ya pagaste, omite este mensaje"', /^Pendientes de hoy\s*[^\n]*\n\s*Pago mensual del sistema/.test(dailyText) && dailyText.includes('Si ya pagaste, omite este mensaje.'), dailyText)
+      const t1 = await ev("document.querySelector('dialog[open] [role=timer]')?.innerText")
+      await sleep(1300)
+      const t2 = await ev("document.querySelector('dialog[open] [role=timer]')?.innerText")
+      check('12 y una cuenta regresiva que corre', !!t1 && !!t2 && t1 !== t2, { t1, t2 })
+    } else check('12 fuera del 11 al 13 no hay recordatorio del pago mensual', !dailyText.includes('Pago mensual del sistema'), dailyText)
+    await shot(c, '17-pendientes-de-hoy')
+    const urgent = reminderDue ? '4' : '3'
+    check('12 la campana cuenta lo que pide atención: agotados (rojo), stock bajo, un pago de esta semana (y el pago mensual)', (await ev(`(${bell})?.innerText.trim() === '${urgent}' && !!(${bell}).querySelector('.bg-red')`)) === true, await ev(`(${bell})?.outerHTML`))
+    await ev(clickText('Entendido', "document.querySelector('dialog[open]')"))
+    await sleep(400)
+    await send('Page.reload')
+    await waitFor("!!document.querySelector('#venta-search-input')", 30000)
+    await sleep(9000)
+    check('12 el mismo día no vuelve a abrirse sola', (await ev("!document.querySelector('dialog[open]')")) === true, await dialogText())
+    await ev(`(${bell}).click()`)
+    check('12 la campana la abre cuando uno quiera', (await waitFor("(document.querySelector('dialog[open]')?.innerText||'').includes('Pendientes de hoy')", 5000)).ok)
+    await ev(clickText('Entendido', "document.querySelector('dialog[open]')"))
+    await sleep(400)
+
+    // The rest screen. The page's clock is pushed forward instead of waiting 3 minutes.
+    const rest = "document.querySelector('[aria-label=\"Pantalla de reposo\"]')"
+    const skipAhead = () => ev('(() => { window.__realNow ??= Date.now; window.__ahead = (window.__ahead || 0) + 200000; Date.now = () => window.__realNow() + window.__ahead; return true })()')
+    await ev("document.querySelector('#venta-search-input').focus()")
+    await skipAhead()
+    check('12 tras 3 minutos sin uso aparece la pantalla de reposo', (await waitFor(`!!${rest}`, 9000)).ok)
+    await sleep(700) // its fade-in
+    const restText = await ev(`${rest}.innerText`)
+    check('12 lo que se debe a proveedores va en grande, con la cuenta que vence esta semana', /Pendientes por pagar a proveedores\s*\$49\.000,00/i.test(restText) && /Distribuidora Andina\s*#P\d+ · Vence en 3 días/.test(restText), restText)
+    check('12 y los demás pendientes al lado', restText.includes('Productos agotados') && restText.includes('Stock bajo') && restText.includes('Pedidos por recibir') && restText.includes('Toca la pantalla'), restText)
+    if (reminderDue) check('12 el pago mensual del sistema arriba de todo, con su cuenta regresiva', /pago mensual del sistema/i.test(restText) && restText.search(/pago mensual del sistema/i) < restText.search(/pendientes por pagar/i) && (await ev(`!!${rest}.querySelector('[role=timer]')`)) === true, restText)
+    await shot(c, '18-pantalla-de-reposo')
+    await send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 2, mobile: true })
+    await sleep(700)
+    await shot(c, '19-pantalla-de-reposo-celular')
+    check('12 en un celular cabe a lo ancho (sin desplazarse de lado)', (await ev(`${rest}.scrollWidth <= ${rest}.clientWidth && document.documentElement.scrollWidth <= innerWidth`)) === true)
+    await send('Emulation.clearDeviceMetricsOverride')
+    await sleep(700)
+    // A barcode reader's burst wakes it and is dropped whole: nothing typed, nothing added to the cart.
+    const typeKey = (key, code, vk) =>
+      send('Input.dispatchKeyEvent', { type: 'keyDown', key, code, windowsVirtualKeyCode: vk, text: key === 'Enter' ? '\r' : key }).then(() => send('Input.dispatchKeyEvent', { type: 'keyUp', key, code, windowsVirtualKeyCode: vk }))
+    for (const [key, code, vk] of [['A', 'KeyA', 65], ['1', 'Digit1', 49], ['Enter', 'Enter', 13]]) await typeKey(key, code, vk)
+    await sleep(700)
+    check('12 una tecla la despierta', (await ev(`!${rest}`)) === true)
+    check('12 y lo que se tecleó no llegó a la página: buscador vacío, carrito vacío', (await ev("document.querySelector('#venta-search-input').value === '' && document.body.innerText.includes('Carrito vacío')")) === true, await ev("document.querySelector('#venta-search-input').value"))
+    check('12 el cursor sigue en el buscador', (await ev("document.activeElement === document.querySelector('#venta-search-input')")) === true)
+    await typeKey('B', 'KeyB', 66)
+    await sleep(300)
+    check('12 pasado el instante, el teclado vuelve a escribir normal', (await ev("document.querySelector('#venta-search-input').value")) === 'B')
+    await ev(setInput('#venta-search-input', ''))
+    // A tap wakes it without pressing what is behind (here, the row of a product, which would add it to the cart).
+    const at = await ev("(() => { const r = [...document.querySelectorAll('[role=row]')].find((x) => x.innerText.includes('Balde')).getBoundingClientRect(); return { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2) } })()")
+    await send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: at.x, y: at.y })
+    await sleep(300)
+    await skipAhead()
+    await waitFor(`!!${rest}`, 9000)
+    await send('Input.dispatchMouseEvent', { type: 'mousePressed', x: at.x, y: at.y, button: 'left', clickCount: 1 })
+    await send('Input.dispatchMouseEvent', { type: 'mouseReleased', x: at.x, y: at.y, button: 'left', clickCount: 1 })
+    await sleep(700)
+    check('12 un toque la despierta y no pulsa lo de atrás (el carrito sigue vacío)', (await ev(`!${rest}`)) === true && (await ev("document.body.innerText.includes('Carrito vacío')")) === true)
+    // Someone in the middle of a form: it doesn't come up.
+    await ev(`(${bell}).click()`)
+    await waitFor("!!document.querySelector('dialog[open]')", 5000)
+    await skipAhead()
+    await sleep(7000)
+    check('12 con una ventana abierta no aparece', (await ev(`!${rest}`)) === true)
+    await ev(clickText('Entendido', "document.querySelector('dialog[open]')"))
+    await ev('Date.now = window.__realNow')
+    await sleep(300)
+    if (reminderDue) {
+      // "Ya pagué" (confirmed) hides it on this device until next month's.
+      await ev(`(${bell}).click()`)
+      await waitFor("(document.querySelector('dialog[open]')?.innerText||'').includes('Pago mensual del sistema')", 5000)
+      await ev(clickText('Ya pagué', "document.querySelector('dialog[open]')"))
+      await waitFor("[...document.querySelectorAll('dialog[open]')].some((d) => d.innerText.includes('¿Ya hiciste el pago de este mes?'))", 5000)
+      await ev(clickText('Sí, ya pagué', "[...document.querySelectorAll('dialog[open]')].find((d) => d.innerText.includes('¿Ya hiciste el pago'))"))
+      check('12 "Ya pagué" (confirmado) lo quita de la lista y de la campana', (await waitFor(`document.querySelectorAll('dialog[open]').length === 1 && !(document.querySelector('dialog[open]')?.innerText||'').includes('Pago mensual del sistema') && (${bell})?.innerText.trim() === '3'`, 5000)).ok, await dialogText())
+      await ev(clickText('Entendido', "document.querySelector('dialog[open]')"))
+      await send('Page.reload')
+      await waitFor("!!document.querySelector('#venta-search-input')", 30000)
+      await sleep(1500)
+      await ev(`(${bell}).click()`)
+      await waitFor("(document.querySelector('dialog[open]')?.innerText||'').includes('Pendientes de hoy')", 5000)
+      check('12 y sigue oculto al recargar (hasta el mes que viene)', !(await dialogText()).includes('Pago mensual del sistema'), await dialogText())
+      await ev(clickText('Entendido', "document.querySelector('dialog[open]')"))
+      await sleep(300)
+    }
 
     const errors = c.logs.filter((l) => /EXC/.test(l))
     check('sin errores de JavaScript en toda la prueba', errors.length === 0, errors.slice(0, 5))

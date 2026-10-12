@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react'
-import { Moon, Sun } from 'lucide-react'
+import { Bell, Moon, Sun } from 'lucide-react'
+import { urgentCount } from '../features/notifications/lib/notices'
+import { useNoticesStore } from '../store/useNoticesStore'
 import { updateSettings } from '../db/repositories/settings'
 import { toast } from '../store/useToastStore'
 import { useThemeStore } from '../store/useThemeStore'
@@ -39,6 +41,7 @@ export function HeaderTools() {
   return (
     <div className="flex items-center gap-2.5">
       <ConnectionPill />
+      <NoticesBell />
       <OperatorMenu />
       <Clock />
       <button
@@ -50,6 +53,26 @@ export function HeaderTools() {
         {dark ? <Sun size={17} /> : <Moon size={17} />}
       </button>
     </div>
+  )
+}
+
+/** The bell: opens "Pendientes de hoy"; its count is what asks for action (red/orange notices). */
+function NoticesBell() {
+  const notices = useNoticesStore((s) => s.notices)
+  const count = urgentCount(notices)
+  const red = notices.some((n) => n.tone === 'red')
+  return (
+    <button
+      onClick={() => useNoticesStore.getState().setSheetOpen(true)}
+      title={count ? `Pendientes: ${count}` : 'Pendientes'}
+      aria-label="Notificaciones"
+      className="relative flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg text-nav-fg-dim transition-colors hover:bg-nav-hover hover:text-nav-fg focus-visible:outline-yellow"
+    >
+      <Bell size={17} />
+      {count > 0 && (
+        <span className={`absolute -right-0.5 -top-0.5 min-w-[16px] rounded-full px-1 text-center text-[10px] font-bold leading-[16px] text-on-solid ${red ? 'bg-red' : 'bg-orange'}`}>{count}</span>
+      )}
+    </button>
   )
 }
 

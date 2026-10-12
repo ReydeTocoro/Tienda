@@ -1,4 +1,5 @@
 import { useMemo, useState, type ReactNode } from 'react'
+import { useLocation, useSearchParams } from 'react-router-dom'
 import { useSecureTable } from '../../db/secure'
 import { Chip } from '../../shared/components/Chip'
 import { round2 } from '../../shared/lib/cash'
@@ -19,7 +20,15 @@ const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one :
 
 /** Proveedores y compras: who we buy from, what we ask them for, what arrived, and what we owe. */
 export function ProveedoresPage() {
-  const [tab, setTab] = useState<Tab>('pedidos')
+  // `?tab=porpagar` (the notices' "Ver") opens Por pagar — also when it is followed while already on this page.
+  const [params] = useSearchParams()
+  const location = useLocation()
+  const [tab, setTab] = useState<Tab>(() => (params.get('tab') === 'porpagar' ? 'porpagar' : 'pedidos'))
+  const [seenKey, setSeenKey] = useState(location.key)
+  if (location.key !== seenKey) {
+    setSeenKey(location.key)
+    if (params.get('tab') === 'porpagar') setTab('porpagar')
+  }
   // `key` forces a fresh draft each time a different order (or a new one) is opened for editing;
   // `supplierId` is the supplier a new order starts addressed to.
   const [editing, setEditing] = useState<{ order: PurchaseOrder | null; supplierId: string | null; key: number }>({ order: null, supplierId: null, key: 0 })
