@@ -3,6 +3,7 @@ import { Moon, Sun } from 'lucide-react'
 import { updateSettings } from '../db/repositories/settings'
 import { toast } from '../store/useToastStore'
 import { useThemeStore } from '../store/useThemeStore'
+import { ConnectionPill } from './ConnectionPill'
 import { OperatorMenu } from './OperatorMenu'
 
 function useClock() {
@@ -37,6 +38,7 @@ export function HeaderTools() {
 
   return (
     <div className="flex items-center gap-2.5">
+      <ConnectionPill />
       <OperatorMenu />
       <Clock />
       <button

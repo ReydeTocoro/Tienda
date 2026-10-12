@@ -3,6 +3,7 @@ import { useSecureTable } from '../../../db/secure'
 import { useProfits } from '../../../shared/hooks/useSecretFigures'
 import { formatMoney } from '../../../shared/lib/currency'
 import { formatCierreId } from '../../../shared/lib/id'
+import { transferRows } from '../../../shared/lib/transferAccounts'
 import { usePermission } from '../../pin/usePermission'
 
 /** legacy `renderCierres()` (index.html L5050-5083). The cierres only reach this device for whoever
@@ -52,6 +53,17 @@ export function CierresHistoryList() {
                 <span className={diff === 0 ? 'text-green' : diff > 0 ? 'text-lime' : 'text-red'}>
                   {diff === 0 ? 'Cuadre perfecto' : diff > 0 ? `+${formatMoney(diff)} sobrante` : `-${formatMoney(Math.abs(diff))} faltante`}
                 </span>
+              </div>
+            )}
+            {transferRows(c.transferBreak).length > 0 && (
+              <div className="mt-1 text-[11px] text-txt2">
+                Transferencias:{' '}
+                {transferRows(c.transferBreak).map((r, i) => (
+                  <span key={r.key}>
+                    {i > 0 && ' · '}
+                    {r.label} <span className="font-mono font-semibold">{formatMoney(r.value)}</span>
+                  </span>
+                ))}
               </div>
             )}
             {c.traslado !== undefined && (

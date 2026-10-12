@@ -318,6 +318,84 @@ r = await put(OWNER, '/api/products/A1', { code: 'A1', name: 'Balde grande', pri
 okStatus(r, 'el dueño cambia el precio de compra')
 assert.equal(r.body.cost, 1300)
 assert.equal((await row<{ c: number }>(`select (data ->> 'cost')::int as c from "productCosts" where code = 'A1'`))!.c, 1300)
+
+// A form saved after sales were made must not put back the stock it loaded when it opened.
+const a1Stock = async () => (await row<{ s: number }>(`select (data ->> 'stock')::float8 as s from products where code = 'A1'`))!.s
+const a1Audits = async () => (await row<{ n: number }>(`select count(*)::int as n from "auditLog" where data ->> 'code' = 'A1'`))!.n
+const live = await a1Stock()
+const auditsA1 = await a1Audits()
+r = await put(OWNER, '/api/products/A1', { code: 'A1', name: 'Balde grande', price: 2500, min: 2, unit: 'unidad', esPaquete: false })
+okStatus(r, 'el dueño guarda el producto sin tocar el stock (el formulario no lo manda)')
+assert.equal(await a1Stock(), live, 'queda el stock que hay en este momento, no el que traía el formulario')
+assert.equal(await a1Audits(), auditsA1, 'y no se registra ningún ajuste')
+r = await put(OWNER, '/api/products/A1', { code: 'A1', name: 'Balde grande', price: 2500, stock: live + 7, min: 2, unit: 'unidad', esPaquete: false })
+okStatus(r, 'si lo cambia a propósito, se guarda')
+assert.equal(await a1Stock(), live + 7)
+assert.equal(await a1Audits(), auditsA1 + 1, 'y deja huella como los demás ajustes')
+const formAudit = await row<{ type: string; before: number; after: number; diff: number; user: string }>(
+  `select data ->> 'type' as type, (data ->> 'before')::float8 as before, (data ->> 'after')::float8 as after, (data ->> 'diff')::float8 as diff, data ->> 'user' as "user" from "auditLog" where data ->> 'code' = 'A1' order by id desc limit 1`,
+)
+assert.deepEqual(formAudit, { type: 'ajuste', before: live, after: live + 7, diff: 7, user: 'Propietario' })
+okStatus(await put(OWNER, '/api/products/A1', { code: 'A1', name: 'Balde grande', price: 2500, stock: live, min: 2, unit: 'unidad', esPaquete: false }), 'y lo deja como estaba')
+
+// An import that replaces the stock leaves a trace too, and a file bigger than the Function can finish is refused up front.
+const auditsImport = await a1Audits()
+r = await post(OWNER, '/api/inventory/import', { parsed: [{ code: 'A1', name: 'Balde grande', price: 0, price2: 0, price3: 0, cost: 0, stock: live + 3, min: 0 }], dupAction: 'update' })
+okStatus(r, 'importar actualizando')
+assert.equal(await a1Stock(), live + 3)
+assert.equal(await a1Audits(), auditsImport + 1, 'cambiar el stock desde un archivo deja huella')
+assert.deepEqual(
+  await row(`select data ->> 'type' as type, (data ->> 'diff')::float8 as diff, data ->> 'user' as "user" from "auditLog" where data ->> 'code' = 'A1' order by id desc limit 1`),
+  { type: 'importacion', diff: 3, user: 'Propietario' },
+)
+await post(OWNER, '/api/inventory/import', { parsed: [{ code: 'A1', name: 'Balde grande', price: 0, price2: 0, price3: 0, cost: 0, stock: live + 3, min: 0 }], dupAction: 'update' })
+assert.equal(await a1Audits(), auditsImport + 1, 'repetir el mismo archivo no vuelve a registrar nada: el stock no cambió')
+okStatus(await put(OWNER, '/api/products/A1', { code: 'A1', name: 'Balde grande', price: 2500, stock: live, min: 2, unit: 'unidad', esPaquete: false }), 'y el stock vuelve a lo que era')
+r = await post(OWNER, '/api/inventory/import', { parsed: Array.from({ length: 3001 }, (_, i) => ({ code: `Z${i}`, name: 'x' })), dupAction: 'skip' })
+assert.equal(r.status, 400)
+assert.match(String(r.body.error), /hasta 3\.000 filas por archivo \(este tiene 3\.001\)/)
+r = await post(OWNER, '/api/entradas/bulk', { entries: Array.from({ length: 5001 }, (_, i) => ({ code: `Z${i}`, qty: 1 })) })
+assert.equal(r.status, 400)
+assert.match(String(r.body.error), /hasta 5\.000 productos por vez/)
+
+// Bulk entries (escaneo masivo) and the cyclic count do their arithmetic in one pass: a code that appears twice
+// adds up in order, an unknown one is skipped, and each record shows the stock before and after it.
+const b2Stock = async () => (await row<{ s: number }>(`select (data ->> 'stock')::float8 as s from products where code = 'B2'`))!.s
+const b2Now = await b2Stock()
+const entriesBefore = (await row<{ n: number }>(`select count(*)::int as n from entradas`))!.n
+r = await post(OWNER, '/api/entradas/bulk', { source: 'prueba', entries: [{ code: 'A1', qty: 2 }, { code: 'A1', qty: 3 }, { code: 'NOPE', qty: 5 }, { code: 'B2', qty: 1 }] })
+okStatus(r, 'escaneo masivo')
+assert.equal(r.body.totalUnidades, 6, 'las unidades del código desconocido no cuentan')
+assert.equal(await a1Stock(), live + 5)
+assert.equal(await b2Stock(), b2Now + 1)
+const chain = (await lite.query<{ code: string; antes: number; despues: number; source: string }>(`select data ->> 'code' as code, (data ->> 'stockAntes')::float8 as antes, (data ->> 'stockDespues')::float8 as despues, data ->> 'source' as source from entradas where data ->> 'source' = 'prueba' order by id`)).rows
+assert.deepEqual(chain, [
+  { code: 'A1', antes: live, despues: live + 2, source: 'prueba' },
+  { code: 'A1', antes: live + 2, despues: live + 5, source: 'prueba' },
+  { code: 'B2', antes: b2Now, despues: b2Now + 1, source: 'prueba' },
+])
+assert.equal((await row<{ n: number }>(`select count(*)::int as n from entradas`))!.n, entriesBefore + 3, 'un registro por cada entrada válida')
+assert.equal((await row<{ p: number }>(`select (data ->> 'price')::int as p from products where code = 'A1'`))!.p, 2500, 'el resto del producto no se toca')
+r = await post(OWNER, '/api/inventory/cyclic-count', {
+  adjustments: [
+    { code: 'A1', counted: live + 10, reason: 'primero' },
+    { code: 'A1', counted: live + 4, reason: 'segundo' },
+    { code: 'NOPE', counted: 1, reason: 'no existe' },
+    { code: 'B2', counted: b2Now + 1, reason: 'igual' },
+  ],
+})
+okStatus(r, 'conteo cíclico')
+assert.equal(r.body.applied, 2, 'se aplican los dos del mismo código; el desconocido y el que no cambia no cuentan')
+assert.equal(await a1Stock(), live + 4, 'queda el último conteo')
+const counted = (await lite.query<{ type: string; before: number; after: number; reason: string }>(`select data ->> 'type' as type, (data ->> 'before')::float8 as before, (data ->> 'after')::float8 as after, data ->> 'reason' as reason from "auditLog" where data ->> 'reason' in ('primero', 'segundo') order by id`)).rows
+assert.deepEqual(counted, [
+  { type: 'ajuste', before: live + 5, after: live + 10, reason: 'primero' },
+  { type: 'merma', before: live + 10, after: live + 4, reason: 'segundo' },
+])
+okStatus(await post(OWNER, '/api/products/A1/adjust-stock', { delta: live - (live + 4) }), 'y deja el stock como estaba')
+okStatus(await post(OWNER, '/api/products/B2/adjust-stock', { delta: -1 }), 'igual con la ponchera')
+assert.equal(await a1Stock(), live)
+assert.equal(await b2Stock(), b2Now)
 ok('Stock: cada acción pide su permiso en el servidor; una autorización vale para un paso en esa sesión y queda firmada por ambos; sin permiso no se fija el costo ni el stock')
 
 // ─── 6. Sales ───────────────────────────────────────────────────────────────────────────────────
@@ -343,13 +421,15 @@ assert.match(String(r.body.error), /Stock insuficiente/)
 needs(await post(PEPE, '/api/sales/finalize', { ...sale([{ code: 'B2', price: 5000, qty: 1 }]), discount: 500, total: 4500 }), 'ventas.descuentos', 'descuento')
 needs(await post(PEPE, '/api/sales/finalize', { ...sale([{ code: 'B2', price: 5000, qty: 1 }]), total: 4000 }), 'ventas.cambiarTotal', 'cambiar el total')
 needs(await post(PEPE, '/api/sales/finalize', { ...sale([{ code: 'B2', price: 5000, qty: 1 }]), payMethod: 'fiado', fiadoName: 'Don José' }), 'ventas.fiar', 'fiar')
-needs(await post(PEPE, '/api/sales/finalize', sale([{ code: 'FREE_x1', name: 'Bolsa', price: 300, qty: 1, isFree: true }])), 'ventas.productoLibre', 'producto sin registrar')
+r = await post(OWNER, '/api/sales/finalize', sale([{ code: 'FREE_x1', name: 'Bolsa', price: 300, qty: 1, isFree: true }]))
+assert.equal(r.status, 400, 'un producto que no es del inventario (el antiguo "producto libre") ya no se vende, ni siquiera el dueño')
+assert.match(String(r.body.error), /"Bolsa" ya no existe en el inventario/)
 okStatus(await approve(PEPE, '7310', 'ventas.descuentos'), 'la supervisora autoriza el descuento')
 r = await post(PEPE, '/api/sales/finalize', { ...sale([{ code: 'B2', price: 5000, qty: 1 }]), discount: 500, total: 4500 })
 okStatus(r, 'con la autorización, la venta con descuento pasa')
 assert.equal(r.body.sellerName, 'Pepe', 'y es venta de Pepe')
 needs(await post(PEPE, '/api/sales/finalize', { ...sale([{ code: 'B2', price: 5000, qty: 1 }]), discount: 500, total: 4500 }), 'ventas.descuentos', 'la autorización se gastó en esa venta')
-ok('Ventas: precio, totales y stock se verifican en el servidor; descuento, cambio de total, fiado y producto libre piden permiso o autorización, que se gasta en una sola venta; la ganancia y el vendedor los pone el servidor')
+ok('Ventas: precio, totales y stock se verifican en el servidor y solo se venden productos del inventario; descuento, cambio de total y fiado piden permiso o autorización, que se gasta en una sola venta; la ganancia y el vendedor los pone el servidor')
 
 // Up to three selling prices: Precio 2 and 3 are kept on the product and a sale line may be charged at
 // any of the product's prices (the cashier picks on the cart line) — with no permission, since the
@@ -407,6 +487,7 @@ assert.match(String(r.body.error), /supera la deuda/, 'no se abona más de lo qu
 r = await post(OWNER, `/api/sales/${saleId}/pagar-completo`, {})
 assert.match(String(r.body.error), /no es un fiado/, 'una venta de contado no se "paga" otra vez')
 needs(await put(ANA, `/api/sales/${saleId}/correct`, { newItems: [], reason: 'x' }), 'facturas.corregir', 'la cajera no corrige facturas')
+needs(await post(ANA, `/api/sales/${saleId}/void`, { reason: 'x' }), 'facturas.corregir', 'ni las anula')
 ok('Fiados y facturas: abonar, condonar y corregir piden su permiso; no se abona de más ni se cobra dos veces una venta de contado')
 
 // ─── 7. Caja ────────────────────────────────────────────────────────────────────────────────────

@@ -1,9 +1,10 @@
 import { randomUUID } from 'node:crypto'
 import type { CajaId, CashMovement, CashSession, ExpenseCategory } from '../../src/types/cash'
 import type { Sale } from '../../src/types/sale'
-import { CAJA_LABEL, round2 } from '../../src/shared/lib/cash'
+import { CAJA_LABEL, CATEGORY_LABEL, round2 } from '../../src/shared/lib/cash'
 import { dayKeyOf, formatMoney } from '../../src/shared/lib/currency'
 import { formatSaleId } from '../../src/shared/lib/id'
+import type { TransferAccount } from '../../src/shared/lib/transferAccounts'
 import type { Sql } from '../db'
 import { insertAutoRow, putRow } from '../routes/generic'
 
@@ -33,6 +34,17 @@ export async function openSession(sql: Sql): Promise<CashSession | undefined> {
   return row?.data
 }
 
+/** The workday that was open at `at` (an ISO date): what a sale made without internet belongs to, even
+ * when it reaches the server after that day was closed. Falls back to the one open now, like any movement. */
+export async function sessionAt(sql: Sql, at?: string): Promise<CashSession | undefined> {
+  if (!at) return openSession(sql)
+  const [row] = await sql.query<{ data: CashSession }>(
+    `select data from "${SESSIONS}" where data ->> 'openedAt' <= $1 and (data ->> 'closedAt' is null or data ->> 'closedAt' >= $1) order by id desc limit 1`,
+    [at],
+  )
+  return row?.data ?? (await openSession(sql))
+}
+
 export interface NewMovement {
   caja: CajaId
   direction: 'in' | 'out'
@@ -44,20 +56,25 @@ export interface NewMovement {
   refId?: number | string
   transferId?: string
   medio?: CashMovement['medio']
+  cuenta?: CashMovement['cuenta']
   by?: string
   sessionId?: number
+  /** When it happened, if not now (ISO): a sale made without internet is booked when it reaches the
+   * server but dated, and put in the workday, of the moment it was made. */
+  at?: string
 }
 
 export async function insertMovement(sql: Sql, m: NewMovement): Promise<CashMovement & { id: number }> {
   const amount = round2(m.amount)
   if (!Number.isFinite(amount) || amount <= 0) throw new Error('El monto debe ser mayor a 0')
-  const now = new Date()
+  const { at, ...movement } = m
+  const when = at ? new Date(at) : new Date()
   const row: Omit<CashMovement, 'id'> = {
-    ...m,
+    ...movement,
     amount,
-    date: now.toISOString(),
-    dayKey: dayKeyOf(now),
-    sessionId: m.sessionId ?? (m.caja === 'menor' ? (await openSession(sql))?.id : undefined),
+    date: when.toISOString(),
+    dayKey: dayKeyOf(when),
+    sessionId: m.sessionId ?? (m.caja === 'menor' ? (await sessionAt(sql, at))?.id : undefined),
   }
   return insertAutoRow(sql, MOVEMENTS, row)
 }
@@ -90,6 +107,7 @@ export async function registerMovement(sql: Sql, input: MovementInput): Promise<
   if (!concept) throw new Error('Escribe el concepto del movimiento')
   const amount = round2(input.amount)
   if (!(amount > 0)) throw new Error('El monto debe ser mayor a 0')
+  if (input.category && !Object.hasOwn(CATEGORY_LABEL, input.category)) throw new Error('Esa categoría de gasto no existe')
   if (input.direction === 'out') await requireFunds(sql, input.caja, amount)
   return insertMovement(sql, {
     caja: input.caja,
@@ -212,13 +230,23 @@ export async function recordArqueoAdjustment(sql: Sql, diff: number, by: string)
 export type CollectMethod = 'efectivo' | 'transferencia'
 
 /** Cash goes into the Caja Menor drawer; a bank transfer is credited to the Caja Mayor (safe + banks). */
-const receiptTarget = (method: CollectMethod): Pick<NewMovement, 'caja' | 'medio'> =>
-  method === 'transferencia' ? { caja: 'mayor', medio: 'transferencia' } : { caja: 'menor', medio: 'efectivo' }
+const receiptTarget = (method: CollectMethod, cuenta?: TransferAccount): Pick<NewMovement, 'caja' | 'medio' | 'cuenta'> =>
+  method === 'transferencia' ? { caja: 'mayor', medio: 'transferencia', ...(cuenta ? { cuenta } : {}) } : { caja: 'menor', medio: 'efectivo' }
 
 /** A collected sale puts its total where the money arrived. Fiado sales collect nothing yet. */
 export async function recordSaleReceipt(sql: Sql, sale: Sale & { id: number }): Promise<void> {
   if ((sale.payMethod !== 'efectivo' && sale.payMethod !== 'transferencia') || sale.total <= 0) return
-  await insertMovement(sql, { ...receiptTarget(sale.payMethod), direction: 'in', type: 'venta', amount: sale.total, concept: `Venta ${formatSaleId(sale.id)}`, refType: 'sale', refId: sale.id })
+  await insertMovement(sql, {
+    ...receiptTarget(sale.payMethod, sale.transferAccount),
+    direction: 'in',
+    type: 'venta',
+    amount: sale.total,
+    concept: `Venta ${formatSaleId(sale.id)}`,
+    refType: 'sale',
+    refId: sale.id,
+    // A sale that came from a device without internet keeps the moment it was made.
+    ...(sale.offline ? { at: sale.date } : {}),
+  })
 }
 
 /** Correcting an invoice changes what was collected; the difference goes through the ledger, in
@@ -227,7 +255,7 @@ export async function recordSaleCorrection(sql: Sql, sale: Sale & { id: number }
   const diff = round2(totalDiff)
   if ((sale.payMethod !== 'efectivo' && sale.payMethod !== 'transferencia') || diff === 0) return
   await insertMovement(sql, {
-    ...receiptTarget(sale.payMethod),
+    ...receiptTarget(sale.payMethod, sale.transferAccount),
     direction: diff > 0 ? 'in' : 'out',
     type: 'ajuste_venta',
     amount: Math.abs(diff),
@@ -237,11 +265,40 @@ export async function recordSaleCorrection(sql: Sql, sale: Sale & { id: number }
   })
 }
 
+/** Annulling an invoice that was collected takes its whole total back out of the caja it went into. */
+export async function recordSaleVoid(sql: Sql, sale: Sale & { id: number }): Promise<void> {
+  if ((sale.payMethod !== 'efectivo' && sale.payMethod !== 'transferencia') || sale.total <= 0) return
+  await insertMovement(sql, {
+    ...receiptTarget(sale.payMethod, sale.transferAccount),
+    direction: 'out',
+    type: 'ajuste_venta',
+    amount: sale.total,
+    concept: `Anulación de venta ${formatSaleId(sale.id)}`,
+    refType: 'sale',
+    refId: sale.id,
+  })
+}
+
+/** What a customer had paid towards a fiado that is annulled goes back to them, from the caja it came into. It is an
+ * expense of today because the payment itself counted as income on its own day. */
+export async function recordFiadoRefund(sql: Sql, sale: Sale & { id: number }, amount: number, method: CollectMethod, account?: TransferAccount): Promise<void> {
+  if (!(round2(amount) > 0)) return
+  await insertMovement(sql, {
+    ...receiptTarget(method, account),
+    direction: 'out',
+    type: 'egreso',
+    amount,
+    concept: `Devolución de abonos · anulación de venta ${formatSaleId(sale.id)}`,
+    refType: 'sale',
+    refId: sale.id,
+  })
+}
+
 /** A fiado payment collected from the customer is money in (cash → Menor, transfer → Mayor);
  * forgiving a debt is not, so callers skip this for condonations. */
-export async function recordFiadoCollection(sql: Sql, sale: Sale & { id: number }, amount: number, method: CollectMethod = 'efectivo'): Promise<void> {
+export async function recordFiadoCollection(sql: Sql, sale: Sale & { id: number }, amount: number, method: CollectMethod = 'efectivo', account?: TransferAccount): Promise<void> {
   if (!(amount > 0)) return
   if (method !== 'efectivo' && method !== 'transferencia') throw new Error('Medio de pago inválido')
   const who = sale.fiadoName || sale.customerName || 'cliente'
-  await insertMovement(sql, { ...receiptTarget(method), direction: 'in', type: 'abono_fiado', amount, concept: `Abono de fiado · ${who} (${formatSaleId(sale.id)})`, refType: 'sale', refId: sale.id })
+  await insertMovement(sql, { ...receiptTarget(method, account), direction: 'in', type: 'abono_fiado', amount, concept: `Abono de fiado · ${who} (${formatSaleId(sale.id)})`, refType: 'sale', refId: sale.id })
 }

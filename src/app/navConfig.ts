@@ -5,7 +5,6 @@ import { db } from '../db/index'
 import { useSecureTable } from '../db/secure'
 import { groupFiados, groupTotals } from '../features/fiados/lib/fiadoGrouping'
 import { payableBalance } from '../shared/lib/cash'
-import { todayKey } from '../shared/lib/currency'
 import type { Need } from '../shared/lib/permissions'
 import { useMemo } from 'react'
 
@@ -37,19 +36,17 @@ export const NAV_ITEMS: NavItem[] = [
   { to: '/configuracion', label: 'Config.', title: 'Configuración', icon: Settings, need: 'admin' },
 ]
 
-/** Live low-stock / pending-fiado counts used for nav badges in both chromes. */
+/** Live low-stock / pending-fiado / pending-payable counts used for nav badges in both chromes. */
 export function useNavBadges() {
   const lowStockCount = useLiveQuery(() => db.products.filter((p) => p.stock > 0 && p.min > 0 && p.stock <= p.min).count(), [], 0)
   const fiadoCount = useLiveQuery(
-    () => db.sales.toArray().then((sales) => groupFiados(sales).filter((g) => groupTotals(g).totalDebt > 0).length),
+    () => db.sales.where('payMethod').equals('fiado').toArray().then((sales) => groupFiados(sales).filter((g) => groupTotals(g).totalDebt > 0).length),
     [],
     0,
   )
-  // Supplier debts already past their due date (only known to whoever may see purchasing).
+  // Accounts payable still to be paid to suppliers, overdue or not — like the fiados count (only known
+  // to whoever may see purchasing).
   const payables = useSecureTable('payables')
-  const overdueCount = useMemo(() => {
-    const today = todayKey()
-    return payables.filter((p) => payableBalance(p) > 0 && p.dueDate < today).length
-  }, [payables])
-  return { lowStock: lowStockCount, fiados: fiadoCount, payables: overdueCount }
+  const pendingCount = useMemo(() => payables.filter((p) => payableBalance(p) > 0).length, [payables])
+  return { lowStock: lowStockCount, fiados: fiadoCount, payables: pendingCount }
 }

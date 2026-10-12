@@ -39,6 +39,10 @@ interface DataTableProps<T, K extends string> {
   bottomSpace?: number
   /** Tighter cells (8px instead of 10px at each side): for a list with many columns that has to fit a laptop screen without scrolling sideways. */
   dense?: boolean
+  /** A thinner header too, for a list that should look like a spreadsheet (Venta's products, one line per row). */
+  compact?: boolean
+  /** The row a keyboard is on (a search box with the arrow keys): outlined, and scrolled into view when it changes. */
+  activeKey?: string | number
 }
 
 /** Spreadsheet-style list shared by Stock, Clientes, Fiados, Facturas, Proveedores and Venta: sticky header, grid lines,
@@ -46,8 +50,9 @@ interface DataTableProps<T, K extends string> {
  * which keeps a 1000+ row list smooth (rendering all of them at once is what made the old card
  * grids janky). Built from CSS-grid rows instead of a `<table>` because a table can't absolutely
  * position its rows. */
-export function DataTable<T, K extends string>({ columns, rows, rowKey, sort, onSort, resetKey, onRowClick, rowClassName, rowHeight = 46, bottomSpace = 0, dense = false }: DataTableProps<T, K>) {
+export function DataTable<T, K extends string>({ columns, rows, rowKey, sort, onSort, resetKey, onRowClick, rowClassName, rowHeight = 46, bottomSpace = 0, dense = false, compact = false, activeKey }: DataTableProps<T, K>) {
   const px = dense ? 'px-2' : 'px-2.5'
+  const hy = compact ? 'py-1' : 'py-2'
   const scrollRef = useRef<HTMLDivElement>(null)
   // The room the table has (without its own vertical scrollbar), to leave out the columns that don't fit.
   const [room, setRoom] = useState<number | null>(null)
@@ -67,7 +72,16 @@ export function DataTable<T, K extends string>({ columns, rows, rowKey, sort, on
     getScrollElement: () => scrollRef.current,
     estimateSize: () => rowHeight,
     overscan: 14,
+    scrollPaddingStart: 36, // the sticky header must not cover the row that is scrolled to
   })
+
+  useEffect(() => {
+    if (activeKey === undefined) return
+    const at = rows.findIndex((r) => rowKey(r) === activeKey)
+    if (at >= 0) virtualizer.scrollToIndex(at)
+    // Only when the active row changes: a new list of rows that keeps it where it is must not scroll.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeKey])
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: 0 })
@@ -98,7 +112,7 @@ export function DataTable<T, K extends string>({ columns, rows, rowKey, sort, on
                   <button
                     onClick={col.lock.onClick}
                     title={col.lock.title}
-                    className={`flex w-full items-center gap-1 ${px} py-2 text-[11px] font-semibold text-txt2 transition-colors hover:text-txt ${justify}`}
+                    className={`flex w-full items-center gap-1 ${px} ${hy} text-[11px] font-semibold text-txt2 transition-colors hover:text-txt ${justify}`}
                   >
                     <Lock size={11} />
                     {col.label}
@@ -106,13 +120,13 @@ export function DataTable<T, K extends string>({ columns, rows, rowKey, sort, on
                 ) : col.sortKey ? (
                   <button
                     onClick={() => onSort(col.sortKey!)}
-                    className={`flex w-full items-center gap-1 ${px} py-2 text-[11px] font-semibold transition-colors hover:text-txt ${justify} ${active ? 'text-lime' : 'text-txt2'}`}
+                    className={`flex w-full items-center gap-1 ${px} ${hy} text-[11px] font-semibold transition-colors hover:text-txt ${justify} ${active ? 'text-lime' : 'text-txt2'}`}
                   >
                     {col.label}
                     {active && (sort.dir === 'asc' ? <ChevronUp size={12} /> : <ChevronDown size={12} />)}
                   </button>
                 ) : (
-                  <span className={`flex w-full items-center ${px} py-2 text-[11px] font-semibold text-txt2 ${justify}`}>{col.label}</span>
+                  <span className={`flex w-full items-center ${px} ${hy} text-[11px] font-semibold text-txt2 ${justify}`}>{col.label}</span>
                 )}
               </div>
             )
@@ -142,7 +156,7 @@ export function DataTable<T, K extends string>({ columns, rows, rowKey, sort, on
                 tabIndex={onRowClick ? 0 : undefined}
                 className={`absolute left-0 right-0 grid border-b border-grid text-[12px] transition-colors hover:bg-s3/60 ${vRow.index % 2 ? 'bg-s2' : ''} ${
                   onRowClick ? 'cursor-pointer focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-lime' : ''
-                } ${rowClassName?.(row) ?? ''}`}
+                } ${activeKey !== undefined && rowKey(row) === activeKey ? 'ring-2 ring-inset ring-lime' : ''} ${rowClassName?.(row) ?? ''}`}
                 style={{ height: rowHeight, transform: `translateY(${vRow.start}px)`, gridTemplateColumns: template }}
               >
                 {shown.map((col) => (

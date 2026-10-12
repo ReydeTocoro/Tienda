@@ -60,8 +60,6 @@ export const MOVEMENT_LABEL: Record<MovementType, string> = {
   ajuste_arqueo: 'Ajuste de arqueo',
 }
 
-export const MEDIO_LABEL = { efectivo: 'Efectivo', transferencia: 'Transferencia' } as const
-
 export const CATEGORY_LABEL: Record<ExpenseCategory, string> = {
   nomina: 'Nómina',
   servicios: 'Servicios públicos',

@@ -11,6 +11,8 @@ const TERMINATORS = new Set(['Enter', 'Tab'])
 function isTypingTarget(target: EventTarget | null, exceptEl?: HTMLElement | null): boolean {
   if (!(target instanceof HTMLElement)) return false
   if (exceptEl && target === exceptEl) return false
+  // A widget that types with the keyboard itself (the calculator) owns the keys pressed in it.
+  if (target.closest('[data-keys-owner]')) return true
   const tag = target.tagName
   if (tag === 'TEXTAREA') return true
   if (tag === 'INPUT') {

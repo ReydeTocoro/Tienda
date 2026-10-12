@@ -1,10 +1,15 @@
 import { supabase } from '../../api/supabase'
+import { probeNow } from '../../offline/connection'
+import { outboxCounts } from '../../offline/outbox'
 import { clearLocalData, setSecurePerms, stopSync } from '../../sync'
 import { clearSearchHistory } from '../../shared/lib/searchHistory'
+import { useConnectionStore } from '../../store/useConnectionStore'
 import { useSessionStore } from '../../store/useSessionStore'
 import { endCounterSession, forgetRemembered, refreshCounterSession } from '../pin/counterSession'
 
 let pendingNotice: string | undefined
+
+const NEEDS_INTERNET = 'No se pudo cerrar la sesión: sin internet no se puede cambiar de usuario (quien entre debe verificar su contraseña en línea). Puedes seguir vendiendo'
 
 /** Why the latest sign-out happened (inactivity, lost access…), for the login screen — once. */
 export function takeSignOutNotice(): string | undefined {
@@ -17,16 +22,34 @@ export function takeSignOutNotice(): string | undefined {
  * working here, the secret data they could see goes, and the login shows for whoever comes next.
  * The store's data (and the recent searches of the search boxes) stays on the device — every account
  * sees the same — unless `forget` (a device that stops being used). Only this device: the same
- * person may be signed in on another. */
+ * person may be signed in on another.
+ *
+ * It needs the internet (Supabase revokes the session), and that is on purpose: whoever came next could not sign
+ * in without it either (each person's password is checked online), so signing out offline would only lock the
+ * till. Sales made without internet that haven't been sent yet stay on the device and go up with the next
+ * session — but "forget" refuses while there are any, because it would lose them. */
 export async function signOut({ forget = false, notice }: { forget?: boolean; notice?: string } = {}): Promise<void> {
+  if (forget) {
+    const { pending, rejected } = await outboxCounts()
+    if (pending + rejected > 0) {
+      throw new Error('Hay ventas hechas sin internet que todavía no llegaron al servidor: si borras este equipo se perderían. Conéctate a internet, espera a que se envíen y vuelve a intentarlo')
+    }
+  }
+  // Without the internet nobody could sign in afterwards, so signing out would only lock the till. Said up front instead of
+  // trusting what Supabase's client does when its own refresh has been failing for a while (it sometimes signed out anyway).
+  if (!(navigator.onLine && useConnectionStore.getState().reachable) && !(await probeNow())) throw new Error(NEEDS_INTERNET)
   pendingNotice = notice
   await endCounterSession()
-  const { error } = await supabase.auth.signOut({ scope: 'local' })
+  // A connection that leads nowhere must not leave the button spinning for minutes.
+  const { error } = await Promise.race([
+    supabase.auth.signOut({ scope: 'local' }),
+    new Promise<{ error: Error }>((resolve) => setTimeout(() => resolve({ error: new Error('tiempo agotado') }), 10_000)),
+  ])
   if (error) {
     // Still signed in (offline, most likely): carry on as before.
     pendingNotice = undefined
     void refreshCounterSession()
-    throw new Error('No se pudo cerrar la sesión: revisa la conexión a internet')
+    throw new Error(NEEDS_INTERNET)
   }
   useSessionStore.getState().clear()
   forgetRemembered()

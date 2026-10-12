@@ -1,0 +1,25 @@
+// Fragmento de firestore.rules. Va DENTRO de `match /databases/{database}/documents { … }`.
+//
+// Necesita tres funciones auxiliares (cópialas o adáptalas a las del otro proyecto):
+//
+//   function isAuth()  { return request.auth != null; }
+//   function getRole() {
+//     let ref = /databases/$(database)/documents/usuarios/$(request.auth.uid);
+//     return isAuth() && exists(ref) ? get(ref).data.rol : 'cliente';
+//   }
+//   function isAdmin() { return isAuth() && getRole() == 'admin'; }
+//   function isCaja()  { return isAuth() && getRole() == 'caja'; }
+//
+// Recibos que el personal manda por WhatsApp: solo el TEXTO del recibo. El código del
+// documento es aleatorio de 128 bits y es el enlace secreto que recibe el cliente
+// (/recibo/<código>): se puede LEER un recibo si se conoce su código, pero no listar
+// ni enumerar. Los crea el personal de caja; nadie los modifica.
+match /recibos_compartidos/{id} {
+  allow get:    if true;                       // público: lo abre el cliente sin sesión
+  allow list:   if false;                      // nadie puede recorrer la colección
+  allow create: if (isAdmin() || isCaja())
+                && request.resource.data.keys().hasOnly(['datos', 'negocio', 'creado_en'])
+                && request.resource.data.datos.items.size() <= 200;
+  allow update: if false;
+  allow delete: if isAdmin();
+}

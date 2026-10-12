@@ -32,6 +32,17 @@ export interface CorrectionAuditEntry extends AuditLogBase {
   before: SaleSnapshot
   after: SaleSnapshot
   totalDiff: number
+  /** Who made the correction (absent on the ones from before it was recorded). */
+  user?: string
+}
+
+/** An invoice was annulled as a whole: `before` is what it said, and all of it went back to the inventory. */
+export interface VoidAuditEntry extends AuditLogBase {
+  type: 'anulacion_venta'
+  saleId: number
+  reason: string
+  before: SaleSnapshot
+  user: string
 }
 
 /** A product's code was changed: its sales and the purchase orders still open moved to the new code. */
@@ -47,4 +58,4 @@ export interface CodeChangeAuditEntry extends AuditLogBase {
   pedidos: number
 }
 
-export type AuditLogEntry = StockAuditEntry | CorrectionAuditEntry | CodeChangeAuditEntry
+export type AuditLogEntry = StockAuditEntry | CorrectionAuditEntry | VoidAuditEntry | CodeChangeAuditEntry

@@ -4,6 +4,8 @@ import { useDayAggregation } from '../../../shared/hooks/useDayAggregation'
 import { BottomSheet } from '../../../shared/components/BottomSheet'
 import { PrintPortal } from '../../../shared/components/PrintPortal'
 import { PrintHeader } from '../../../shared/components/PrintHeader'
+import { TransferByAccount } from '../../../shared/components/TransferByAccount'
+import { transferRows } from '../../../shared/lib/transferAccounts'
 import { formatMoney } from '../../../shared/lib/currency'
 import { usePermission } from '../../pin/usePermission'
 
@@ -45,6 +47,12 @@ export function ReporteXModal({ open, dayKey, onClose }: ReporteXModalProps) {
         {(Object.keys(agg.payBreak) as Array<keyof typeof agg.payBreak>).map(
           (m) => agg.payBreak[m] > 0 && <Row key={m} label={PAY_LABEL[m]} value={formatMoney(agg.payBreak[m])} />,
         )}
+        {transferRows(agg.transferBreak).length > 0 && (
+          <>
+            <div className="mt-1 text-[11px] text-muted">Transferencias por cuenta (ventas y abonos)</div>
+            <TransferByAccount breakdown={agg.transferBreak} />
+          </>
+        )}
         <div className="my-2 border-t border-dashed border-br2" />
         <Row label="Cobrado en caja" value={formatMoney(agg.cobradoReal)} color="text-green" bold />
         {agg.fiadoTotalDay > 0 && <Row label="Fiado (pendiente)" value={formatMoney(agg.fiadoTotalDay)} color="text-red" />}
@@ -74,6 +82,12 @@ export function ReporteXModal({ open, dayKey, onClose }: ReporteXModalProps) {
           <div className="my-1 border-t border-dashed border-black" />
           {(Object.keys(agg.payBreak) as Array<keyof typeof agg.payBreak>).map(
             (m) => agg.payBreak[m] > 0 && <PrintRow key={m} label={PAY_LABEL[m]} value={formatMoney(agg.payBreak[m])} />,
+          )}
+          {transferRows(agg.transferBreak).length > 0 && (
+            <>
+              <div className="text-[10px]">Transferencias por cuenta (ventas y abonos)</div>
+              <TransferByAccount breakdown={agg.transferBreak} plain />
+            </>
           )}
           <div className="my-1 border-t border-dashed border-black" />
           <PrintRow label="Cobrado en caja" value={formatMoney(agg.cobradoReal)} bold />

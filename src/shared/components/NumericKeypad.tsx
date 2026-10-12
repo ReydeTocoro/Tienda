@@ -15,6 +15,8 @@ export function NumericKeypad({ onKey, allowDot = true }: NumericKeypadProps) {
           key={k}
           type="button"
           onClick={() => onKey(k)}
+          // A tap leaves the focus where it was (the quantity field), so the keyboard keeps typing there.
+          onMouseDown={(e) => e.preventDefault()}
           className={`rounded-xl border py-3.5 font-mono text-xl font-semibold transition active:scale-95 ${
             k === '⌫' ? 'border-red/20 bg-red/10 text-red' : 'border-br bg-s2 text-txt'
           }`}

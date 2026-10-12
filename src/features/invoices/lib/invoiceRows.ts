@@ -3,13 +3,15 @@ import type { PayMethod, Sale } from '../../../types/sale'
 import { getFiadoDebt } from '../../../db/repositories/sales'
 import { addDaysToKey, formatDayKey } from '../../../shared/lib/cash'
 import { dayKeyOf, formatQty } from '../../../shared/lib/currency'
-import { formatOrderId, formatSaleId } from '../../../shared/lib/id'
+import { formatOrderId, formatSaleId, isPendingSaleId } from '../../../shared/lib/id'
 import { sortRows, type SortState } from '../../../shared/lib/sortRows'
+import { ACCOUNT_LABEL, type TransferAccount } from '../../../shared/lib/transferAccounts'
 
 export type InvoiceKind = 'venta' | 'compra'
 /** How an invoice was paid: sales with the till's methods, supplier purchases in cash or on credit. */
 export type InvoiceMethod = PayMethod | 'contado' | 'credito' | 'ninguno'
-export type InvoiceStatus = 'pagada' | 'por cobrar' | 'recibida'
+/** 'por enviar': a sale made without internet that the server doesn't have yet. 'anulada': annulled (history only). */
+export type InvoiceStatus = 'pagada' | 'por cobrar' | 'recibida' | 'por enviar' | 'anulada'
 
 /** One line of the Facturas table: a sale or a received supplier order, normalized to the same
  * columns so they can be filtered, sorted and totalled together. */
@@ -29,10 +31,16 @@ export interface InvoiceRow {
   /** Who made the sale or received the order, when someone was signed in. */
   seller: string
   method: InvoiceMethod
+  /** The account a transfer came into, when the sale says. */
+  account?: TransferAccount
   total: number
   /** Fiado balance still owed (sales only). */
   debt: number
   corrected: boolean
+  /** Annulled: it stays in the list but counts in no total. */
+  voided: boolean
+  /** A sale made without internet whose oddities (`reviewNotes`) nobody has marked as read yet. */
+  toReview: boolean
   status: InvoiceStatus
   /** Lower-cased text the search box matches against. */
   haystack: string
@@ -53,10 +61,12 @@ export const STATUS_LABEL: Record<InvoiceStatus, string> = {
   pagada: 'Pagada',
   'por cobrar': 'Por cobrar',
   recibida: 'Recibida',
+  'por enviar': 'Por enviar',
+  anulada: 'Anulada',
 }
 
 function finish(row: Omit<InvoiceRow, 'haystack'>): InvoiceRow {
-  return { ...row, haystack: [row.number, row.party, row.detail, row.seller, METHOD_LABEL[row.method], STATUS_LABEL[row.status]].join(' ').toLowerCase() }
+  return { ...row, haystack: [row.number, row.party, row.detail, row.seller, METHOD_LABEL[row.method], row.account ? ACCOUNT_LABEL[row.account] : '', STATUS_LABEL[row.status], row.toReview ? 'por revisar' : ''].join(' ').toLowerCase() }
 }
 
 export function buildInvoiceRows(sales: Sale[], orders: PurchaseOrder[]): InvoiceRow[] {
@@ -73,10 +83,13 @@ export function buildInvoiceRows(sales: Sale[], orders: PurchaseOrder[]): Invoic
       detail: s.items.map((i) => `${i.name} ×${formatQty(i.qty)}`).join(', '),
       seller: s.sellerName ?? '',
       method: s.payMethod,
+      account: s.payMethod === 'transferencia' ? s.transferAccount : undefined,
       total: s.total,
       debt,
       corrected: !!s.corrected,
-      status: debt > 0 ? 'por cobrar' : 'pagada',
+      voided: !!s.voided,
+      toReview: !!s.reviewNotes?.length && !s.reviewedAt && !s.voided,
+      status: s.voided ? 'anulada' : isPendingSaleId(s.id) ? 'por enviar' : debt > 0 ? 'por cobrar' : 'pagada',
       sale: s,
     })
   })
@@ -99,6 +112,8 @@ export function buildInvoiceRows(sales: Sale[], orders: PurchaseOrder[]): Invoic
       total: o.receivedTotal ?? o.total,
       debt: 0,
       corrected: false,
+      voided: false,
+      toReview: false,
       status: 'recibida',
       order: o,
     })

@@ -114,7 +114,7 @@ function PayForm({ payable, onClose }: { payable: Payable; onClose: () => void }
           {settled ? 'Cerrar' : 'Cancelar'}
         </button>
         {!settled && (
-          <button disabled={busy || over || insufficient} onClick={submit} className="flex-[2] rounded-[10px] bg-lime py-2.5 text-[14px] font-bold text-on-solid disabled:opacity-50">
+          <button data-enter disabled={busy || over || insufficient} onClick={submit} className="flex-[2] rounded-[10px] bg-lime py-2.5 text-[14px] font-bold text-on-solid disabled:opacity-50">
             Registrar pago
           </button>
         )}

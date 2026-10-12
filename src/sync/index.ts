@@ -2,6 +2,9 @@ import type { RealtimeChannel } from '@supabase/supabase-js'
 import { db } from '../db/index'
 import { supabase } from '../api/supabase'
 import { SECURE_TABLES, SECURE_TABLE_NAMES, clearSecure, deleteSecure, isSecureLoaded, putSecure, securePk, type SecureTable } from '../db/secure'
+import { holdBack, reconcileSales } from '../offline/outbox'
+import type { Product } from '../types/product'
+import type { Sale } from '../types/sale'
 
 /** Keeps the local copies in step with Supabase, the source of truth. On every (re)connect it pulls
  * only what changed since its last pull (everything the first time, or after the data was reloaded
@@ -13,7 +16,11 @@ import { SECURE_TABLES, SECURE_TABLE_NAMES, clearSecure, deleteSecure, isSecureL
  * - `TABLES`: what every staff member may see, mirrored in Dexie (on disk, so it works offline);
  * - the secret ones (src/db/secure.ts): the database only serves them while someone allowed is
  *   signed in on this device, and they're kept in memory only. `setSecurePerms` (called as whoever
- *   is working changes) downloads a table when its permission is gained and forgets it when lost. */
+ *   is working changes) downloads a table when its permission is gained and forgets it when lost.
+ *
+ * Sales made without internet (src/offline) live on this device before the server has them: a product
+ * written here has what they took off its stock again (`holdBack`), and a sale written here that is one
+ * of them settles it (`reconcileSales`) — both in the same transaction as the write. */
 
 const TABLES = ['products', 'sales', 'customers', 'auditLog', 'entradas', 'settings', 'usuarios', 'cajaState'] as const
 type Table = (typeof TABLES)[number]
@@ -117,9 +124,20 @@ export async function clearLocalData(): Promise<void> {
   securePerms = new Set()
 }
 
+/** Asks for a download of what changed on the server now (the connection just came back, or a batch of sales
+ * was sent), instead of waiting for the next Realtime change. */
+export function syncNow(): void {
+  if (channel) void pull()
+}
+
 function pull(): Promise<void> {
-  // One pull at a time; a reconnect while pulling just waits for the one in flight.
+  // One pull at a time; a reconnect while pulling just waits for the one in flight. It runs twice: a
+  // Realtime change that arrives while the first download is under way is applied at once, and the
+  // download — a snapshot from before it — can then write the older row over it (or, on a full pull,
+  // clear a new one). The second pass is incremental, so it costs almost nothing: it re-reads the last
+  // minute and puts whatever the server has now back.
   pulling ??= pullAll()
+    .then(() => pullAll())
     .catch((err) => console.error('Sync: falló la descarga de datos', err))
     .finally(() => {
       pulling = null
@@ -181,9 +199,12 @@ async function pullTable(table: Table, replace: boolean): Promise<void> {
   const t = db.table(table)
   // Replace (not merge) on a full pull: rows deleted while this device wasn't listening must go
   // too. Clear + put in one transaction, so live queries never see the table empty mid-refresh.
-  await db.transaction('rw', t, async () => {
+  const scope = table === 'products' || table === 'sales' ? [t, db.outbox, db.products, db.sales] : [t]
+  await db.transaction('rw', scope, async () => {
     if (replace) await t.clear()
-    if (rows.length) await t.bulkPut(rows.map((r) => r.data) as never[])
+    const data = rows.map((r) => r.data)
+    if (data.length) await t.bulkPut((table === 'products' ? await holdBack(data as Product[]) : data) as never[])
+    if (table === 'sales') await reconcileSales(data as Sale[])
   })
   const last = rows.reduce<string | null>((max, r) => (max && max > r.updated_at ? max : r.updated_at), null)
   if (last) writeLocal(cursorKey(table), last)
@@ -241,6 +262,14 @@ async function applyChange(table: Table | SecureTable, event: string, next: { da
     const key = old?.[pkOf(table)]
     if (key !== undefined) await t.delete(toKey(table, key))
   } else if (next?.data) {
-    await t.put(next.data as never)
+    if (table === 'products' || table === 'sales') {
+      await db.transaction('rw', [t, db.outbox, db.products, db.sales], async () => {
+        if (table === 'products') await t.put((await holdBack([next.data as Product]))[0] as never)
+        else {
+          await t.put(next.data as never)
+          await reconcileSales([next.data as Sale])
+        }
+      })
+    } else await t.put(next.data as never)
   }
 }

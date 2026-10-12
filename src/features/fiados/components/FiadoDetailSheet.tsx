@@ -2,12 +2,14 @@ import { useState } from 'react'
 import type { FiadoGroup } from '../lib/fiadoGrouping'
 import { groupTotals } from '../lib/fiadoGrouping'
 import { getFiadoDebt, addFiadoPago, payFiadoInFull, payAllFiados, type CollectMethod } from '../../../db/repositories/sales'
+import { AccountPicker } from '../../../shared/components/AccountPicker'
 import { BottomSheet } from '../../../shared/components/BottomSheet'
+import type { TransferAccount } from '../../../shared/lib/transferAccounts'
 import { AbonoModal } from './AbonoModal'
 import { useConfirm } from '../../../store/useConfirmStore'
 import { toast } from '../../../store/useToastStore'
 import { formatDateTime, formatMoney, formatQty } from '../../../shared/lib/currency'
-import { formatSaleId } from '../../../shared/lib/id'
+import { formatSaleId, isPendingSaleId } from '../../../shared/lib/id'
 import { initials } from '../../../shared/lib/text'
 import type { Customer } from '../../../types/customer'
 import { usePermission } from '../../pin/usePermission'
@@ -22,13 +24,31 @@ interface FiadoDetailSheetProps {
 export function FiadoDetailSheet({ group, customer, onClose }: FiadoDetailSheetProps) {
   const [abonoTarget, setAbonoTarget] = useState<{ saleId: number; maxDebt: number } | null>(null)
   const [method, setMethod] = useState<CollectMethod>('efectivo')
+  // A payment by transfer says which account it came into (so the day's close can tell them apart).
+  const [account, setAccount] = useState<TransferAccount | null>(null)
   const confirm = useConfirm()
   const { requirePermission } = usePermission()
 
   if (!group) return null
   const { totalOwed, totalDebt, totalPaid } = groupTotals(group)
+  // A fiado made without internet isn't on the server yet: it can't be collected until it is sent (it then gets
+  // its number and can be paid like any other).
+  const collectable = group.sales.filter((s) => !isPendingSaleId(s.id))
+  const waiting = group.sales.length - collectable.length
+  const collectableDebt = collectable.reduce((a, s) => a + getFiadoDebt(s), 0)
+
+  /** The account is part of a transfer; asked before anything else so nothing is left half done. */
+  function accountOk(): boolean {
+    if (method === 'transferencia' && !account) {
+      toast('Elige la cuenta a la que llegó la transferencia', 'orange')
+      return false
+    }
+    return true
+  }
+  const accountOf = method === 'transferencia' && account ? account : undefined
 
   async function openAbono(saleId: number, maxDebt: number) {
+    if (!accountOk()) return
     const ok = await requirePermission('fiados.abonar', 'Registrar abono', 'Recibir abonos de fiados requiere permiso.')
     if (!ok) return
     setAbonoTarget({ saleId, maxDebt })
@@ -36,17 +56,20 @@ export function FiadoDetailSheet({ group, customer, onClose }: FiadoDetailSheetP
 
   async function abonar(amount: number, note: string) {
     if (!abonoTarget) return
-    await addFiadoPago(abonoTarget.saleId, { amount, date: new Date().toISOString(), note, method })
+    await addFiadoPago(abonoTarget.saleId, { amount, date: new Date().toISOString(), note, method, ...(accountOf ? { account: accountOf } : {}) })
     toast(`Abono de ${formatMoney(amount)} registrado`, 'green')
     setAbonoTarget(null)
+    setAccount(null)
   }
 
   async function pagar(saleId: number, debt: number) {
+    if (!accountOk()) return
     if (!(await requirePermission('fiados.abonar', 'Pago de fiado', 'Recibir pagos de fiados requiere permiso.'))) return
     const ok = await confirm(`¿Marcar este fiado como pagado en su totalidad (${formatMoney(debt)})?`)
     if (!ok) return
-    await payFiadoInFull(saleId, 'Pago completo', false, method)
+    await payFiadoInFull(saleId, 'Pago completo', false, method, accountOf)
     toast('Fiado pagado', 'green')
+    setAccount(null)
   }
 
   async function condonar(saleId: number, debt: number) {
@@ -58,26 +81,28 @@ export function FiadoDetailSheet({ group, customer, onClose }: FiadoDetailSheetP
   }
 
   async function pagarTodo() {
-    if (!group) return
+    if (!group || !accountOk()) return
     if (!(await requirePermission('fiados.abonar', 'Pago de fiado', 'Recibir pagos de fiados requiere permiso.'))) return
-    const ok = await confirm(`¿Marcar TODOS los fiados como pagados? Total: ${formatMoney(totalDebt)}`)
+    const ok = await confirm(`¿Marcar TODOS los fiados como pagados? Total: ${formatMoney(collectableDebt)}`)
     if (!ok) return
     const paid = await payAllFiados(
-      group.sales.map((s) => s.id!),
+      collectable.map((s) => s.id!),
       'Pago total de todos los fiados',
       false,
       method,
+      accountOf,
     )
     toast(`${formatMoney(paid)} cobrados`, 'green')
+    setAccount(null)
   }
 
   async function condonarTodo() {
     if (!group) return
     if (!(await requirePermission('fiados.condonar', 'Condonar deuda', 'Perdonar un fiado requiere permiso.'))) return
-    const ok = await confirm({ message: `¿Condonar TODOS los fiados de ${group.name}? Total: ${formatMoney(totalDebt)}. Esto no puede deshacerse.`, danger: true })
+    const ok = await confirm({ message: `¿Condonar TODOS los fiados de ${group.name}? Total: ${formatMoney(collectableDebt)}. Esto no puede deshacerse.`, danger: true })
     if (!ok) return
     await payAllFiados(
-      group.sales.map((s) => s.id!),
+      collectable.map((s) => s.id!),
       'Deuda condonada/abandonada',
       true,
     )
@@ -117,7 +142,7 @@ export function FiadoDetailSheet({ group, customer, onClose }: FiadoDetailSheetP
           </div>
         </div>
 
-        {totalDebt > 0 && (
+        {collectableDebt > 0 && (
           <div className="mb-3">
             <div className="mb-1.5 field-label">El cliente paga por</div>
             <div className="flex gap-2">
@@ -131,19 +156,32 @@ export function FiadoDetailSheet({ group, customer, onClose }: FiadoDetailSheetP
                 </button>
               ))}
             </div>
+            {method === 'transferencia' && (
+              <div className="mt-2">
+                <div className="mb-1.5 field-label">¿A qué cuenta llegó?</div>
+                <AccountPicker value={account} onChange={setAccount} />
+              </div>
+            )}
           </div>
         )}
 
-        {totalDebt > 0 ? (
+        {waiting > 0 && (
+          <div className="mb-3 rounded-[10px] border border-orange/30 bg-orange/10 px-3 py-2 text-[12px] leading-snug text-orange">
+            {waiting === 1 ? '1 fiado se hizo' : `${waiting} fiados se hicieron`} sin internet y todavía no se {waiting === 1 ? 'ha enviado' : 'han enviado'} al servidor. Se podrá
+            cobrar en cuanto se {waiting === 1 ? 'envíe' : 'envíen'}.
+          </div>
+        )}
+
+        {collectableDebt > 0 ? (
           <div className="mb-4 grid grid-cols-2 gap-2">
             <button onClick={pagarTodo} className="rounded-[10px] border border-green/25 bg-green/10 py-2.5 text-[13px] font-semibold text-green">
-              Pagar todo ({formatMoney(totalDebt)})
+              Pagar todo ({formatMoney(collectableDebt)})
             </button>
             <button onClick={condonarTodo} className="rounded-[10px] border border-red/25 bg-red/10 py-2.5 text-[13px] font-semibold text-red">
               Condonar todo
             </button>
           </div>
-        ) : (
+        ) : totalDebt > 0 ? null : (
           <div className="mb-4 rounded-xl border border-green/25 bg-green/10 py-3 text-center font-bold text-green">¡Todo pagado!</div>
         )}
 
@@ -177,7 +215,8 @@ export function FiadoDetailSheet({ group, customer, onClose }: FiadoDetailSheetP
                   <span>+{formatMoney(p.amount)}</span>
                 </div>
               ))}
-              {!isPaid && (
+              {!isPaid && isPendingSaleId(s.id) && <div className="mt-2 text-[11px] font-semibold text-orange">Por enviar al servidor: se podrá cobrar cuando se envíe</div>}
+              {!isPaid && !isPendingSaleId(s.id) && (
                 <div className="mt-2 flex gap-1.5">
                   <button onClick={() => openAbono(s.id!, debt)} className="flex-1 rounded-lg border border-br2 py-1.5 text-[11px] text-txt2">
                     Abonar

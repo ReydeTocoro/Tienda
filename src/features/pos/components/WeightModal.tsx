@@ -47,6 +47,14 @@ export function WeightModal({ product: p, editIndex, onClose }: WeightModalProps
     })
   }
 
+  /** What the physical keyboard typed: digits and one decimal point (a comma counts as a point). */
+  function typeQty(text: string) {
+    const clean = text.replace(',', '.').replace(/[^0-9.]/g, '')
+    const dot = clean.indexOf('.')
+    const oneDot = dot < 0 ? clean : clean.slice(0, dot + 1) + clean.slice(dot + 1).replace(/\./g, '')
+    setVal(oneDot.replace(/^0+(?=\d)/, ''))
+  }
+
   function confirm() {
     if (raw <= 0) {
       toast('Ingresa una cantidad', 'orange')
@@ -93,7 +101,18 @@ export function WeightModal({ product: p, editIndex, onClose }: WeightModalProps
         <div className="mb-3 flex items-center justify-between gap-2.5 rounded-[14px] border border-lime bg-s2 px-4 py-3.5">
           <div>
             <div className="mb-1 field-label">Cantidad</div>
-            <div className="font-mono text-[32px] font-bold leading-none">{val}</div>
+            {/* A real field, so the keyboard types the quantity (Enter adds it); `inputMode="none"` keeps
+             * a phone's own keyboard from covering the keypad below. */}
+            <input
+              value={val}
+              onChange={(e) => typeQty(e.target.value)}
+              onFocus={(e) => e.target.select()}
+              inputMode="none"
+              placeholder="0"
+              aria-label="Cantidad"
+              autoFocus
+              className="w-full min-w-0 bg-transparent font-mono text-[32px] font-bold leading-none outline-none"
+            />
           </div>
           <div className="text-right">
             <div className="mb-1 field-label">Unidad</div>
@@ -132,6 +151,7 @@ export function WeightModal({ product: p, editIndex, onClose }: WeightModalProps
             Cancelar
           </button>
           <button
+            data-enter
             onClick={confirm}
             disabled={exceedsStock}
             className="col-span-2 rounded-[10px] bg-lime py-3 text-[15px] font-bold text-on-solid disabled:cursor-not-allowed disabled:bg-br2 disabled:text-muted"

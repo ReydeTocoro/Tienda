@@ -1,7 +1,7 @@
 import { sortRows, type SortState } from '../../../shared/lib/sortRows'
 import type { CustomerWithSpent } from '../hooks/useCustomersWithSpent'
 
-export type CustomerSortKey = 'name' | 'cedula' | 'phone' | 'count' | 'spent' | 'pts' | 'tier' | 'last'
+export type CustomerSortKey = 'name' | 'cedula' | 'phone' | 'count' | 'spent' | 'last'
 
 /** Biggest spenders first — what the list showed before it became a sortable table. */
 export const DEFAULT_CUSTOMER_SORT: SortState<CustomerSortKey> = { key: 'spent', dir: 'desc' }
@@ -17,10 +17,7 @@ function sortValue(r: CustomerWithSpent, key: CustomerSortKey): string | number 
     case 'count':
       return r.salesCount
     case 'spent':
-    case 'tier': // the tier is a band of lifetime spend, so it orders like spend does
       return r.spent
-    case 'pts':
-      return r.pts
     case 'last':
       return r.lastPurchase ?? ''
   }

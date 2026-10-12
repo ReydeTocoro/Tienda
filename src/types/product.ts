@@ -16,6 +16,9 @@ export interface Product {
    * where the app merged it in for them (`useProductCosts`), and on writes from them. */
   cost?: number
   stock: number
+  /** LOCAL ONLY — never stored on the server. While sales made without internet wait to be sent, `stock` is
+   * the server's figure minus what they already took, and this is the server's own figure (src/offline). */
+  serverStock?: number
   min: number
   cat: string
   brand: string

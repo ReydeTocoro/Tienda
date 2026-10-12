@@ -7,10 +7,11 @@ import { authOf } from '../auth'
 import { actorOf, requireNeed } from '../domain/counter'
 import { reviveKey } from '../domain/productCode'
 import { looseUnitCost } from '../domain/secrets'
-import { getRow, putRow, insertAutoRow, roundQty } from './generic'
+import { getRow, getRowsByKey, putRow, insertAutoRow, insertAutoRows, roundQty, setStocks, text } from './generic'
 import { HttpError, handle } from './http'
 
-const text = (v: unknown, max: number): string => (typeof v === 'string' ? v.trim().slice(0, max) : '')
+const MAX_IMPORT_ROWS = 3000
+const MAX_COUNT_ROWS = 5000
 const nonNegative = (v: unknown): number => {
   const n = Number(v)
   return Number.isFinite(n) && n >= 0 ? n : 0
@@ -113,33 +114,29 @@ export function inventoryOpsRouter(db: Db) {
     handle(async (req) => {
       const { adjustments } = (req.body ?? {}) as { adjustments: Array<{ code: string; counted: number; reason: string }> }
       if (!Array.isArray(adjustments)) throw new HttpError(400, 'No hay ajustes para aplicar')
+      if (adjustments.length > MAX_COUNT_ROWS) throw new HttpError(400, `Aplica hasta ${MAX_COUNT_ROWS.toLocaleString('es-CO')} ajustes por vez (hay ${adjustments.length.toLocaleString('es-CO')}): hazlo en partes`)
       return db.tx(async (q) => {
         const by = await requireNeed(q, await actorOf(q, authOf(req)), 'stock.ajustar')
-        let applied = 0
+        // Same shape as the bulk entries: one trip to read the products, the arithmetic here, one trip each
+        // to write the stocks and the audit entries (a code that appears twice is counted in order).
+        const products = await getRowsByKey<Product>(q, 'products', 'code', adjustments.map((a) => String(a?.code ?? '')))
+        const stock = new Map([...products].map(([code, p]) => [code, p.stock || 0]))
+        const entries: Array<Omit<StockAuditEntry, 'id'>> = []
+        const date = new Date().toISOString()
         for (const a of adjustments) {
-          const p = await getRow<Product>(q, 'products', 'code', a?.code)
+          const code = String(a?.code ?? '')
+          const p = products.get(code)
           if (!p) continue
           const counted = roundQty(nonNegative(a.counted))
-          const before = p.stock || 0
+          const before = stock.get(code)!
           const diff = counted - before
           if (diff === 0) continue
-          await putRow(q, 'products', 'code', a.code, { ...p, stock: counted })
-
-          const entry: Omit<StockAuditEntry, 'id'> = {
-            type: diff < 0 ? 'merma' : 'ajuste',
-            date: new Date().toISOString(),
-            code: a.code,
-            name: p.name,
-            before,
-            after: counted,
-            diff,
-            reason: text(a.reason, 200),
-            user: by,
-          }
-          await insertAutoRow(q, 'auditLog', entry)
-          applied++
+          stock.set(code, counted)
+          entries.push({ type: diff < 0 ? 'merma' : 'ajuste', date, code, name: p.name, before, after: counted, diff, reason: text(a.reason, 200), user: by })
         }
-        return { applied }
+        await setStocks(q, [...new Set(entries.map((e) => e.code))].map((code) => ({ code, stock: stock.get(code)! })))
+        await insertAutoRows(q, 'auditLog', entries)
+        return { applied: entries.length }
       })
     }),
   )
@@ -150,7 +147,10 @@ export function inventoryOpsRouter(db: Db) {
     '/import',
     handle(async (req) => {
       const { parsed, dupAction } = (req.body ?? {}) as { parsed: ParsedImportRow[]; dupAction: DupAction }
-      if (!Array.isArray(parsed) || parsed.length > 20_000) throw new HttpError(400, 'El archivo no tiene filas válidas')
+      if (!Array.isArray(parsed)) throw new HttpError(400, 'El archivo no tiene filas válidas')
+      // Every row costs a few queries in one transaction that holds the write lock, and the Function stops at 60 s:
+      // more rows than fit would fail after a minute of nobody being able to sell.
+      if (parsed.length > MAX_IMPORT_ROWS) throw new HttpError(400, `Importa hasta ${MAX_IMPORT_ROWS.toLocaleString('es-CO')} filas por archivo (este tiene ${parsed.length.toLocaleString('es-CO')}): divídelo en partes`)
       return db.tx(async (q) => {
         const by = await requireNeed(q, await actorOf(q, authOf(req)), 'stock.importar')
         let added = 0
@@ -210,9 +210,26 @@ export function inventoryOpsRouter(db: Db) {
             if (row.price2 > 0) merged.price2 = row.price2
             if (row.price3 > 0) merged.price3 = row.price3
             if (row.cost > 0) merged.cost = row.cost
-            if (row.stock > 0) merged.stock = row.stock
+            if (row.stock > 0) merged.stock = roundQty(row.stock)
             if (row.min > 0) merged.min = row.min
             await putRow(q, 'products', 'code', row.code, merged)
+            // Replacing the stock leaves the same trace as adding to it ("solo stock" above).
+            const before = existing.stock || 0
+            const after = merged.stock || 0
+            if (after !== before) {
+              const entry: Omit<StockAuditEntry, 'id'> = {
+                type: 'importacion',
+                date: new Date().toISOString(),
+                code: row.code,
+                name: merged.name,
+                before,
+                after,
+                diff: roundQty(after - before),
+                reason: 'Importación CSV/Excel (actualizar)',
+                user: by,
+              }
+              await insertAutoRow(q, 'auditLog', entry)
+            }
             updated++
           } else {
             if (!row.name) {

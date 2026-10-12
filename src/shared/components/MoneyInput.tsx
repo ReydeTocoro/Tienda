@@ -19,6 +19,11 @@ interface MoneyInputProps {
 export function MoneyInput({ id, value, onChange, className, placeholder, autoFocus }: MoneyInputProps) {
   const [focused, setFocused] = useState(false)
   const [raw, setRaw] = useState('')
+  // While the field has the cursor it shows what was typed ("12." mid-keystroke) — unless the figure was changed from
+  // outside meanwhile (a banknote button that doesn't take the focus, "Borrar"): then the new figure is what shows.
+  const asNumber = Number(raw) // '' is 0; a lone "." is not a number yet, and counts as 0
+  const typed = Number.isNaN(asNumber) ? value === 0 : asNumber === value
+  const shown = focused ? (typed ? raw : value ? String(value) : '') : value ? formatQty(value) : ''
 
   return (
     <div className="relative">
@@ -30,7 +35,7 @@ export function MoneyInput({ id, value, onChange, className, placeholder, autoFo
         placeholder={placeholder}
         autoFocus={autoFocus}
         className={`pl-6 ${className ?? ''}`}
-        value={focused ? raw : value ? formatQty(value) : ''}
+        value={shown}
         onFocus={(e) => {
           setFocused(true)
           setRaw(value ? String(value) : '')

@@ -1,17 +1,17 @@
 import { Router } from 'express'
 import type { Product } from '../../src/types/product'
+import type { StockAuditEntry } from '../../src/types/auditLog'
 import { UNITS } from '../../src/types/unit'
 import type { Db } from '../db'
 import { authOf } from '../auth'
 import { actorOf, allowed, requireNeed } from '../domain/counter'
 import { MAX_CODE, assertCodeFree, renameProduct, reviveKey } from '../domain/productCode'
-import { getRow, putRow, deleteRow, roundQty } from './generic'
+import { getRow, putRow, deleteRow, insertAutoRow, roundQty, text } from './generic'
 import { HttpError, handle } from './http'
 
 const TABLE = 'products'
 const UNIT_VALUES = new Set(UNITS.map((u) => u.value))
 
-const text = (v: unknown, max: number): string => (typeof v === 'string' ? v.trim().slice(0, max) : '')
 function amount(v: unknown, label: string): number {
   const n = typeof v === 'number' ? v : Number(v)
   if (!Number.isFinite(n) || n < 0 || n > 1e9) throw new HttpError(400, `${label} no es válido`)
@@ -49,7 +49,9 @@ function cleanProduct(raw: Record<string, unknown>, code: string, existing?: Pro
     price: amount(raw.price ?? 0, 'El precio'),
     price2: extraPrice(raw.price2, existing?.price2, 'El precio 2'),
     price3: extraPrice(raw.price3, existing?.price3, 'El precio 3'),
-    stock: roundQty(amount(raw.stock ?? 0, 'El stock')),
+    // A form that doesn't send the stock (it didn't touch it) leaves the stored one: sending back the figure it
+    // loaded would undo every sale made since.
+    stock: raw.stock === undefined && existing ? existing.stock : roundQty(amount(raw.stock ?? 0, 'El stock')),
     min: amount(raw.min ?? 0, 'El mínimo'),
     cat: text(raw.cat, 60),
     brand: text(raw.brand, 60),
@@ -114,6 +116,22 @@ export function productsRouter(db: Db) {
         const withCost = 'cost' in raw && allowed(actor, 'costos.ver') ? { ...product, cost: amount(raw.cost, 'El precio de compra') } : product
         if (code === existing.code) await putRow(q, TABLE, 'code', existing.code, withCost)
         else await renameProduct(q, by, existing, withCost, code)
+        // Stock changed through the form (not through Ajustar / Entrada / Conteo): it leaves a trace like they do.
+        if (withCost.stock !== existing.stock) {
+          const diff = roundQty(withCost.stock - existing.stock)
+          const entry: Omit<StockAuditEntry, 'id'> = {
+            type: diff < 0 ? 'merma' : 'ajuste',
+            date: new Date().toISOString(),
+            code,
+            name: withCost.name,
+            before: existing.stock || 0,
+            after: withCost.stock,
+            diff,
+            reason: 'Cambio de existencias en el formulario del producto',
+            user: by,
+          }
+          await insertAutoRow(q, 'auditLog', entry)
+        }
         return withCost
       })
     }),

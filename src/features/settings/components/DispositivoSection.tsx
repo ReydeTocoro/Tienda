@@ -13,6 +13,7 @@ const SHORTCUTS: Array<[string, string]> = [
   ['F1 – F6', 'Ir a Venta, Stock, Clientes, Fiados, Facturas o Reporte'],
   ['/  o  F7', 'Escribir en el buscador de productos de Venta'],
   ['F8', 'Activar o desactivar el lector de códigos'],
+  ['F9', 'Abrir o cerrar la calculadora de Venta (escribe con el teclado: números, + − * /, Enter, Esc)'],
   ['0 – 9', 'Escribir el PIN cuando se pide una autorización'],
   ['Esc', 'Cerrar la ventana del PIN'],
 ]

@@ -110,5 +110,5 @@ export function startCounterSession(): Promise<SessionEnded | null> {
 /** The session is ending: the server stops serving it anything secret (best effort — offline, the
  * binding dies with the session anyway). */
 export async function endCounterSession(): Promise<void> {
-  await apiPost('/api/counter/sign-out').catch(() => {})
+  await apiPost('/api/counter/sign-out', undefined, { timeoutMs: 8_000 }).catch(() => {})
 }

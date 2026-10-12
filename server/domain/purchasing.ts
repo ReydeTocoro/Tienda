@@ -8,7 +8,7 @@ import { dueDateFrom, payableBalance, round2 } from '../../src/shared/lib/cash'
 import { formatMoney } from '../../src/shared/lib/currency'
 import { formatOrderId } from '../../src/shared/lib/id'
 import type { Sql } from '../db'
-import { deleteRow, getRow, insertAutoRow, listAll, putRow, roundQty } from '../routes/generic'
+import { deleteRow, getRow, getRowsByKey, insertAutoRow, insertAutoRows, listAll, putRow, putRows, roundQty } from '../routes/generic'
 import { insertMovement, isCaja, requireFunds } from './cash'
 
 /** Suppliers, purchase orders and accounts payable. Same contract as `./cash`: runs inside the
@@ -244,19 +244,26 @@ export async function receiveOrder(sql: Sql, id: number, input: ReceiveInput, op
   const receivedTotal = round2(lines.reduce((t, l) => t + (l.qtyReceived ?? 0) * l.unitCost, 0))
 
   const source = `Pedido ${formatOrderId(id)}`
-  for (const l of lines) {
+  // Every product of the order in one trip, and the new stocks and the entry records written in one trip
+  // each (a trip per line made a twenty-line order wait for sixty). A product that is gone fails before
+  // anything is written.
+  const arrived = lines.filter((l) => (l.qtyReceived ?? 0) > 0)
+  const products = await getRowsByKey<Product>(sql, 'products', 'code', arrived.map((l) => l.code))
+  const date = new Date().toISOString()
+  const updatedProducts: Array<{ pk: string; obj: Product }> = []
+  const records: Array<Omit<EntradaRecord, 'id'>> = []
+  for (const l of arrived) {
     const qty = l.qtyReceived ?? 0
-    if (qty <= 0) continue
-    const p = await getRow<Product>(sql, 'products', 'code', l.code)
+    const p = products.get(l.code)
     if (!p) throw new Error(`El producto "${l.name}" ya no existe en el inventario`)
     const stockAntes = p.stock || 0
     const stockDespues = roundQty(stockAntes + qty)
     // A new purchase price replaces the old one (the products table's trigger files it in "productCosts").
-    const updated: Product = l.unitCost > 0 ? { ...p, stock: stockDespues, cost: l.unitCost } : { ...p, stock: stockDespues }
-    await putRow(sql, 'products', 'code', p.code, updated)
-    const record: Omit<EntradaRecord, 'id'> = { code: p.code, name: p.name, qty, stockAntes, stockDespues, date: new Date().toISOString(), source }
-    await insertAutoRow(sql, 'entradas', record)
+    updatedProducts.push({ pk: p.code, obj: l.unitCost > 0 ? { ...p, stock: stockDespues, cost: l.unitCost } : { ...p, stock: stockDespues } })
+    records.push({ code: p.code, name: p.name, qty, stockAntes, stockDespues, date, source })
   }
+  await putRows(sql, 'products', 'code', updatedProducts)
+  await insertAutoRows(sql, 'entradas', records)
 
   let payment: OrderPayment = { mode: 'ninguno' }
   const by = input.by?.trim() || undefined

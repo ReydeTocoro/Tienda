@@ -6,8 +6,8 @@ import type { Sale } from '../../../types/sale'
 import { BottomSheet } from '../../../shared/components/BottomSheet'
 import { ReceiptSheet } from '../../../shared/components/ReceiptSheet'
 import { CustomerAvatar } from './CustomerAvatar'
-import { getSpent, getPts, tier } from '../../../shared/lib/loyalty'
-import { formatDate, formatDateTime, formatMoney, formatQty } from '../../../shared/lib/currency'
+import { getSpent } from '../../../shared/lib/customerSpend'
+import { formatDate, formatDateTime, formatMoney } from '../../../shared/lib/currency'
 import { formatSaleId } from '../../../shared/lib/id'
 
 interface ClientProfileSheetProps {
@@ -17,17 +17,11 @@ interface ClientProfileSheetProps {
   onSell: () => void
 }
 
-const NEXT_TIER: Array<{ threshold: number; label: string }> = [
-  { threshold: 200, label: 'Bronce' },
-  { threshold: 1000, label: 'Plata' },
-  { threshold: 5000, label: 'Oro' },
-]
-
 /** Customer profile — legacy `openProfile()` (index.html L4472-4530). */
 export function ClientProfileSheet({ customer, onClose, onEdit, onSell }: ClientProfileSheetProps) {
   const [receiptSale, setReceiptSale] = useState<Sale | null>(null)
   const sales = useLiveQuery(
-    () => (customer ? db.sales.where('customerId').equals(customer.id).toArray() : Promise.resolve([] as Sale[])),
+    () => (customer ? db.sales.where('customerId').equals(customer.id).filter((s) => !s.voided).toArray() : Promise.resolve([] as Sale[])),
     [customer?.id],
     [],
   )
@@ -35,17 +29,13 @@ export function ClientProfileSheet({ customer, onClose, onEdit, onSell }: Client
   const stats = useMemo(() => {
     if (!customer) return null
     const spent = getSpent(sales, customer.id)
-    const pts = getPts(sales, customer.id)
-    const t = tier(spent)
     const sorted = [...sales].sort((a, b) => (a.date < b.date ? 1 : -1))
     const count = sorted.length
     const avg = count ? spent / count : 0
     const productCounts = new Map<string, number>()
     sorted.forEach((s) => s.items.forEach((i) => productCounts.set(i.name, (productCounts.get(i.name) || 0) + i.qty)))
     const fav = [...productCounts.entries()].sort((a, b) => b[1] - a[1])[0]
-    const next = NEXT_TIER.find((n) => spent < n.threshold)
-    const barPct = next ? Math.min(100, (spent / next.threshold) * 100) : 100
-    return { spent, pts, tier: t, count, avg, fav, next, barPct, recent: sorted.slice(0, 5) }
+    return { spent, count, avg, fav, recent: sorted.slice(0, 5) }
   }, [customer, sales])
 
   if (!customer || !stats) return null
@@ -54,12 +44,11 @@ export function ClientProfileSheet({ customer, onClose, onEdit, onSell }: Client
     <>
       <BottomSheet open={!!customer} onClose={onClose}>
         <div className="mb-4 flex items-center gap-3.5 border-b border-br pb-3.5">
-          <CustomerAvatar name={customer.name} spent={stats.spent} size={62} />
+          <CustomerAvatar name={customer.name} size={62} />
           <div>
             <div className="font-display text-[19px] font-bold">{customer.name}</div>
             <div className="mt-0.5 text-[11px] text-muted">Cliente desde {formatDate(customer.createdAt)}</div>
             {customer.cedula && <div className="mt-0.5 text-[12px] text-txt2">{customer.cedula}</div>}
-            <span className={`mt-1 inline-flex rounded-full border px-2 py-0.5 text-[11px] font-semibold ${stats.tier.badgeClass}`}>{stats.tier.label}</span>
           </div>
         </div>
 
@@ -67,19 +56,6 @@ export function ClientProfileSheet({ customer, onClose, onEdit, onSell }: Client
           <ProfileStat label="Total" value={formatMoney(stats.spent)} color="text-lime" />
           <ProfileStat label="Compras" value={String(stats.count)} color="text-blue" />
           <ProfileStat label="Promedio" value={formatMoney(stats.avg)} color="text-green" />
-        </div>
-
-        <div className="mb-3.5">
-          <div className="mb-1.5 flex justify-between text-[11px] text-muted">
-            <span>{formatQty(stats.pts)} puntos</span>
-            <span>{stats.next ? `Próx: ${stats.next.label} (−${formatMoney(stats.next.threshold - stats.spent)})` : '¡Nivel máximo!'}</span>
-          </div>
-          <div className="h-1.5 overflow-hidden rounded-full bg-s3">
-            <div className="h-full rounded-full bg-gradient-to-r from-lime to-orange" style={{ width: `${stats.barPct}%` }} />
-          </div>
-          <div className={`mt-1.5 text-[12px] ${stats.pts >= 50 ? 'text-purple' : 'text-muted'}`}>
-            {stats.pts >= 50 ? 'Tiene descuento disponible al cobrar' : `Faltan ${formatQty(50 - stats.pts)} pts para obtener descuento`}
-          </div>
         </div>
 
         {stats.fav && (

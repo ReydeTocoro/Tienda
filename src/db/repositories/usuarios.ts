@@ -1,4 +1,3 @@
-import { db } from '../index'
 import type { Usuario, UsuarioRole } from '../../types/usuario'
 import { apiPost, apiPut, apiDelete } from '../../api/client'
 
@@ -16,10 +15,6 @@ export interface UsuarioInput {
   /** A profile picture (a data URL from src/shared/lib/image.ts). Omitted = unchanged; null = remove. */
   photo?: string | null
   active: boolean
-}
-
-export async function listUsuarios(): Promise<Usuario[]> {
-  return db.usuarios.toArray()
 }
 
 /** The server refuses an email, a name or a PIN someone else already has, and a role that doesn't

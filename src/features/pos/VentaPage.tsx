@@ -11,28 +11,25 @@ import { CameraOverlay } from '../../shared/components/CameraOverlay'
 import { ScanFlashOverlay } from '../../shared/components/ScanFlashOverlay'
 import { ReceiptSheet } from '../../shared/components/ReceiptSheet'
 import { toast } from '../../store/useToastStore'
-import { searchMatches } from './lib/search'
+import type { SortState } from '../../shared/lib/sortRows'
+import { ALL, DEFAULT_SALE_SORT, buildSaleList, type SaleSortKey } from './lib/saleProducts'
 import { ProductPicker } from './components/ProductPicker'
 import { CartPanel } from './components/CartPanel'
-import { SearchDropdown } from './components/SearchDropdown'
 import { WeightModal } from './components/WeightModal'
-import { FreeProductModal } from './components/FreeProductModal'
 import { CalculatorModal } from './components/CalculatorModal'
 import { QuickDiscountModal } from './components/QuickDiscountModal'
-import { VentaKpiBar } from './components/VentaKpiBar'
 import { CajaBanner } from '../cash/components/CajaBanner'
 import { useFinalizeSale } from './hooks/useFinalizeSale'
-import { usePermission } from '../pin/usePermission'
 
 export function VentaPage() {
   const products = useLiveQuery(() => db.products.toArray(), [], []) as Product[]
 
   const [search, setSearch] = useState('')
-  const [ddFocus, setDdFocus] = useState(-1)
-  const [activeCat, setActiveCat] = useState('__all__')
-  const [lowStockOnly, setLowStockOnly] = useState(false)
+  // The row of the list the arrow keys are on (-1: none yet).
+  const [rowIdx, setRowIdx] = useState(-1)
+  const [activeCat, setActiveCat] = useState(ALL)
+  const [sort, setSort] = useState<SortState<SaleSortKey>>(DEFAULT_SALE_SORT)
   const [weightModal, setWeightModal] = useState<{ product: Product; editIndex: number | null } | null>(null)
-  const [freeModal, setFreeModal] = useState<{ open: boolean; prefill: number | null }>({ open: false, prefill: null })
   const [calcOpen, setCalcOpen] = useState(false)
   const [discOpen, setDiscOpen] = useState(false)
   const [receiptSale, setReceiptSale] = useState<Sale | null>(null)
@@ -40,15 +37,12 @@ export function VentaPage() {
   const [flash, setFlash] = useState<{ show: boolean; success: boolean }>({ show: false, success: true })
 
   const searchRef = useRef<HTMLInputElement>(null)
-  const dropdownMatches = useMemo(() => searchMatches(products, search), [products, search])
+  // What the table shows: typing narrows it (and marks the word), and the arrow keys walk down it.
+  const list = useMemo(() => buildSaleList(products, search, activeCat, sort), [products, search, activeCat, sort])
+  const activeRow = rowIdx >= 0 ? list.rows[Math.min(rowIdx, list.rows.length - 1)] : undefined
   const items = useActiveCart((c) => c.items)
   const addUnitItem = useCartStore((s) => s.addUnitItem)
   const finalize = useFinalizeSale()
-  const { requirePermission } = usePermission()
-
-  async function openFree(prefill: number | null) {
-    if (await requirePermission('ventas.productoLibre', 'Producto sin registrar', 'Cobrar algo que no está en el inventario requiere autorización.')) setFreeModal({ open: true, prefill })
-  }
 
   function flashOnce(success: boolean) {
     setFlash({ show: true, success })
@@ -70,7 +64,7 @@ export function VentaPage() {
   function pickAndClear(p: Product) {
     pickProduct(p)
     setSearch('')
-    setDdFocus(-1)
+    setRowIdx(-1)
   }
 
   function handleScan(code: string) {
@@ -95,6 +89,18 @@ export function VentaPage() {
 
   const scanner = useBarcodeScanner({ onScan: handleScan, exceptRef: searchRef })
 
+  // F9 opens and closes the calculator from anywhere on Venta, even from a field: it is a function
+  // key, so it types nothing. Not while a dialog is open — the calculator would hide behind it.
+  useEffect(() => {
+    function onKeyDown(e: globalThis.KeyboardEvent) {
+      if (e.key !== 'F9' || e.defaultPrevented || document.querySelector('dialog[open]')) return
+      e.preventDefault()
+      setCalcOpen((o) => !o)
+    }
+    document.addEventListener('keydown', onKeyDown)
+    return () => document.removeEventListener('keydown', onKeyDown)
+  }, [])
+
   useEffect(() => {
     if (cameraOpen) scanner.start()
     else scanner.stop()
@@ -109,33 +115,29 @@ export function VentaPage() {
       pickAndClear(exact)
       return
     }
-    const matches = dropdownMatches
-    if (!matches.length) {
+    if (!list.rows.length) {
       toast('Producto no encontrado', 'orange')
       return
     }
-    if (matches.length === 1) {
-      pickAndClear(matches[0])
-    } else {
-      setDdFocus(0)
-    }
+    // One match goes in; several: the first one is marked, and Enter again takes it (↓ moves to another).
+    if (list.rows.length === 1) pickAndClear(list.rows[0])
+    else setRowIdx(0)
   }
 
   function handleSearchKeyDown(e: KeyboardEvent<HTMLInputElement>) {
-    const matches = dropdownMatches
     if (e.key === 'ArrowDown') {
       e.preventDefault()
-      setDdFocus((f) => Math.min(f + 1, matches.length - 1))
+      setRowIdx((i) => Math.min(i + 1, list.rows.length - 1))
     } else if (e.key === 'ArrowUp') {
       e.preventDefault()
-      setDdFocus((f) => Math.max(f - 1, -1))
+      setRowIdx((i) => Math.max(i - 1, -1))
     } else if (e.key === 'Enter') {
       e.preventDefault()
-      if (ddFocus >= 0 && matches[ddFocus]) pickAndClear(matches[ddFocus])
+      if (activeRow) pickAndClear(activeRow)
       else addItemFromSearch()
     } else if (e.key === 'Escape') {
       setSearch('')
-      setDdFocus(-1)
+      setRowIdx(-1)
     }
   }
 
@@ -154,13 +156,12 @@ export function VentaPage() {
 
   return (
     <div className="mx-auto flex h-full max-w-[1800px] flex-col">
-      {/* Left column carries everything that finds products (KPIs, search, table); the cart is a
+      {/* Left column carries everything that finds products (search, table); the cart is a
        * standalone card in the right column spanning the full height — it's the thing the cashier
        * watches the whole time, so it owns its title, customer and Cobrar button. */}
       <div className="flex min-h-0 flex-1 overflow-hidden">
         <div className="flex w-[52%] flex-shrink-0 flex-col overflow-hidden md:w-[56%] xl:w-[58%]">
           <CajaBanner />
-          <VentaKpiBar onClickLowStock={() => setLowStockOnly(true)} />
 
           <div className="flex flex-shrink-0 gap-2 px-3 py-2 md:px-4">
             <div className="relative flex-1">
@@ -170,14 +171,13 @@ export function VentaPage() {
                 value={search}
                 onChange={(e) => {
                   setSearch(e.target.value)
-                  setDdFocus(-1)
+                  setRowIdx(-1)
                 }}
                 onKeyDown={handleSearchKeyDown}
                 placeholder="Buscar producto por nombre o código..."
                 autoComplete="off"
                 className="input md:h-[42px] md:text-[15px]"
               />
-              <SearchDropdown matches={dropdownMatches} query={search} focusIndex={ddFocus} onHover={setDdFocus} onSelect={pickAndClear} />
             </div>
             <button
               onClick={() => setCameraOpen(true)}
@@ -188,32 +188,24 @@ export function VentaPage() {
             </button>
             <button
               onClick={() => setCalcOpen((o) => !o)}
-              title="Calculadora"
+              title="Calculadora (F9)"
               className="flex h-[42px] w-11 flex-shrink-0 items-center justify-center rounded-[10px] border border-br2 bg-s1 text-blue transition-colors hover:border-blue/40 hover:bg-s2"
             >
               <Calculator size={19} />
             </button>
           </div>
 
-          {lowStockOnly && (
-            <button
-              onClick={() => setLowStockOnly(false)}
-              className="mx-3 mb-2 flex-shrink-0 rounded-lg border border-orange/30 bg-orange/10 px-3 py-1.5 text-left text-[12px] text-orange transition-colors hover:bg-orange/15 md:mx-4"
-            >
-              Mostrando solo stock bajo — toca para quitar el filtro
-            </button>
-          )}
-
           <div className="min-h-0 flex-1 border-t border-br">
             <ProductPicker
-              products={products}
+              list={list}
+              total={products.length}
               cart={items}
               search={search}
-              activeCat={activeCat}
+              sort={sort}
+              onSort={setSort}
               onSetCat={setActiveCat}
               onPick={pickProduct}
-              onOpenFree={() => openFree(null)}
-              lowStockOnly={lowStockOnly}
+              activeCode={activeRow?.code}
             />
           </div>
         </div>
@@ -225,15 +217,7 @@ export function VentaPage() {
       {weightModal && (
         <WeightModal product={weightModal.product} editIndex={weightModal.editIndex} onClose={() => setWeightModal(null)} />
       )}
-      <FreeProductModal open={freeModal.open} prefillPrice={freeModal.prefill} onClose={() => setFreeModal({ open: false, prefill: null })} />
-      <CalculatorModal
-        open={calcOpen}
-        onClose={() => setCalcOpen(false)}
-        onUseAsPrice={(v) => {
-          setCalcOpen(false)
-          void openFree(v)
-        }}
-      />
+      <CalculatorModal open={calcOpen} onClose={() => setCalcOpen(false)} />
       <QuickDiscountModal open={discOpen} onClose={() => setDiscOpen(false)} />
       <ReceiptSheet sale={receiptSale} onClose={() => setReceiptSale(null)} />
       <CameraOverlay open={cameraOpen} videoRef={scanner.videoRef} onClose={() => setCameraOpen(false)} />

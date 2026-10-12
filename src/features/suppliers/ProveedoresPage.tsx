@@ -38,7 +38,6 @@ export function ProveedoresPage() {
   }, [orderRows])
   const drafts = useMemo(() => orderRows.filter((r) => r.status === 'borrador').length, [orderRows])
   const debt = useMemo(() => summarizePayables(payableRows), [payableRows])
-  const overdueCount = useMemo(() => payableRows.filter((r) => r.status === 'vencida').length, [payableRows])
   const inactive = useMemo(() => supplierRows.filter((r) => !r.active).length, [supplierRows])
 
   function startOrder(order: PurchaseOrder | null, supplierId: string | null = null) {
@@ -49,7 +48,8 @@ export function ProveedoresPage() {
   const tabs: Array<{ key: Tab; label: string; badge?: number; badgeCls?: string }> = [
     { key: 'pedidos', label: 'Pedidos', badge: toReceive.count, badgeCls: 'bg-orange text-on-solid' },
     { key: 'nuevo', label: 'Nuevo pedido' },
-    { key: 'porpagar', label: 'Por pagar', badge: overdueCount, badgeCls: 'bg-red text-on-solid' },
+    // The accounts still to pay: the same number the Proveedores item of the nav shows.
+    { key: 'porpagar', label: 'Por pagar', badge: debt.open, badgeCls: 'bg-red text-on-solid' },
     { key: 'proveedores', label: 'Proveedores' },
   ]
 

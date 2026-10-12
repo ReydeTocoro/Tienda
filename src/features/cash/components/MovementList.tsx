@@ -1,5 +1,7 @@
 import { CAJA_LABEL, CATEGORY_LABEL, MOVEMENT_LABEL } from '../../../shared/lib/cash'
+import { AccountIcon } from '../../../shared/components/AccountIcon'
 import { formatDateTime, formatMoney } from '../../../shared/lib/currency'
+import { ACCOUNT_LABEL } from '../../../shared/lib/transferAccounts'
 import type { CashMovement } from '../../../types/cash'
 
 export function MovementList({ movements, showCaja }: { movements: CashMovement[]; showCaja: boolean }) {
@@ -16,7 +18,12 @@ export function MovementList({ movements, showCaja }: { movements: CashMovement[
               <div className="truncate text-[13px] font-semibold">{m.concept}</div>
               <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-muted">
                 <span className="rounded-full border border-br2 bg-s2 px-1.5 py-px text-[10px] font-semibold text-txt2">{MOVEMENT_LABEL[m.type]}</span>
-                {m.medio === 'transferencia' && <span className="rounded-full border border-blue/30 bg-blue/10 px-1.5 py-px text-[10px] font-semibold text-blue">Transferencia</span>}
+                {m.medio === 'transferencia' && (
+                  <span className="inline-flex items-center gap-1 rounded-full border border-blue/30 bg-blue/10 px-1.5 py-px text-[10px] font-semibold text-blue">
+                    {m.cuenta && <AccountIcon account={m.cuenta} size={12} />}
+                    Transferencia{m.cuenta ? ` · ${ACCOUNT_LABEL[m.cuenta]}` : ''}
+                  </span>
+                )}
                 {m.category && <span>{CATEGORY_LABEL[m.category]}</span>}
                 {showCaja && <span>{CAJA_LABEL[m.caja]}</span>}
                 <span>{formatDateTime(m.date)}</span>

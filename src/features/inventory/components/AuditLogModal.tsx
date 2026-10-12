@@ -14,6 +14,7 @@ const TYPE_LABEL: Record<string, string> = {
   ajuste: 'Ajuste',
   importacion: 'Importación',
   correccion_venta: 'Corrección de venta',
+  anulacion_venta: 'Anulación de venta',
   cambio_codigo: 'Cambio de código',
 }
 
@@ -56,6 +57,20 @@ export function AuditLogModal({ open, onClose }: AuditLogModalProps) {
                     <br />
                     <span className="text-muted">
                       Antes: ${a.before.total.toFixed(2)} Después: ${a.after.total.toFixed(2)}
+                    </span>
+                  </div>
+                </>
+              ) : a.type === 'anulacion_venta' ? (
+                <>
+                  <div className="flex items-center justify-between">
+                    <div className="font-mono text-[12px] font-bold text-red">Venta #{a.saleId} anulada</div>
+                    <div className="font-mono text-[12px] text-red">-${a.before.total.toFixed(2)}</div>
+                  </div>
+                  <div className="mt-1 text-[12px] text-txt2">
+                    <b>Motivo:</b> {a.reason}
+                    <br />
+                    <span className="text-muted">
+                      {formatDateTime(a.date)} · {a.user}
                     </span>
                   </div>
                 </>

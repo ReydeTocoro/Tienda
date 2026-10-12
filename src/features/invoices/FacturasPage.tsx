@@ -12,11 +12,13 @@ import { nextSort, type SortState } from '../../shared/lib/sortRows'
 import { OrderDetailSheet } from '../suppliers/components/OrderDetailSheet'
 import { usePermission } from '../pin/usePermission'
 import { CorrectionModal } from './components/CorrectionModal'
+import { VoidSheet } from './components/VoidSheet'
 import { InvoiceTable } from './components/InvoiceTable'
 import {
   buildInvoiceRows,
   DEFAULT_INVOICE_SORT,
   filterInvoices,
+  periodBounds,
   INVOICE_PERIODS,
   METHOD_LABEL,
   periodPhrase,
@@ -29,12 +31,12 @@ import {
 const SALE_METHODS: PayMethod[] = ['efectivo', 'transferencia', 'fiado']
 
 export function FacturasPage() {
-  const sales = useLiveQuery(() => db.sales.toArray(), [], []) as Sale[]
   // Purchase invoices only reach this device for whoever may see purchase prices.
   const allOrders = useSecureTable('purchaseOrders')
   const orders = useMemo(() => allOrders.filter((o) => o.status === 'recibido'), [allOrders])
   const [receiptSale, setReceiptSale] = useState<Sale | null>(null)
   const [correctingSale, setCorrectingSale] = useState<Sale | null>(null)
+  const [voidingSale, setVoidingSale] = useState<Sale | null>(null)
   const [viewOrder, setViewOrder] = useState<PurchaseOrder | null>(null)
   const [search, setSearch] = useState('')
   const [kind, setKind] = useState<'todas' | InvoiceKind>('todas')
@@ -46,6 +48,17 @@ export function FacturasPage() {
   const [from, setFrom] = useState(todayKey)
   const [to, setTo] = useState(todayKey)
   const [sort, setSort] = useState<SortState<InvoiceSortKey>>(DEFAULT_INVOICE_SORT)
+  const today = todayKey()
+  // Only the sales of the days on screen are read (by the indexed day), not the whole history — which would be
+  // read again on every sale that arrives, on every open device. A period with no end reads everything it must.
+  const { since, until } = periodBounds({ period, day, from, to }, today)
+  const sales = useLiveQuery(
+    () => (since === null && until === null ? db.sales.toArray() : db.sales.where('dayKey').between(since ?? '', until ?? '\uffff', true, true).toArray()),
+    [since, until],
+    [],
+  ) as Sale[]
+  // How many sales exist at all (a count reads no rows): tells "no invoices yet" from "none on those days".
+  const salesEver = useLiveQuery(() => db.sales.count(), [], -1)
   const { can, requirePermission } = usePermission()
   // Purchase invoices show what each product cost: only for whoever may see purchase prices.
   const canSeePurchases = can('costos.ver')
@@ -57,8 +70,15 @@ export function FacturasPage() {
     setReceiptSale(null)
   }
 
+  async function requestVoid(sale: Sale) {
+    const ok = await requirePermission('facturas.corregir', 'Anular factura', 'Anular una venta ya hecha requiere permiso.')
+    if (!ok) return
+    setVoidingSale(sale)
+    setReceiptSale(null)
+  }
+
   const all = useMemo(() => buildInvoiceRows(sales, canSeePurchases ? orders : []), [sales, orders, canSeePurchases])
-  const today = todayKey()
+  const toReview = useMemo(() => all.filter((r) => r.toReview).length, [all])
   const shownKind = canSeePurchases ? kind : 'todas'
   const rows = useMemo(
     () => sortInvoices(filterInvoices(all, { search, kind: shownKind, method, period, day, from, to }, today), sort),
@@ -69,7 +89,7 @@ export function FacturasPage() {
   // came up empty (when the dates are all that narrows the list) rather than blame the filters.
   const periodText = periodPhrase({ period, day, from, to }, today)
   const emptyMessage =
-    all.length === 0
+    salesEver === 0 && (!canSeePurchases || orders.length === 0)
       ? 'Sin facturas aún — se crean al vender.'
       : periodText && !search.trim() && shownKind === 'todas' && method === 'todos'
         ? `No hay facturas ${periodText}. Cambia la fecha para ver otros días.`
@@ -82,6 +102,7 @@ export function FacturasPage() {
     let nVentas = 0
     let nCompras = 0
     for (const r of rows) {
+      if (r.voided) continue // an annulled invoice is listed but adds to nothing
       if (r.kind === 'venta') {
         ventas += r.total
         nVentas++
@@ -104,6 +125,16 @@ export function FacturasPage() {
             </Chip>
             {totals.nVentas > 0 && <Chip tone="green">Ventas {formatMoney(totals.ventas)}</Chip>}
             {totals.nCompras > 0 && <Chip tone="red">Compras {formatMoney(totals.compras)}</Chip>}
+            {/* Sales made without internet that arrived with something that didn't add up (see ReviewNotes). */}
+            {toReview > 0 && (
+              <button
+                onClick={() => setSearch('por revisar')}
+                title="Ventas hechas sin internet con observaciones que nadie ha revisado"
+                className="rounded-full border border-orange/30 bg-orange/10 px-2.5 py-0.5 font-semibold text-orange"
+              >
+                {toReview} por revisar
+              </button>
+            )}
           </div>
         </div>
 
@@ -160,14 +191,21 @@ export function FacturasPage() {
             resetKey={`${search}|${shownKind}|${method}|${period}|${day}|${from}|${to}|${sort.key}|${sort.dir}`}
             onViewSale={setReceiptSale}
             onCorrectSale={requestCorrection}
+            onVoidSale={requestVoid}
             onViewOrder={setViewOrder}
             withPurchases={canSeePurchases}
           />
         )}
       </div>
 
-      <ReceiptSheet sale={receiptSale} onClose={() => setReceiptSale(null)} onCorrect={receiptSale ? () => requestCorrection(receiptSale) : undefined} />
+      <ReceiptSheet
+        sale={receiptSale}
+        onClose={() => setReceiptSale(null)}
+        onCorrect={receiptSale ? () => requestCorrection(receiptSale) : undefined}
+        onVoid={receiptSale ? () => requestVoid(receiptSale) : undefined}
+      />
       <CorrectionModal sale={correctingSale} onClose={() => setCorrectingSale(null)} onCorrected={() => setCorrectingSale(null)} />
+      <VoidSheet sale={voidingSale} onClose={() => setVoidingSale(null)} onVoided={() => setVoidingSale(null)} />
       {/* Only received orders are listed here, which have no edit/receive actions to offer. */}
       <OrderDetailSheet order={viewOrder} onClose={() => setViewOrder(null)} onEditDraft={() => undefined} onReceive={() => undefined} />
     </div>

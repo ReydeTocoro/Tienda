@@ -4,11 +4,14 @@ const { onRequest } = require('firebase-functions/v2/https')
 const { defineSecret } = require('firebase-functions/params')
 const { createServerApp } = require('./lib/server.js')
 
-// Both live in Secret Manager, and both must exist before a deploy:
+// All three live in Secret Manager, and all must exist before a deploy:
 //   firebase functions:secrets:set SUPABASE_DB_URL      (the database URL, it carries the password)
 //   firebase functions:secrets:set SUPABASE_SECRET_KEY  (creates the users' sign-in accounts)
+//   firebase functions:secrets:set GMAIL_APP_PASSWORD   (the app password of the Gmail account in functions/.env,
+//                                                        which e-mails the receipts)
 const SUPABASE_DB_URL = defineSecret('SUPABASE_DB_URL')
 const SUPABASE_SECRET_KEY = defineSecret('SUPABASE_SECRET_KEY')
+const GMAIL_APP_PASSWORD = defineSecret('GMAIL_APP_PASSWORD')
 
 let app
 
@@ -18,7 +21,7 @@ exports.api = onRequest(
     region: 'us-east4',
     // Reachable from the browser through Hosting; the API itself demands a staff session.
     invoker: 'public',
-    secrets: [SUPABASE_DB_URL, SUPABASE_SECRET_KEY],
+    secrets: [SUPABASE_DB_URL, SUPABASE_SECRET_KEY, GMAIL_APP_PASSWORD],
     memory: '512MiB',
     timeoutSeconds: 60,
     maxInstances: 2,
@@ -30,6 +33,7 @@ exports.api = onRequest(
       supabaseUrl: process.env.SUPABASE_URL,
       publishableKey: process.env.SUPABASE_PUBLISHABLE_KEY,
       secretKey: SUPABASE_SECRET_KEY.value(),
+      mail: { user: process.env.GMAIL_USER, password: GMAIL_APP_PASSWORD.value() },
     })
     return app(req, res)
   },

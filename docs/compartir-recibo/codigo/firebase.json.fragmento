@@ -1,0 +1,43 @@
+// Fragmentos de configuración. No es un archivo completo: cada bloque va en su sitio.
+//
+// 1) firebase.json → hosting.headers (si hay varios sitios, en el que sirve /recibo):
+//    el enlace del recibo no debe filtrarse por el encabezado Referer ni indexarse.
+{
+  "source": "/recibo/**",
+  "headers": [
+    { "key": "Referrer-Policy", "value": "no-referrer" },
+    { "key": "X-Robots-Tag", "value": "noindex" }
+  ]
+}
+
+// 2) firebase.json → hosting.rewrites: la app es una SPA, así que /recibo/<id> tiene
+//    que caer en index.html (si ya tienes `"source": "**", "destination": "/index.html"`,
+//    no hay que añadir nada).
+
+// 3) vite.config.ts → vite-plugin-pwa (SOLO si el proyecto es PWA con service worker):
+//    jsPDF y sus dependencias opcionales NO deben ir en el precache; se descargan solo
+//    cuando alguien manda o descarga un recibo.
+//      VitePWA({
+//        workbox: {
+//          globIgnores: ['**/jspdf*.js', '**/html2canvas*.js', '**/purify*.js'],
+//        },
+//      })
+
+// 4) functions/.env (variables NO secretas de la función; el secreto va por separado):
+//      GMAIL_USER=cuenta-del-negocio@gmail.com
+//      NOMBRE_NEGOCIO=Mi Negocio
+
+// 5) firestore.indexes.json → (OPCIONAL, recomendado) que los recibos compartidos
+//    caduquen solos. En el proyecto original NO existe: los enlaces viven para siempre.
+//    Para activarlo, guardar también `expiraEn` (Timestamp) al crear el doc — y añadirlo
+//    a `hasOnly([...])` de la regla — y declarar:
+{
+  "fieldOverrides": [
+    {
+      "collectionGroup": "recibos_compartidos",
+      "fieldPath": "expiraEn",
+      "ttl": true,
+      "indexes": [{ "order": "ASCENDING", "queryScope": "COLLECTION" }]
+    }
+  ]
+}

@@ -16,10 +16,16 @@ export const MAX_CODE = 60
  * make two codes different — or that a package has reserved for its loose unit (opening the package
  * would pour its units into that product). `except` is the product being renamed. */
 export async function assertCodeFree(sql: Sql, code: string, except?: string): Promise<void> {
-  const taken = await sql.query<{ code: string }>(`select code from products where lower(code) = lower($1) and ($2::text is null or code <> $2) limit 1`, [code, except ?? null])
-  if (taken.length) throw new HttpError(409, 'Ese código ya existe')
-  const reserved = await sql.query<{ name: string }>(`select data ->> 'name' as name from products where lower(data ->> 'codigoSuelta') = lower($1) limit 1`, [code])
-  if (reserved.length) throw new HttpError(409, `Ese código está reservado para la unidad suelta de "${reserved[0].name}"`)
+  // Both checks in one trip: a code another product has, or one a package reserves for its loose unit.
+  const found = await sql.query<{ kind: 'taken' | 'reserved'; name: string | null }>(
+    `select 'taken' as kind, null::text as name from products where lower(code) = lower($1) and ($2::text is null or code <> $2)
+     union all
+     select 'reserved', data ->> 'name' from products where lower(data ->> 'codigoSuelta') = lower($1)`,
+    [code, except ?? null],
+  )
+  if (found.some((f) => f.kind === 'taken')) throw new HttpError(409, 'Ese código ya existe')
+  const reserved = found.find((f) => f.kind === 'reserved')
+  if (reserved) throw new HttpError(409, `Ese código está reservado para la unidad suelta de "${reserved.name}"`)
 }
 
 /** A key that was deleted and is in use again must not be deleted again on a device that catches up

@@ -31,7 +31,9 @@ function ChangePasswordForm({ onClose }: { onClose: () => void }) {
     setBusy(false)
     if (authError) {
       setError(
-        authError.code === 'same_password'
+        authError.name === 'AuthRetryableFetchError'
+          ? 'Sin conexión con el servidor: para cambiar la contraseña hace falta internet'
+          : authError.code === 'same_password'
           ? 'Esa ya es tu contraseña: escribe una distinta'
           : authError.code === 'weak_password'
             ? 'Supabase la rechazó por débil: usa una más larga, con letras y números'

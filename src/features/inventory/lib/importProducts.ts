@@ -92,10 +92,10 @@ export function buildParsedRows(rawRows: Record<string, string>[], existingProdu
     seenCodes.add(finalCode)
 
     // "Precio Venta" and "Precio 1" are the same price: the old column name and the one the new
-    // exports and template use. "Precio 2" / "Precio 3" are the optional extra selling prices.
-    let price = parseFloat(get(row, 'precio venta', 'precio_venta', 'price', 'precio', 'sale price', 'venta', 'precio 1', 'precio1', 'price 1', 'price1').replace(',', '.')) || 0
-    const price2 = parseFloat(get(row, 'precio 2', 'precio2', 'price 2', 'price2').replace(',', '.')) || 0
-    const price3 = parseFloat(get(row, 'precio 3', 'precio3', 'price 3', 'price3').replace(',', '.')) || 0
+    // exports and template use ("Precio Venta 1/2/3" is how the previous point-of-sale system exported them). "Precio 2" / "Precio 3" are the optional extra selling prices.
+    let price = parseFloat(get(row, 'precio venta', 'precio_venta', 'price', 'precio', 'sale price', 'venta', 'precio 1', 'precio1', 'price 1', 'price1', 'precio venta 1', 'precio venta1').replace(',', '.')) || 0
+    const price2 = parseFloat(get(row, 'precio 2', 'precio2', 'price 2', 'price2', 'precio venta 2', 'precio venta2').replace(',', '.')) || 0
+    const price3 = parseFloat(get(row, 'precio 3', 'precio3', 'price 3', 'price3', 'precio venta 3', 'precio venta3').replace(',', '.')) || 0
     const cost = parseFloat(get(row, 'precio compra', 'precio_compra', 'cost', 'costo', 'compra').replace(',', '.')) || 0
     const marginStr = get(row, '% margen', 'margen', 'margin', '% ganancia', 'ganancia')
     if (!price && cost && marginStr) price = cost * (1 + parseFloat(marginStr) / 100)

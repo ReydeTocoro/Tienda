@@ -217,6 +217,7 @@ export function ProductForm({ product, showCosts, onSaved, onCancel, scanSeed, o
 
     // Without purchase prices on screen the form doesn't send one: the stored cost stays (and the
     // server only takes a cost from someone who may see them).
+    const stockNum = parseFloat(f.stock) || 0
     const prod: Product = {
       code,
       name,
@@ -225,7 +226,7 @@ export function ProductForm({ product, showCosts, onSaved, onCancel, scanSeed, o
       price2,
       price3,
       ...(showCosts ? { cost } : {}),
-      stock: parseFloat(f.stock) || 0,
+      stock: stockNum,
       min: parseFloat(f.min) || 0,
       cat: f.cat.trim(),
       brand: f.brand.trim(),
@@ -243,7 +244,8 @@ export function ProductForm({ product, showCosts, onSaved, onCancel, scanSeed, o
 
     try {
       if (editing) {
-        await updateProduct(product!.code, prod)
+        // Stock the person didn't touch isn't sent: the figure loaded with the form may be stale (sales since).
+        await updateProduct(product!.code, prod, { keepStock: stockNum === (product!.stock || 0) })
         toast(codeChange ? `Producto actualizado · código nuevo: ${codeChange}` : 'Producto actualizado', 'lime')
       } else {
         await addProduct(prod)

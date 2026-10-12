@@ -25,8 +25,12 @@ const WRITE_LOCK = 4207
 /** Supabase through its connection pooler. The certificate is checked against Supabase's root CA
  * (not in Node's default store), so the connection is verified, not just encrypted. The URL must
  * not carry `sslmode`, which would override this. */
-export function pgDb(connectionString: string, maxConnections = 3): Db {
-  const pool = new pg.Pool({ connectionString, max: maxConnections, idleTimeoutMillis: 30_000, ssl: { ca: SUPABASE_CA, rejectUnauthorized: true } })
+export function pgDb(
+  connectionString: string,
+  maxConnections = 3,
+  // Injectable only so the self-check can hand it a connection that drops.
+  pool: pg.Pool = new pg.Pool({ connectionString, max: maxConnections, idleTimeoutMillis: 30_000, ssl: { ca: SUPABASE_CA, rejectUnauthorized: true } }),
+): Db {
   // The pooler can drop a connection that sits idle (a network blip, the machine waking from sleep): the
   // pool then emits 'error' for it, and with no listener Node treats that as fatal — the whole API dies
   // (ECONNRESET). The pool already discards that client and opens another on the next query, so the
@@ -41,9 +45,19 @@ export function pgDb(connectionString: string, maxConnections = 3): Db {
     ...wrap(pool),
     async tx<T>(fn: (q: Sql) => Promise<T>) {
       const client = await pool.connect()
+      // While a transaction holds the connection, the pool's own listener is off it and nothing else listens: a drop
+      // between two of its queries (the internet blinking while the route waits on something else) would be an
+      // unhandled 'error' event and kill the whole API. The next query on it rejects — that is how the transaction
+      // learns of it — and a connection that dropped is discarded, not handed back.
+      let lost = false
+      const onLost = () => {
+        lost = true
+      }
+      client.on('error', onLost)
       try {
-        await client.query('begin')
-        await client.query('select pg_advisory_xact_lock($1)', [WRITE_LOCK])
+        // BEGIN and the lock in one trip (simple protocol, no parameters): every trip to the database costs
+        // time that each write pays — 170 ms from a developer's computer — so they are counted.
+        await client.query(`begin; select pg_advisory_xact_lock(${WRITE_LOCK})`)
         const result = await fn(wrap(client))
         await client.query('commit')
         return result
@@ -51,7 +65,8 @@ export function pgDb(connectionString: string, maxConnections = 3): Db {
         await client.query('rollback').catch(() => {})
         throw err
       } finally {
-        client.release()
+        client.removeListener('error', onLost)
+        client.release(lost)
       }
     },
     end: () => pool.end(),

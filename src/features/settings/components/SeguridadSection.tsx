@@ -39,7 +39,7 @@ export function SeguridadSection({ security }: { security: SecurityInfo | null }
       <Card title="Sesiones" description="Cada persona entra con su correo y su contraseña. Para que entre otra, quien usa el equipo elige “Cambiar de usuario” en el menú de su nombre (arriba a la derecha).">
         <Row
           label="Cerrar la sesión por inactividad"
-          hint="Tras ese tiempo sin tocar la pantalla, la sesión se cierra y se vuelve a pedir el correo y la contraseña. Útil si el equipo se queda solo en el mostrador."
+          hint="Tras ese tiempo sin tocar la pantalla, la sesión se cierra y se vuelve a pedir el correo y la contraseña. Útil si el equipo se queda solo en el mostrador. Ojo: volver a entrar necesita internet, así que si se va el internet quien ya cerró la sesión no podrá entrar hasta que vuelva (con la sesión abierta sí se puede seguir vendiendo)."
           htmlFor="idle-sign-out"
         >
           <select id="idle-sign-out" className="input w-full py-2 sm:w-56" value={access.idleSignOutMinutes} onChange={(e) => saveIdle(Number(e.target.value))}>

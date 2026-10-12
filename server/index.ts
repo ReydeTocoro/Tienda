@@ -16,6 +16,9 @@ const app = createServerApp({
   publishableKey: requireEnv('VITE_SUPABASE_PUBLISHABLE_KEY'),
   // Optional, in .env.local: lets Configuración → Usuarios create accounts and set passwords.
   secretKey: process.env.SUPABASE_SECRET_KEY,
+  // Optional, in .env.local: lets the receipt's "Correo" button send from this Gmail account
+  // (GMAIL_APP_PASSWORD is its app password, never the account's own).
+  mail: { user: process.env.GMAIL_USER, password: process.env.GMAIL_APP_PASSWORD },
 })
 
 const distDir = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'dist')

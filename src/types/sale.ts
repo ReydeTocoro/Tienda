@@ -1,3 +1,4 @@
+import type { TransferAccount } from '../shared/lib/transferAccounts'
 import type { CartItem } from './cartItem'
 
 export type PayMethod = 'efectivo' | 'transferencia' | 'fiado'
@@ -10,6 +11,8 @@ export interface FiadoPago {
   condonado?: boolean
   /** How the payment was collected (absent on older rows = efectivo). */
   method?: 'efectivo' | 'transferencia'
+  /** The account a transfer came into (absent on older payments and on cash). */
+  account?: TransferAccount
 }
 
 export interface Sale {
@@ -22,6 +25,9 @@ export interface Sale {
    * (`ganancias.ver`); the app merges it in where it may show it. */
   ganancia?: number
   payMethod: PayMethod
+  /** For a sale paid by transfer: the account it came into. Absent on older sales and on one made from a screen that
+   * doesn't ask (the day's close lists those as "sin cuenta indicada"). */
+  transferAccount?: TransferAccount
   fiadoName?: string
   customerId?: string
   customerName?: string
@@ -43,6 +49,34 @@ export interface Sale {
   corrected?: boolean
   correctedAt?: string
   correctionReason?: string
+  /** The invoice was annulled: the goods went back to the inventory and the money back out of the caja, but the row
+   * stays as history. Every total, report, fiado and customer figure leaves it out. */
+  voided?: boolean
+  voidedAt?: string
+  voidedBy?: string
+  voidReason?: string
   /** Set by a Cierre Z once this sale's day is closed. Row is never deleted. */
   closedInCierreId?: number
+
+  // ── Sales that cross a bad connection ──────────────────────────────────────────────────────────
+  /** The code the device gave this sale when it was made (a UUID). Sending a sale twice — a reply that
+   * got lost, a retry after the internet came back — can't save it twice: the server knows the code. */
+  clientId?: string
+  /** Made on a device without internet and sent later (server/domain/offlineSales.ts). */
+  offline?: boolean
+  /** When the server received it (an offline sale's `date` is when it was made). */
+  syncedAt?: string
+  /** Who sent it, when that isn't who made it (another cashier signed in before it was sent). */
+  syncedBy?: string
+  /** The provisional number printed on the receipt while it had none ("PEND-0003"). */
+  refLocal?: string
+  /** What did not add up when the server received an offline sale — stock that wasn't there, a price that
+   * changed, a discount nobody authorized… The sale is kept anyway (the goods already left); the owner
+   * reads these and marks the sale as reviewed. */
+  reviewNotes?: string[]
+  reviewedAt?: string
+  reviewedBy?: string
+  /** LOCAL ONLY — never stored on the server: a sale saved on this device that hasn't reached the server
+   * yet (its `id` is negative until it does). */
+  pendingSync?: boolean
 }

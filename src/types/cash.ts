@@ -1,3 +1,5 @@
+import type { TransferAccount } from '../shared/lib/transferAccounts'
+
 export type CajaId = 'menor' | 'mayor'
 
 export type MovementType =
@@ -33,6 +35,8 @@ export interface CashMovement {
   transferId?: string
   /** How the money arrived. Cash goes to the Caja Menor drawer; a bank transfer is credited to the Caja Mayor (safe + banks). */
   medio?: 'efectivo' | 'transferencia'
+  /** For a transfer: the account it came into or left from. */
+  cuenta?: TransferAccount
   refType?: 'sale' | 'purchaseOrder' | 'payable'
   refId?: number | string
   by?: string

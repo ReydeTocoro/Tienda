@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import type { CartItem } from '../types/cartItem'
 import type { PayMethod } from '../types/sale'
-import { generateId } from '../shared/lib/id'
+import type { TransferAccount } from '../shared/lib/transferAccounts'
 import { samePrice } from '../shared/lib/prices'
 import { toast } from './useToastStore'
 
@@ -20,8 +20,9 @@ export interface CartData {
   customerId: string | null
   customerName: string | null
   payMethod: PayMethod
+  /** For a transfer: the account it came into. Never preset — the cashier picks it at every charge. */
+  transferAccount: TransferAccount | null
   fiadoName: string
-  manualDiscountPct: number
   notes: string
   /** Cash-register tender: null = charge the computed total as-is. Set when the cashier types a
    * different "Total a cobrar" (e.g. rounding cash to the nearest bill). */
@@ -47,16 +48,18 @@ interface CartState {
   // Everything below edits the ACTIVE cart.
   addUnitItem: (p: AddUnitSource, qty?: number) => void
   addWeightedItem: (item: CartItem, stock: number, editIndex?: number | null) => void
-  addFreeItem: (desc: string, price: number, qty: number) => void
   changeQty: (index: number, delta: number, maxStock?: number) => void
-  /** Charges a line at another of its product's prices (Precio 1, 2 or 3 — the caller offers only
-   * those); free lines keep the price they were typed at. */
+  /** A quantity typed by hand on a line: whole units, never more than there is (it stops at the stock, and says so). */
+  setQty: (index: number, qty: number, maxStock?: number) => void
+  /** Charges a line at another of its product's prices (Precio 1, 2 or 3 — the caller offers only those). */
   setItemPrice: (index: number, price: number) => void
   removeItem: (index: number) => void
   setCustomer: (id: string | null, name: string | null) => void
   setPayMethod: (m: PayMethod) => void
+  setTransferAccount: (a: TransferAccount | null) => void
   setFiadoName: (n: string) => void
-  setManualDiscountPct: (p: number) => void
+  /** Money off one line ("descuento en dinero"); 0 takes it off. */
+  setItemDiscount: (index: number, amount: number) => void
   setNotes: (n: string) => void
   setChargeOverride: (n: number | null) => void
   setAmountReceived: (n: number) => void
@@ -81,8 +84,8 @@ const emptyData = (): CartData => ({
   customerId: null,
   customerName: null,
   payMethod: 'efectivo',
+  transferAccount: null,
   fiadoName: '',
-  manualDiscountPct: 0,
   notes: '',
   chargeOverride: null,
   amountReceived: 0,
@@ -150,7 +153,8 @@ export const useCartStore = create<CartState>((set, get) => {
           return
         }
         const next = [...items]
-        next[editIndex] = item
+        // Editing the weight keeps the discount the line had (it is clamped to what the line is worth when totalled).
+        next[editIndex] = items[editIndex]?.discount ? { ...item, discount: items[editIndex].discount } : item
         patchActive({ items: next })
         return
       }
@@ -173,24 +177,11 @@ export const useCartStore = create<CartState>((set, get) => {
       }
     },
 
-    addFreeItem: (desc, price, qty) => {
-      const item: CartItem = {
-        code: 'FREE_' + generateId(),
-        name: desc,
-        price,
-        qty,
-        brand: '',
-        unit: 'unidad',
-        isFree: true,
-      }
-      patchActive({ items: [...active().items, item] })
-    },
-
     changeQty: (index, delta, maxStock) => {
       const items = active().items
       const item = items[index]
       if (!item) return
-      if (delta > 0 && !item.isFree && maxStock !== undefined && item.qty + delta > maxStock) {
+      if (delta > 0 && maxStock !== undefined && item.qty + delta > maxStock) {
         toast('Stock máximo alcanzado', 'orange')
         return
       }
@@ -204,10 +195,25 @@ export const useCartStore = create<CartState>((set, get) => {
       patchActive({ items: next })
     },
 
+    setQty: (index, qty, maxStock) => {
+      const items = active().items
+      const item = items[index]
+      if (!item || !Number.isFinite(qty) || qty < 1) return
+      let next = Math.round(qty)
+      if (maxStock !== undefined && next > maxStock) {
+        toast('Stock máximo alcanzado', 'orange')
+        next = Math.floor(maxStock)
+      }
+      if (next < 1 || next === item.qty) return
+      const list = [...items]
+      list[index] = { ...item, qty: next }
+      patchActive({ items: list })
+    },
+
     setItemPrice: (index, price) => {
       const items = active().items
       const item = items[index]
-      if (!item || item.isFree || !Number.isFinite(price) || price < 0 || samePrice(item.price, price)) return
+      if (!item || !Number.isFinite(price) || price < 0 || samePrice(item.price, price)) return
       const next = [...items]
       next[index] = { ...item, price }
       patchActive({ items: next })
@@ -217,8 +223,17 @@ export const useCartStore = create<CartState>((set, get) => {
 
     setCustomer: (customerId, customerName) => patchActive({ customerId, customerName }),
     setPayMethod: (payMethod) => patchActive({ payMethod }),
+    setTransferAccount: (transferAccount) => patchActive({ transferAccount }),
     setFiadoName: (fiadoName) => patchActive({ fiadoName }),
-    setManualDiscountPct: (manualDiscountPct) => patchActive({ manualDiscountPct }),
+    setItemDiscount: (index, amount) => {
+      const items = active().items
+      const item = items[index]
+      if (!item || !Number.isFinite(amount)) return
+      const cents = Math.round(Math.max(amount, 0) * 100) / 100
+      const next = [...items]
+      next[index] = { ...item, discount: cents > 0 ? cents : undefined }
+      patchActive({ items: next })
+    },
     setNotes: (notes) => patchActive({ notes }),
     setChargeOverride: (chargeOverride) => patchActive({ chargeOverride }),
     setAmountReceived: (amountReceived) => patchActive({ amountReceived }),

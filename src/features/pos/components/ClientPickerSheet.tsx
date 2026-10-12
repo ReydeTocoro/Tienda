@@ -3,7 +3,7 @@ import { X } from 'lucide-react'
 import { BottomSheet } from '../../../shared/components/BottomSheet'
 import { CustomerAvatar } from '../../customers/components/CustomerAvatar'
 import { useCustomersWithSpent } from '../../customers/hooks/useCustomersWithSpent'
-import { formatQty } from '../../../shared/lib/currency'
+import { formatMoney } from '../../../shared/lib/currency'
 
 interface ClientPickerSheetProps {
   open: boolean
@@ -57,18 +57,16 @@ export function ClientPickerSheet({ open, onClose, onPick, onClear }: ClientPick
         </div>
       ) : (
         <div className="max-h-[360px] overflow-y-auto">
-          {filtered.map(({ customer: c, spent, pts, tier: t }) => (
+          {filtered.map(({ customer: c, spent }) => (
             <div key={c.id} onClick={() => pick(c.id, c.name)} className="flex cursor-pointer items-center gap-2.5 rounded-xl p-2.5 active:bg-s2">
-              <CustomerAvatar name={c.name} spent={spent} size={38} />
+              <CustomerAvatar name={c.name} size={38} />
               <div className="min-w-0 flex-1">
                 <div className="text-[14px] font-semibold">{c.name}</div>
                 <div className="text-[11px] text-muted">
                   {c.cedula ? c.cedula + (c.phone ? ' · ' : '') : ''}
                   {c.phone || ''}
                 </div>
-                <div className="font-mono text-[11px] text-lime">
-                  {formatQty(pts)} pts · {t.label}
-                </div>
+                {spent > 0 && <div className="font-mono text-[11px] text-lime">Ha comprado {formatMoney(spent)}</div>}
               </div>
             </div>
           ))}

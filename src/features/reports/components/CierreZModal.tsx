@@ -3,10 +3,15 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { useDayAggregation } from '../../../shared/hooks/useDayAggregation'
 import { BottomSheet } from '../../../shared/components/BottomSheet'
 import { MoneyInput } from '../../../shared/components/MoneyInput'
+import { TransferByAccount } from '../../../shared/components/TransferByAccount'
+import { transferRows } from '../../../shared/lib/transferAccounts'
 import { confirmCierreZ } from '../../../db/repositories/cierres'
 import { getSettings } from '../../../db/repositories/settings'
 import { round2 } from '../../../shared/lib/cash'
 import { toast } from '../../../store/useToastStore'
+import { useConnectionStore } from '../../../store/useConnectionStore'
+import { useOutboxCounts } from '../../../offline/outbox'
+import { processOutbox } from '../../../offline/outboxSync'
 import { formatMoney } from '../../../shared/lib/currency'
 import { usePermission } from '../../pin/usePermission'
 import { useCaja } from '../../cash/hooks/useCaja'
@@ -46,6 +51,14 @@ function CierreZForm({ dayKey, onClose, onClosed }: Omit<CierreZModalProps, 'ope
   const [trasladarInput, setTrasladarInput] = useState<number | null>(null)
   const [notas, setNotas] = useState('')
   const [busy, setBusy] = useState(false)
+  // The closing adds up what the server has: sales made without internet must have reached it first. They are
+  // sent as soon as this opens, and the closing waits for them — and for the ones the server refused, which a
+  // person has to settle (retry or throw away) before the day can be closed.
+  const { pending, rejected } = useOutboxCounts()
+  const reachable = useConnectionStore((s) => s.reachable)
+  useEffect(() => {
+    if (pending > 0 && reachable) void processOutbox({ force: true })
+  }, [pending, reachable])
 
   useEffect(() => {
     if (operator) setCajero(operator.name)
@@ -63,6 +76,10 @@ function CierreZForm({ dayKey, onClose, onClosed }: Omit<CierreZModalProps, 'ope
   const quedaEnCaja = round2(fisico - trasladar)
 
   async function confirm() {
+    if (pending > 0 || rejected > 0) {
+      toast(pending > 0 ? 'Primero deben enviarse las ventas hechas sin internet' : 'Primero hay que resolver las ventas que el servidor rechazó', 'orange')
+      return
+    }
     if (!cajero.trim()) {
       toast('Ingresa el nombre del cajero', 'orange')
       return
@@ -100,6 +117,20 @@ function CierreZForm({ dayKey, onClose, onClosed }: Omit<CierreZModalProps, 'ope
       <div className="mb-1 font-display text-[18px] font-bold">Reporte Z — Cierre definitivo</div>
       <div className="mb-4 text-[12px] text-muted">Fecha: {dayKey}</div>
 
+      {pending > 0 && (
+        <div className="mb-3.5 rounded-xl border border-orange/30 bg-orange/10 p-3 text-[12px] leading-snug text-orange">
+          {reachable
+            ? `Enviando ${pending === 1 ? '1 venta hecha' : `${pending} ventas hechas`} sin internet… espera un momento: el cierre las necesita para cuadrar.`
+            : `Hay ${pending === 1 ? '1 venta hecha' : `${pending} ventas hechas`} sin internet que todavía no llegaron al servidor. Para cerrar la caja hace falta conexión: el cierre las necesita para cuadrar.`}
+        </div>
+      )}
+
+      {rejected > 0 && (
+        <div className="mb-3.5 rounded-xl border border-red/30 bg-red/10 p-3 text-[12px] leading-snug text-red">
+          El servidor rechazó {rejected === 1 ? '1 venta hecha' : `${rejected} ventas hechas`} sin internet. Ábrelas desde el aviso rojo de arriba y reintenta o descártalas antes de cerrar la caja: el cierre las necesita para cuadrar.
+        </div>
+      )}
+
       {blind ? (
         <div className="mb-3.5 rounded-xl bg-s2 p-3.5 text-[12px] leading-relaxed text-txt2">
           Cuenta billetes y monedas de la caja y escribe el total. El sistema lo compara con lo que debería haber; el resultado lo ve el administrador.
@@ -115,6 +146,14 @@ function CierreZForm({ dayKey, onClose, onClosed }: Omit<CierreZModalProps, 'ope
             {agg.totalExIn > 0 && <Stat label="Otros ingresos (abonos, etc.)" value={formatMoney(agg.totalExIn)} color="text-lime" />}
             {agg.totalExOut > 0 && <Stat label="Egresos de caja" value={formatMoney(agg.totalExOut)} color="text-orange" />}
             {agg.fiadoTotalDay > 0 && <Stat label="Fiado (no en caja)" value={formatMoney(agg.fiadoTotalDay)} color="text-red" span2 />}
+            {transferRows(agg.transferBreak).length > 0 && (
+              <div className="col-span-2 border-t border-br pt-1.5">
+                <div className="mb-1 field-label">Transferencias por cuenta (ventas y abonos)</div>
+                <div className="space-y-1 text-[13px]">
+                  <TransferByAccount breakdown={agg.transferBreak} />
+                </div>
+              </div>
+            )}
             <div className="col-span-2 border-t border-br pt-1.5">
               <div className="field-label">Flujo neto</div>
               <div className={`font-mono text-[18px] font-extrabold ${agg.netDay >= 0 ? 'text-lime' : 'text-red'}`}>{formatMoney(agg.netDay)}</div>
@@ -180,7 +219,7 @@ function CierreZForm({ dayKey, onClose, onClosed }: Omit<CierreZModalProps, 'ope
         <button onClick={onClose} className="flex-1 rounded-[10px] border border-br2 py-2.5 text-[13px] text-txt2">
           Cancelar
         </button>
-        <button disabled={busy} onClick={confirm} className="flex-[2] rounded-[10px] bg-red py-2.5 text-[14px] font-extrabold text-on-solid disabled:opacity-60">
+        <button disabled={busy || pending > 0 || rejected > 0} onClick={confirm} className="flex-[2] rounded-[10px] bg-red py-2.5 text-[14px] font-extrabold text-on-solid disabled:opacity-60">
           Confirmar Cierre Z
         </button>
       </div>

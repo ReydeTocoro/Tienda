@@ -11,7 +11,7 @@ export interface FiadoGroup {
 /** Group fiado sales by customer (or free-text name) — legacy `getFiadoSales()` +
  * grouping logic reused across `renderFiados()`/`openFiadoDetail()` (index.html L4754-4844). */
 export function groupFiados(sales: Sale[]): FiadoGroup[] {
-  const fiadoSales = sales.filter((s) => s.payMethod === 'fiado')
+  const fiadoSales = sales.filter((s) => s.payMethod === 'fiado' && !s.voided)
   const map = new Map<string, FiadoGroup>()
   for (const s of fiadoSales) {
     const key = s.customerId || '_' + (s.fiadoName || 'Desconocido').toLowerCase()

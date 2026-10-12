@@ -65,6 +65,7 @@ export async function confirmCierre(sql: Sql, input: ConfirmCierreInput): Promis
     totalExOut: aggregate.totalExOut,
     netDay: aggregate.netDay,
     payBreak: aggregate.payBreak,
+    transferBreak: aggregate.transferBreak,
     arqueo: { efectivoSistema, efectivoFisico: fisico, diferencia, cuadre },
     traslado: traslado > 0 ? traslado : undefined,
     dejadoEnCaja: round2(fisico - traslado),
@@ -84,7 +85,7 @@ export async function confirmCierre(sql: Sql, input: ConfirmCierreInput): Promis
     if (!row) continue
     await putRow(sql, 'sales', 'id', s.id, { ...row, closedInCierreId: saved.id })
   }
-  for (const m of aggregate.movementsDay) {
+  for (const m of [...aggregate.movementsDay, ...aggregate.transferMovementsDay]) {
     if (m.id === undefined) continue
     const row = await getRow<CashMovement>(sql, 'cashMovements', 'id', m.id)
     if (!row) continue

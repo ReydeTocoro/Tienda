@@ -13,7 +13,8 @@ import { formatMoney } from '../../shared/lib/currency'
 import { nextSort, type SortState } from '../../shared/lib/sortRows'
 
 export function FiadosPage() {
-  const sales = useLiveQuery(() => db.sales.toArray(), [], []) as Sale[]
+  // Only the fiado sales (indexed): the rest of the history isn't read, and isn't re-read on every sale.
+  const sales = useLiveQuery(() => db.sales.where('payMethod').equals('fiado').toArray(), [], []) as Sale[]
   const customers = useLiveQuery(() => db.customers.toArray(), [], []) as Customer[]
   const [search, setSearch] = useState('')
   const [status, setStatus] = useState<FiadoStatusFilter>('todos')

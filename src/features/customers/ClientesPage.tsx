@@ -1,7 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import type { Customer } from '../../types/customer'
-import type { TierKey } from '../../shared/lib/loyalty'
 import { useCustomersWithSpent } from './hooks/useCustomersWithSpent'
 import { CustomerTable } from './components/CustomerTable'
 import { ClientFormSheet } from './components/ClientFormSheet'
@@ -15,17 +14,9 @@ import { nextSort, type SortState } from '../../shared/lib/sortRows'
 import { useCartStore } from '../../store/useCartStore'
 import { usePermission } from '../pin/usePermission'
 
-const TIERS: Array<{ key: TierKey; label: string }> = [
-  { key: 'nuevo', label: 'Nuevo' },
-  { key: 'bronce', label: 'Bronce' },
-  { key: 'plata', label: 'Plata' },
-  { key: 'oro', label: 'Oro' },
-]
-
 export function ClientesPage() {
   const list = useCustomersWithSpent()
   const [search, setSearch] = useState('')
-  const [tierFilter, setTierFilter] = useState<TierKey | 'todos'>('todos')
   const [sort, setSort] = useState<SortState<CustomerSortKey>>(DEFAULT_CUSTOMER_SORT)
   const [formOpen, setFormOpen] = useState(false)
   const [editing, setEditing] = useState<Customer | null>(null)
@@ -36,20 +27,12 @@ export function ClientesPage() {
 
   const totalRevenue = useMemo(() => list.reduce((a, c) => a + c.spent, 0), [list])
   const top = useMemo(() => (list.length ? list.reduce((a, c) => (c.spent > a.spent ? c : a), list[0]) : null), [list])
-  const tierCounts = useMemo(() => {
-    const m = new Map<TierKey, number>()
-    for (const r of list) m.set(r.tier.key, (m.get(r.tier.key) ?? 0) + 1)
-    return m
-  }, [list])
 
   const rows = useMemo(() => {
     const q = search.trim().toLowerCase()
-    const filtered = list.filter(
-      ({ customer: c, tier: t }) =>
-        (tierFilter === 'todos' || t.key === tierFilter) && (!q || c.name.toLowerCase().includes(q) || (c.cedula && c.cedula.includes(q)) || (c.phone && c.phone.includes(q))),
-    )
+    const filtered = list.filter(({ customer: c }) => !q || c.name.toLowerCase().includes(q) || (c.cedula && c.cedula.includes(q)) || (c.phone && c.phone.includes(q)))
     return sortCustomers(filtered, sort)
-  }, [list, search, tierFilter, sort])
+  }, [list, search, sort])
 
   const mayEdit = () => requirePermission('clientes.editar', 'Clientes', 'Crear o editar clientes requiere permiso.')
 
@@ -88,26 +71,18 @@ export function ClientesPage() {
 
         <div className="flex flex-wrap items-center gap-2">
           <SearchInput value={search} onChange={setSearch} historyKey="clientes" placeholder="Buscar nombre, cédula o teléfono..." />
-          <select value={tierFilter} onChange={(e) => setTierFilter(e.target.value as TierKey | 'todos')} aria-label="Filtrar por nivel" className="input w-auto min-w-[170px] py-2">
-            <option value="todos">Todos los niveles ({list.length})</option>
-            {TIERS.map((t) => (
-              <option key={t.key} value={t.key}>
-                {t.label} ({tierCounts.get(t.key) ?? 0})
-              </option>
-            ))}
-          </select>
         </div>
 
         {rows.length === 0 ? (
           <div className="flex flex-1 items-center justify-center rounded-xl border border-dashed border-br2 p-10 text-center text-[13px] text-muted">
-            {list.length === 0 ? 'Sin clientes aún — usa el botón + para agregar el primero.' : 'Ningún cliente coincide con la búsqueda o el nivel.'}
+            {list.length === 0 ? 'Sin clientes aún — usa el botón + para agregar el primero.' : 'Ningún cliente coincide con la búsqueda.'}
           </div>
         ) : (
           <CustomerTable
             rows={rows}
             sort={sort}
             onSort={(key) => setSort((s) => nextSort(s, key))}
-            resetKey={`${search}|${tierFilter}|${sort.key}|${sort.dir}`}
+            resetKey={`${search}|${sort.key}|${sort.dir}`}
             onOpen={setProfile}
             onEdit={openEdit}
             onSell={sell}

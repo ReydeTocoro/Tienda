@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { createBrowserRouter, Navigate } from 'react-router-dom'
+import { createBrowserRouter, createHashRouter, Navigate } from 'react-router-dom'
 import { AppShell } from './app/AppShell'
 import { VentaPage } from './features/pos/VentaPage'
 import { InventarioPage } from './features/inventory/InventarioPage'
@@ -24,7 +24,7 @@ function gated(to: string, page: ReactNode): ReactNode {
   )
 }
 
-export const router = createBrowserRouter([
+const routes = [
   {
     element: <AppShell />,
     children: [
@@ -41,4 +41,8 @@ export const router = createBrowserRouter([
       { path: '/configuracion', element: gated('/configuracion', <ConfiguracionPage />) },
     ],
   },
-])
+]
+
+// An installed app (the Windows .exe, the Android .apk — see VITE_PACKAGED in vite.config.ts) opens a file on the
+// device, not an address the server answers with index.html for any path: its screens live after the '#'.
+export const router = import.meta.env.VITE_PACKAGED === '1' ? createHashRouter(routes) : createBrowserRouter(routes)

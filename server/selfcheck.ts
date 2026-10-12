@@ -8,9 +8,17 @@ import { costOf } from './domain/secrets'
 import * as cash from './domain/cash'
 import * as buying from './domain/purchasing'
 import { confirmCierre } from './domain/cierre'
+import { addFiadoPago, correctSale, finalizeSale, voidSale } from './domain/sales'
+import { closingAggregate } from './domain/cierre'
+import { shareReceipt } from './domain/receipts'
+import { computeDayAggregate } from '../src/shared/lib/aggregation'
+import { getSpent } from '../src/shared/lib/customerSpend'
+import { lineDiscount, manualDiscountOf } from '../src/shared/lib/discounts'
+import { stockEffect } from '../src/shared/lib/saleStock'
 import { getRow, insertAutoRow, putRow, listAll } from './routes/generic'
 import { addDaysToKey, dueDateFrom } from '../src/shared/lib/cash'
 import { todayKey } from '../src/shared/lib/currency'
+import { needsOfRole, resolveRoles } from '../src/shared/lib/permissions'
 import type { Product } from '../src/types/product'
 import type { Sale } from '../src/types/sale'
 import type { CashMovement } from '../src/types/cash'
@@ -186,6 +194,244 @@ await fails(() => run((q) => cash.openCaja(q, { countedCash: 5000, by: 'Ana', ma
 const s2 = await run((q) => cash.openCaja(q, { countedCash: 5000, by: 'Ana' }))
 assert.equal(s2.openDiff, 0)
 ok('al día siguiente la caja abre con lo que quedó (sin diferencia)')
+
+// --- Corregir una factura: el redondeo del cobro se conserva, y no se vende lo que no hay -------
+const admin = { sessionId: 's', operator: { id: 'owner', name: 'Dueño', roleId: 'admin' }, needs: new Set<string>(needsOfRole(resolveRoles(undefined), 'admin')) }
+await putRow(db, 'products', 'code', 'R1', product('R1', 5, 5015)) // vende a 10.030
+const item = { code: 'R1', name: 'Prod R1', price: 10030, qty: 1, cost: 0, brand: '', unit: 'unidad', isFree: false }
+const rounded = await run((q) =>
+  finalizeSale(q, admin, { items: [item], subtotal: 10030, discount: 0, total: 10000, roundingAdjustment: -30, amountReceived: 10000, changeGiven: 0, payMethod: 'efectivo' }),
+)
+const menorAfterSale = await bal('menor')
+const untouched = await run((q) => correctSale(q, admin, rounded.id!, [item], 'solo reviso'))
+assert.equal(untouched.total, 10000, 'corregir sin cambiar nada deja el total redondeado que se cobró')
+assert.equal(await bal('menor'), menorAfterSale, 'y la caja no se mueve')
+const two = await run((q) => correctSale(q, admin, rounded.id!, [{ ...item, qty: 2 }], 'eran dos'))
+assert.equal(two.total, 20030, 'con un cambio real, el redondeo sigue: 2 × 10.030 − 30')
+assert.equal(await bal('menor'), menorAfterSale + 10030, 'la caja sube por la diferencia exacta del total')
+assert.equal(await stock('R1'), 3)
+await fails(() => run((q) => correctSale(q, admin, rounded.id!, [{ ...item, qty: 9 }], 'demasiados')), /Stock insuficiente de "Prod R1" \(quedan 5\)/, 'una corrección no vende lo que no hay')
+assert.equal(await stock('R1'), 3, 'rechazada: el inventario queda como estaba')
+assert.equal(await bal('menor'), menorAfterSale + 10030, 'y la caja también')
+ok('corregir una factura conserva el redondeo del cobro (la caja solo se mueve por lo que de verdad cambió) y no deja vender más de lo que hay')
+
+// --- Corregir y anular: el inventario y la caja siempre quedan como deben -------------------------
+// Lo que se teme de una corrección o una anulación es que el producto no vuelva al inventario o que la caja quede mal:
+// cada paso se comprueba contra las cifras reales (stock de cada producto, saldo de cada caja).
+await putRow(db, 'products', 'code', 'V1', product('V1', 10, 1000)) // vende a 2.000
+await putRow(db, 'products', 'code', 'V2', product('V2', 4, 500)) // vende a 1.000
+const line = (code: string, qty: number, price: number) => ({ code, name: `Prod ${code}`, price, qty, cost: 0, brand: '', unit: 'unidad', isFree: false })
+const sumOf = (items: Array<{ price: number; qty: number }>) => items.reduce((a, i) => a + i.price * i.qty, 0)
+const sellItems = (items: ReturnType<typeof line>[], payMethod: Sale['payMethod'] = 'efectivo', extra: object = {}) =>
+  run((q) => finalizeSale(q, admin, { items, subtotal: sumOf(items), discount: 0, total: sumOf(items), payMethod, ...extra }))
+
+// Cambiar lo que se vendió mueve el inventario en los dos sentidos, producto por producto.
+const inv = await sellItems([line('V1', 3, 2000)])
+assert.equal(await stock('V1'), 7)
+let menor = await bal('menor')
+await run((q) => correctSale(q, admin, inv.id!, [line('V1', 1, 2000), line('V2', 2, 1000)], 'cambio de productos'))
+assert.equal(await stock('V1'), 9, 'bajó de 3 a 1: 2 unidades vuelven al inventario')
+assert.equal(await stock('V2'), 2, 'el producto que se agregó sale del inventario')
+assert.equal(await bal('menor'), menor + 4000 - 6000, 'y la caja ajusta el total: de 6.000 a 4.000')
+await run((q) => correctSale(q, admin, inv.id!, [line('V1', 1, 2000), line('V1', 2, 1800)], 'el mismo producto en dos líneas'))
+assert.equal(await stock('V1'), 7, 'dos líneas del mismo producto suman: 1 + 2 = 3 salen')
+assert.equal(await stock('V2'), 4, 'quitar una línea devuelve todo lo que había tomado')
+await run((q) => correctSale(q, admin, inv.id!, [line('V2', 1, 1000)], 'solo queda uno'))
+assert.equal(await stock('V1'), 10, 'quitado del todo: todo vuelve')
+assert.equal(await stock('V2'), 3)
+ok('corregir una factura (cambiar cantidades, agregar, quitar, repetir un producto) deja el inventario y la caja exactamente donde deben quedar')
+
+// Lo que no se puede: vender lo que no hay, productos que no son del inventario, un motivo vacío, dejarla sin productos.
+menor = await bal('menor')
+await fails(() => run((q) => correctSale(q, admin, inv.id!, [line('V2', 5, 1000)], 'demasiados')), /Stock insuficiente de "Prod V2" \(quedan 4\)/, 'no se vende lo que no hay')
+await fails(() => run((q) => correctSale(q, admin, inv.id!, [line('V2', 1, 1000), line('NOPE', 1, 100)], 'x')), /ya no existe/, 'un código que no es del inventario')
+await fails(() => run((q) => correctSale(q, admin, inv.id!, [line('V2', 1, 1000), { ...line('CORR', 1, 100), name: 'Algo suelto', isFree: true }], 'x')), /no es un producto del inventario/, 'ni una línea libre nueva')
+await fails(() => run((q) => correctSale(q, admin, inv.id!, [line('V2', 1, 1000)], '  ')), /motivo/, 'sin motivo no se corrige')
+await fails(() => run((q) => correctSale(q, admin, inv.id!, [], 'x')), /sin productos/, 'ni se deja vacía: para eso está anular')
+assert.equal(await stock('V2'), 3, 'nada de eso cambió el inventario')
+assert.equal(await bal('menor'), menor, 'ni la caja')
+// `isFree` lo dice el navegador: no puede usarse para vender sin que baje el stock.
+await run((q) => correctSale(q, admin, inv.id!, [line('V2', 1, 1000), { ...line('V2', 2, 1000), isFree: true }], 'marcado como libre')) // 1 + 2 = 3 unidades
+assert.equal(await stock('V2'), 1, 'una línea marcada como libre igual descuenta: 3 salen de las 4 que había')
+ok('una corrección no vende lo que no hay, no acepta productos que no son del inventario ni líneas "libres", exige motivo y no se puede usar isFree para saltarse el stock')
+
+// Anular: todo vuelve, el dinero sale de la caja por donde entró, y la factura queda como historial.
+menor = await bal('menor')
+const total = (await getRow<Sale>(db, 'sales', 'id', inv.id!))!.total
+assert.equal(total, 3000)
+await fails(() => run((q) => voidSale(q, admin, inv.id!, '')), /motivo/, 'anular también exige motivo')
+const voided = await run((q) => voidSale(q, admin, inv.id!, 'el cliente devolvió todo'))
+assert.equal(voided.voided, true)
+assert.equal(voided.voidReason, 'el cliente devolvió todo')
+assert.equal(voided.voidedBy, 'Dueño')
+assert.equal(await stock('V2'), 4, 'las 3 unidades vuelven al inventario')
+assert.equal(await stock('V1'), 10)
+assert.equal(await bal('menor'), menor - 3000, 'el total de la factura (ya corregido) sale de la caja')
+assert.equal((voided as Sale & { ganancia?: number }).ganancia, undefined, 'lo que vuelve al navegador no trae la ganancia')
+const audit = await listAll<{ type: string; saleId: number; user: string }>(db, 'auditLog')
+assert.ok(audit.some((a) => a.type === 'anulacion_venta' && a.saleId === inv.id && a.user === 'Dueño'), 'queda en el historial de auditoría, firmado')
+await run((q) => voidSale(q, admin, inv.id!, 'otra vez')) // un segundo clic o una respuesta perdida: no pasa nada
+assert.equal(await stock('V2'), 4, 'anular dos veces no devuelve dos veces')
+assert.equal(await bal('menor'), menor - 3000, 'ni saca el dinero dos veces')
+await fails(() => run((q) => correctSale(q, admin, inv.id!, [line('V2', 1, 1000)], 'x')), /anulada/, 'una factura anulada ya no se corrige')
+ok('anular una factura devuelve todo al inventario, saca de la caja lo cobrado una sola vez, la deja marcada con quién y por qué, y ya no se puede corregir')
+
+// Una factura fiada con abonos: lo que el cliente ya pagó se le devuelve, por la caja por donde entró; lo condonado no mueve dinero.
+const fiado = await sellItems([line('V1', 2, 2000)], 'fiado', { fiadoName: 'Don Pepe' })
+await run((q) => addFiadoPago(q, admin, fiado.id!, { amount: 1500, date: '', note: '', method: 'efectivo' }))
+await run((q) => addFiadoPago(q, admin, fiado.id!, { amount: 500, date: '', note: '', method: 'transferencia' }))
+await run((q) => addFiadoPago(q, admin, fiado.id!, { amount: 100, date: '', note: 'condonado', condonado: true }))
+await fails(() => run((q) => correctSale(q, admin, fiado.id!, [line('V1', 1, 2000)], 'menos')), /ya tiene abonos por \$2\.100/, 'el total de un fiado no baja de lo ya abonado')
+assert.equal(await stock('V1'), 8, 'rechazada: el inventario sigue igual')
+const menorF = await bal('menor')
+const mayorF = await bal('mayor')
+await run((q) => voidSale(q, admin, fiado.id!, 'error de digitación'))
+assert.equal(await stock('V1'), 10, 'la mercancía de un fiado anulado vuelve')
+assert.equal(await bal('menor'), menorF - 1500, 'el abono en efectivo se devuelve por la Caja Menor')
+assert.equal(await bal('mayor'), mayorF - 500, 'el de transferencia, por la Caja Mayor')
+await fails(() => run((q) => addFiadoPago(q, admin, fiado.id!, { amount: 10, date: '', note: '', method: 'efectivo' })), /anulada/, 'a una factura anulada no se le abona')
+ok('anular un fiado con abonos devuelve lo abonado por la caja correcta (lo condonado no mueve dinero) y deja de deber; no admite más abonos')
+
+// Una factura anulada no cuenta en ningún total: ni en el día, ni en el cierre, ni en lo gastado por el cliente.
+const day = todayKey()
+const fresh = await sellItems([line('V1', 1, 2000)])
+assert.ok((await closingAggregate(db, day)).ventasDay.some((s) => s.id === fresh.id), 'antes de anularla, el cierre del día la cuenta')
+await run((q) => voidSale(q, admin, fresh.id!, 'prueba'))
+const agg = await closingAggregate(db, day)
+assert.ok(!agg.ventasDay.some((s) => s.id === fresh.id), 'anulada, el cierre del día ya no la cuenta')
+const mk = (id: number, total: number, extra: Partial<Sale> = {}): Sale => ({ id, items: [], subtotal: total, discount: 0, total, ganancia: 100, payMethod: 'efectivo', date: new Date().toISOString(), dayKey: day, customerId: 'C9', ...extra })
+const day2 = computeDayAggregate(day, [mk(1, 5000), mk(2, 3000, { voided: true })], [])
+assert.equal(day2.totalVentas, 5000, 'el reporte del día no suma la anulada')
+assert.equal(day2.numTx, 1)
+assert.equal(day2.totalGanancia, 100)
+assert.equal(getSpent([mk(1, 5000), mk(2, 3000, { voided: true })], 'C9'), 5000, 'lo gastado por el cliente tampoco')
+ok('una factura anulada no cuenta en el cierre del día, el reporte ni lo gastado por el cliente')
+
+// El inventario puede haber cambiado desde la venta: un producto borrado no impide corregir ni anular lo demás.
+await putRow(db, 'products', 'code', 'V3', product('V3', 6, 100))
+const old = await sellItems([line('V3', 2, 200), line('V2', 1, 1000)])
+await db.query(`delete from products where code = 'V3'`)
+const stockV2 = await stock('V2')
+await run((q) => correctSale(q, admin, old.id!, [line('V3', 2, 250), line('V2', 1, 1000)], 'el precio estaba mal'))
+assert.equal(await stock('V2'), stockV2, 'se corrige el precio de la línea cuyo producto ya no existe, sin tocar lo demás')
+await run((q) => voidSale(q, admin, old.id!, 'prueba'))
+assert.equal(await stock('V2'), stockV2 + 1, 'y al anular vuelve lo que sí existe')
+ok('si un producto de la factura fue borrado del inventario, la factura se corrige y se anula igual con lo demás')
+
+// El enlace de recibo que ya se mandó al cliente: una corrección lo actualiza y una anulación lo retira.
+const shared = await sellItems([line('V1', 1, 2000)])
+await run((q) => shareReceipt(q, shared.id!))
+await run((q) => correctSale(q, admin, shared.id!, [line('V1', 2, 2000)], 'eran dos'))
+const linkTotal = async () => (await db.query<{ total: number }>(`select (data ->> 'total')::float8 as total from private.shared_receipts where sale_id = $1`, [shared.id]))[0]?.total
+assert.equal(await linkTotal(), 4000, 'el enlace ya enviado muestra la factura corregida')
+await run((q) => voidSale(q, admin, shared.id!, 'prueba'))
+assert.equal(await linkTotal(), undefined, 'anulada, el enlace se retira')
+await fails(() => run((q) => shareReceipt(q, shared.id!)), /anulada/, 'y no se puede volver a compartir')
+ok('el enlace de recibo enviado se actualiza al corregir la factura y se retira al anularla')
+
+// Una sola regla para la pantalla y el servidor: qué le pasa al inventario.
+assert.deepEqual(
+  stockEffect([line('A', 3, 1), line('B', 1, 1)], [line('A', 1, 1), line('A', 2, 1), line('C', 4, 1)]).map((e) => [e.code, e.delta]),
+  [['B', 1], ['C', -4]],
+  'lo que no cambia no aparece; el mismo producto en dos líneas se suma',
+)
+assert.deepEqual(stockEffect([line('A', 2, 1), { ...line('CORR', 1, 1), isFree: true }], []).map((e) => [e.code, e.delta]), [['A', 2]], 'las líneas libres no tienen estante')
+ok('stockEffect: la lista de cambios al inventario suma por producto y deja fuera lo que no cambia y las líneas libres')
+
+// --- Transferencias: la cuenta (Nequi / Bancolombia) viaja con el dinero y el cierre la tiene en cuenta -------
+await putRow(db, 'products', 'code', 'T1', product('T1', 20, 1000))
+const tline = line('T1', 2, 2000)
+const movementsOfSale = (id: number) => movements().then((all) => all.filter((m) => m.refId === id))
+await fails(() => sellItems([line('T1', 1, 2000)], 'transferencia', { transferAccount: 'banco-inventado' }), /cuenta de la transferencia no es válida/, 'una cuenta que no existe se rechaza')
+const viaNequi = await sellItems([line('T1', 1, 2000)], 'transferencia', { transferAccount: 'nequi' })
+const viaBanco = await sellItems([tline], 'transferencia', { transferAccount: 'bancolombia' })
+const viaNada = await sellItems([line('T1', 1, 2000)], 'transferencia') // una pantalla vieja no la pregunta
+assert.equal(viaNequi.transferAccount, 'nequi')
+assert.equal(viaNada.transferAccount, undefined, 'sin cuenta se acepta (pantallas viejas), y queda sin cuenta')
+const cash1 = await sellItems([line('T1', 1, 2000)], 'efectivo', { transferAccount: 'nequi' })
+assert.equal(cash1.transferAccount, undefined, 'la cuenta solo cuenta en una transferencia')
+const [mNequi] = await movementsOfSale(viaNequi.id!)
+assert.deepEqual([mNequi.caja, mNequi.medio, mNequi.cuenta, mNequi.amount], ['mayor', 'transferencia', 'nequi', 2000], 'el dinero entra a la Caja Mayor, a la cuenta elegida')
+// corregir y anular conservan la cuenta en el libro
+await run((q) => correctSale(q, admin, viaBanco.id!, [line('T1', 1, 2000)], 'era una sola'))
+await run((q) => voidSale(q, admin, viaNada.id!, 'prueba'))
+const movs = await movements()
+assert.equal(movs.find((m) => m.refId === viaBanco.id && m.type === 'ajuste_venta')?.cuenta, 'bancolombia', 'la corrección ajusta la misma cuenta')
+assert.equal(movs.find((m) => m.refId === viaNada.id && m.type === 'ajuste_venta')?.cuenta, undefined, 'y una venta sin cuenta sigue sin cuenta')
+// un abono por transferencia dice su cuenta, y si la factura se anula se devuelve por esa misma cuenta
+const fiadoT = await sellItems([line('T1', 2, 2000)], 'fiado', { fiadoName: 'Doña Ana' })
+await run((q) => addFiadoPago(q, admin, fiadoT.id!, { amount: 1000, date: '', note: '', method: 'transferencia', account: 'nequi' }))
+await fails(() => run((q) => addFiadoPago(q, admin, fiadoT.id!, { amount: 100, date: '', note: '', method: 'transferencia', account: 'otra' as never })), /cuenta de la transferencia no es válida/, 'el abono tampoco admite una cuenta inventada')
+await run((q) => addFiadoPago(q, admin, fiadoT.id!, { amount: 500, date: '', note: '', method: 'transferencia', account: 'bancolombia' }))
+await run((q) => addFiadoPago(q, admin, fiadoT.id!, { amount: 200, date: '', note: '', method: 'efectivo', account: 'nequi' }))
+const abonos = (await movements()).filter((m) => m.refId === fiadoT.id && m.type === 'abono_fiado')
+assert.deepEqual(abonos.map((m) => [m.medio, m.cuenta]), [['transferencia', 'nequi'], ['transferencia', 'bancolombia'], ['efectivo', undefined]], 'cada abono lleva su cuenta; el de efectivo no')
+await run((q) => voidSale(q, admin, fiadoT.id!, 'error'))
+const devueltos = (await movements()).filter((m) => m.refId === fiadoT.id && m.type === 'egreso')
+assert.deepEqual(devueltos.map((m) => [m.medio, m.cuenta, m.amount]).sort(), [['efectivo', undefined, 200], ['transferencia', 'bancolombia', 500], ['transferencia', 'nequi', 1000]].sort(), 'anulada, cada abono vuelve por su caja y su cuenta')
+ok('una transferencia lleva su cuenta (Nequi/Bancolombia) al libro de la Caja Mayor; corregir y anular la conservan, un abono por transferencia dice la suya y se devuelve por ella, y una cuenta inventada se rechaza')
+
+// El cierre de caja las tiene en cuenta: lo que entró por cada cuenta (ventas y abonos, ya con lo corregido y lo devuelto).
+const dayT = todayKey()
+const fiadoU = await sellItems([line('T1', 1, 2000)], 'fiado', { fiadoName: 'Don Luis' })
+await run((q) => addFiadoPago(q, admin, fiadoU.id!, { amount: 700, date: '', note: '', method: 'transferencia', account: 'nequi' })) // este abono no se devuelve
+const aggT = await closingAggregate(db, dayT)
+assert.equal(aggT.transferBreak.nequi, 2000 + 1000 - 1000 + 700, 'Nequi: la venta de 2.000 + el abono de 1.000 − lo devuelto de ese abono + otro abono de 700')
+assert.equal(aggT.transferBreak.bancolombia, 2000 + 500 - 500, 'Bancolombia: la venta corregida a 2.000 + el abono de 500 − lo devuelto')
+const anuladaAgg = computeDayAggregate(dayT, [{ ...viaNequi, voided: true, dayKey: dayT } as Sale], [], {})
+assert.equal(anuladaAgg.transferBreak.nequi, 0, 'una venta anulada no cuenta en ninguna cuenta')
+const fisicoT = await bal('menor')
+const cierreT = await run((q) => confirmCierre(q, { dayKey: dayT, cajero: 'Ana', notas: '', efectivoFisico: fisicoT, trasladar: 0 }))
+assert.deepEqual([cierreT.transferBreak?.nequi, cierreT.transferBreak?.bancolombia], [2700, 2000], 'el cierre archivado guarda lo que entró por cada cuenta')
+const afterT = await closingAggregate(db, dayT)
+assert.equal(afterT.transferBreak.nequi, 0, 'y lo ya cerrado no se cuenta otra vez (los movimientos de la Caja Mayor también quedan marcados)')
+ok('el cierre del día suma lo que entró por cada cuenta, con lo corregido y lo devuelto, y no cuenta lo anulado')
+
+// --- Descuento en dinero sobre un producto de la venta -----------------------------------------------
+await putRow(db, 'products', 'code', 'D1', product('D1', 20, 500)) // vende a 1.000
+const dLine = (code: string, qty: number, price: number, discount?: number) => ({ ...line(code, qty, price), ...(discount !== undefined ? { discount } : {}) })
+const sellOff = (items: ReturnType<typeof dLine>[], discount: number, actor = admin) =>
+  run((q) => finalizeSale(q, actor, { items, subtotal: sumOf(items), discount, total: sumOf(items) - discount, payMethod: 'efectivo' }))
+menor = await bal('menor')
+const conDesc = await sellOff([dLine('D1', 2, 1000, 500), dLine('T1', 1, 2000)], 500)
+assert.equal(conDesc.total, 3500, 'el total es lo de los productos menos el descuento')
+assert.equal(conDesc.discount, 500)
+assert.equal(conDesc.items.find((i) => i.code === 'D1')?.discount, 500, 'la venta guarda a qué producto se le descontó')
+assert.equal(conDesc.items.find((i) => i.code === 'T1')?.discount, undefined, 'y los demás quedan sin descuento')
+assert.equal(await bal('menor'), menor + 3500, 'la caja recibe lo cobrado, ya sin el descuento')
+const profitOf = async (id: number) => Number((await db.query<{ g: string }>(`select data ->> 'ganancia' as g from profits where key = $1`, [`sale:${id}`]))[0].g)
+assert.equal(await profitOf(conDesc.id!), 3500 - (2 * 500 + 1000), 'la ganancia es lo cobrado menos lo que costó la mercancía: el descuento sale de ella')
+await fails(() => sellOff([dLine('D1', 1, 1000, 1500)], 1500), /descuento de "Prod D1" no es válido/, 'no se descuenta más de lo que vale la línea')
+await fails(() => sellOff([dLine('D1', 1, 1000, -5)], 0), /no es válido/, 'ni un descuento negativo')
+await fails(() => sellOff([dLine('D1', 2, 1000, 600), dLine('T1', 1, 2000, 300)], 700), /no cuadran con el descuento de la venta/, 'los descuentos de las líneas no pueden sumar más que el de la venta')
+const sinPermiso = { ...admin, needs: new Set<string>() }
+const stockD1 = await stock('D1')
+await assert.rejects(() => sellOff([dLine('D1', 1, 1000, 200)], 200, sinPermiso), 'sin permiso para descontar no se descuenta')
+assert.equal(await stock('D1'), stockD1, 'y no se vendió nada')
+// corregir deja a cada línea lo que se le descontó, sin pasar de lo que la línea vale ahora
+await run((q) => correctSale(q, admin, conDesc.id!, [dLine('D1', 1, 1000, 500), line('T1', 1, 2000)], 'una sola'))
+assert.equal((await getRow<Sale>(db, 'sales', 'id', conDesc.id!))!.items.find((i) => i.code === 'D1')?.discount, 500, 'la corrección conserva el descuento de la línea')
+assert.equal(await profitOf(conDesc.id!), 2500 - (500 + 1000), 'y la ganancia de la factura corregida también descuenta lo que se rebajó')
+// El costo de una factura es el de cuando se vendió: corregirla no lo reescribe aunque el producto haya cambiado de costo, y sin cambios la ganancia queda exacta.
+await putRow(db, 'products', 'code', 'H1', product('H1', 10, 1000)) // vende a 2.000 y cuesta 1.000
+const hist = await sellItems([line('H1', 1, 2000)])
+const gHist = await profitOf(hist.id!)
+await run((q) => correctSale(q, admin, hist.id!, [line('H1', 1, 2000)], 'solo reviso'))
+assert.equal(await profitOf(hist.id!), gHist, 'corregir sin cambiar nada deja la ganancia exactamente como estaba')
+await lite.query(`update public."productCosts" set data = jsonb_set(data, '{cost}', '1500') where code = 'H1'`)
+await run((q) => correctSale(q, admin, hist.id!, [line('H1', 2, 2000)], 'eran dos'))
+assert.equal(await profitOf(hist.id!), 4000 - 2 * 1000, 'el costo de la línea es el de cuando se vendió (1.000), no el de hoy (1.500)')
+await run((q) => correctSale(q, admin, conDesc.id!, [dLine('D1', 1, 300, 500), line('T1', 1, 2000)], 'precio más bajo'))
+assert.equal((await getRow<Sale>(db, 'sales', 'id', conDesc.id!))!.items.find((i) => i.code === 'D1')?.discount, 300, 'y si la línea ya vale menos, se corta a lo que vale')
+// las cuentas del carrito: el descuento de una línea nunca pasa de lo que vale la línea
+assert.equal(manualDiscountOf([{ price: 1000, qty: 2, discount: 3000 }, { price: 500, qty: 1, discount: 100 }]), 2100, 'cada línea cuenta, como mucho, lo que vale')
+assert.equal(lineDiscount({ price: 1000, qty: 1 }), 0)
+ok('un descuento en dinero se aplica a un producto de la venta: se guarda en su línea y en el total, no puede pasar de lo que vale la línea ni sumar más que el de la venta, pide el permiso de descontar, y corregir lo conserva')
+
+// --- Egresos: la categoría tiene que ser una de las conocidas ------------------------------------
+await fails(() => run((q) => cash.registerMovement(q, { caja: 'menor', direction: 'out', amount: 10, concept: 'x', category: 'inventada' as never })), /categoría/i, 'categoría desconocida')
+await run((q) => cash.registerMovement(q, { caja: 'menor', direction: 'out', amount: 10, concept: 'x', category: 'mantenimiento' }))
+ok('un egreso solo acepta categorías conocidas')
 
 await db.end()
 console.log(`\nTodo en orden: ${n} comprobaciones del dinero pasaron.`)

@@ -7,6 +7,7 @@ import type { EntradaRecord } from '../types/entrada'
 import type { Settings } from '../types/settings'
 import type { Usuario } from '../types/usuario'
 import type { CajaState } from '../types/secrets'
+import type { OutboxSale } from '../types/outbox'
 
 export class TiendaDB extends Dexie {
   products!: EntityTable<Product, 'code'>
@@ -17,6 +18,7 @@ export class TiendaDB extends Dexie {
   settings!: EntityTable<Settings, 'key'>
   usuarios!: EntityTable<Usuario, 'id'>
   cajaState!: EntityTable<CajaState, 'key'>
+  outbox!: EntityTable<OutboxSale, 'seq'>
 
   constructor() {
     super('tienda-pro')
@@ -65,6 +67,11 @@ export class TiendaDB extends Dexie {
       purchaseOrders: null,
       payables: null,
       cajaState: '&key',
+    })
+    // v7: sales made without internet wait here until the server has them (src/offline). On this device
+    // only — the server never sees this table, and a sale leaves it once the server confirms it.
+    this.version(7).stores({
+      outbox: '++seq, &clientId, status, createdAt',
     })
   }
 }

@@ -9,6 +9,11 @@ const AUTH_ERRORS: Record<string, string> = {
   'Email not confirmed': 'Ese correo aún no está confirmado',
 }
 
+const NO_INTERNET = 'Sin conexión con el servidor: para iniciar sesión hace falta internet. Revisa la conexión e inténtalo de nuevo.'
+
+/** A sign-in that never gets an answer (a connection that leads nowhere) must end, not spin for minutes. */
+const SIGN_IN_PATIENCE_MS = 20_000
+
 /** The login screen, shown until someone signs in on this device — each person with their own
  * account: the owner's, or the one an administrator gave them in Configuración → Usuarios. Whoever
  * signs in is who works here, until they sign out ("Cambiar de usuario"). */
@@ -23,9 +28,14 @@ export function LoginPage({ notice }: { notice?: string }) {
     e.preventDefault()
     setBusy(true)
     setError('')
-    const { error: authError } = await supabase.auth.signInWithPassword({ email: email.trim(), password })
+    const timedOut = Symbol('timeout')
+    const answer = await Promise.race([
+      supabase.auth.signInWithPassword({ email: email.trim(), password }),
+      new Promise<typeof timedOut>((resolve) => setTimeout(() => resolve(timedOut), SIGN_IN_PATIENCE_MS)),
+    ])
     setBusy(false)
-    if (authError) setError(AUTH_ERRORS[authError.message] ?? authError.message)
+    if (answer === timedOut) setError(NO_INTERNET)
+    else if (answer.error) setError(answer.error.name === 'AuthRetryableFetchError' ? NO_INTERNET : (AUTH_ERRORS[answer.error.message] ?? answer.error.message))
     // A fresh sign-in starts the inactivity count from now.
     else markActive()
   }

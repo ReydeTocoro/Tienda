@@ -50,7 +50,9 @@ export function supabaseAccounts(supabaseUrl: string, secretKey: string): Accoun
   async function call<T>(method: string, path: string, body?: unknown): Promise<T> {
     let res: Response
     try {
-      res = await fetch(`${supabaseUrl}/auth/v1/admin${path}`, { method, headers, body: body === undefined ? undefined : JSON.stringify(body) })
+      // These calls run inside the transaction that holds the write lock: one that never answers would
+      // leave every sale waiting, so each gets a few seconds and no more.
+      res = await fetch(`${supabaseUrl}/auth/v1/admin${path}`, { method, headers, body: body === undefined ? undefined : JSON.stringify(body), signal: AbortSignal.timeout(8000) })
     } catch {
       throw new HttpError(503, 'No se pudo conectar con Supabase para guardar la cuenta: inténtalo de nuevo')
     }

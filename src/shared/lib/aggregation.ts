@@ -1,5 +1,6 @@
 import type { Sale, PayMethod } from '../../types/sale'
 import type { CashMovement, MovementType } from '../../types/cash'
+import { emptyTransferBreak, type TransferBreak } from './transferAccounts'
 
 export type PayBreak = Record<PayMethod, number>
 
@@ -18,6 +19,11 @@ export interface DayAggregate {
   netDay: number
   payBreak: PayBreak
   fiadoTotalDay: number
+  /** What came in by transfer, account by account: the day's transfer sales, plus the transfer payments of fiados and
+   * the ones handed back (those are movements of the Caja Mayor, which `movementsDay` leaves out). */
+  transferBreak: TransferBreak
+  /** The Caja Mayor movements behind `transferBreak`, so a Cierre Z can mark them as closed like the rest. */
+  transferMovementsDay: CashMovement[]
   /** What actually landed in the register (efectivo + transferencia — fiado isn't cash yet). */
   cobradoReal: number
   /** netDay minus today's new fiado (money that's owed but not in hand). */
@@ -48,8 +54,18 @@ export function computeDayAggregate(
   const onlyOpen = options.onlyOpen ?? false
   const isOpen = (closedInCierreId?: number) => !onlyOpen || closedInCierreId == null
 
-  const ventasDay = sales.filter((s) => s.dayKey === dayKey && isOpen(s.closedInCierreId))
+  // An annulled invoice is history: it is in no total, count or list of the day.
+  const ventasDay = sales.filter((s) => s.dayKey === dayKey && !s.voided && isOpen(s.closedInCierreId))
   const movementsDay = movements.filter((m) => m.caja === 'menor' && m.dayKey === dayKey && DAY_FLOW_TYPES.has(m.type) && isOpen(m.closedInCierreId))
+
+  // Sales are counted from the sales table (corrections and annulments already in their total), so only the payments
+    // of fiados and the refunds of them are taken from the movements.
+  const transferMovementsDay = movements.filter(
+    (m) => m.medio === 'transferencia' && (m.type === 'abono_fiado' || m.type === 'egreso') && m.dayKey === dayKey && isOpen(m.closedInCierreId),
+  )
+  const transferBreak = emptyTransferBreak()
+  for (const s of ventasDay) if (s.payMethod === 'transferencia') transferBreak[s.transferAccount ?? 'sin'] += s.total
+  for (const m of transferMovementsDay) transferBreak[m.cuenta ?? 'sin'] += m.direction === 'in' ? m.amount : -m.amount
 
   const totalVentas = ventasDay.reduce((a, s) => a + s.total, 0)
   const totalGanancia = ventasDay.reduce((a, s) => a + (s.ganancia || 0), 0)
@@ -74,6 +90,8 @@ export function computeDayAggregate(
     dayKey,
     ventasDay,
     movementsDay,
+    transferBreak,
+    transferMovementsDay,
     totalVentas,
     totalGanancia,
     totalDescuentos,

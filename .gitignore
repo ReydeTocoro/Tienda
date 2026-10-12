@@ -8,3 +8,4 @@ MIOS/
 .firebase/
 firebase-debug.log*
 supabase/.temp/
+inventario/

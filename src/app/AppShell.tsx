@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react'
 import { Outlet } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { Header } from './Header'
+import { BusyBar } from './BusyBar'
 import { BottomNav } from './BottomNav'
 import { DesktopTabs } from './DesktopTabs'
 import { ToastHost } from '../shared/components/ToastHost'
@@ -13,7 +14,9 @@ import { getSettings } from '../db/repositories/settings'
 import { useScannerStore } from '../store/useScannerStore'
 import { useThemeStore } from '../store/useThemeStore'
 import { startSync } from '../sync'
-import { warmUpApi } from '../api/client'
+import { startOffline } from '../offline'
+import { ApiError, NetworkError, warmUpApi } from '../api/client'
+import { toast } from '../store/useToastStore'
 
 /** Mobile: header on top, single content column, thumb bar (`BottomNav`) at the bottom.
  * Desktop (`md:` and up): `DesktopTabs` takes over as the nav chrome instead, a horizontal tab
@@ -27,6 +30,19 @@ export function AppShell() {
   useEffect(() => {
     startSync()
     warmUpApi()
+    return startOffline()
+  }, [])
+
+  // A save that fails (no internet, the server refusing) and that nobody was waiting to catch would otherwise do
+  // nothing at all on screen: the person presses the button and sees no answer. Say what happened instead.
+  useEffect(() => {
+    const onRejected = (e: PromiseRejectionEvent) => {
+      if (!(e.reason instanceof NetworkError || e.reason instanceof ApiError)) return
+      e.preventDefault()
+      toast(e.reason.message, 'orange')
+    }
+    window.addEventListener('unhandledrejection', onRejected)
+    return () => window.removeEventListener('unhandledrejection', onRejected)
   }, [])
 
   const settings = useLiveQuery(() => getSettings())
@@ -56,6 +72,7 @@ export function AppShell() {
 
   return (
     <div className="flex h-full flex-col bg-bg text-txt">
+      <BusyBar />
       <DesktopTabs />
       <Header />
       <main className="min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden">

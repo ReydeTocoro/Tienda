@@ -37,9 +37,9 @@ export interface Actor {
  * open). Only a cleanup: the binding is worth nothing without that session's own sign-in. */
 export const SESSION_TTL_SECONDS = 12 * 60 * 60
 
-/** Sale steps (discount, fiado, changing the total, an unregistered product) wait for their sale and
- * are spent by it; any other approval lets its step through for a few minutes (a form being filled). */
-export const SPENT_BY_SALE = new Set<Need>(['ventas.descuentos', 'ventas.fiar', 'ventas.cambiarTotal', 'ventas.productoLibre'])
+/** Sale steps (discount, fiado, changing the total) wait for their sale and are spent by it; any other
+ * approval lets its step through for a few minutes (a form being filled). */
+export const SPENT_BY_SALE = new Set<Need>(['ventas.descuentos', 'ventas.fiar', 'ventas.cambiarTotal'])
 const SALE_APPROVAL_SECONDS = 15 * 60
 const APPROVAL_SECONDS = 5 * 60
 
@@ -76,15 +76,52 @@ async function ownerOperator(q: Sql, staffName?: string | null): Promise<Operato
 
 // ------------------------------------------------------------------------------ the account
 
-/** Who signs in with this email: an owner, or the active user it belongs to — else nobody. */
-export async function accountOperator(q: Sql, email: string): Promise<Operator | null> {
-  const [owner] = await q.query<{ name: string | null }>(`select name from public.staff where lower(email) = lower($1)`, [email])
-  if (owner) return ownerOperator(q, owner.name)
-  const [u] = await q.query<{ data: Usuario }>(
-    `select data from public.usuarios where lower(data ->> 'email') = lower($1) and (data -> 'active') = 'true'::jsonb`,
+interface Account {
+  /** Who signs in with this email: an owner, or the active user it belongs to — else nobody. */
+  operator: Operator | null
+  settings: Settings | null
+}
+
+/** The account of an email and the store's settings (which carry the roles and the owner's name) in ONE
+ * round trip: every request needs both, and before this they cost three. */
+async function accountOf(q: Sql, email: string): Promise<Account> {
+  const [r] = await q.query<{ is_owner: boolean; staff_name: string | null; usuario: Usuario | null; settings: Settings | null }>(
+    `select exists (select 1 from public.staff where lower(email) = lower($1)) as is_owner,
+            (select name from public.staff where lower(email) = lower($1) limit 1) as staff_name,
+            (select data from public.usuarios where lower(data ->> 'email') = lower($1) and (data -> 'active') = 'true'::jsonb limit 1) as usuario,
+            (select data from public.settings where key = 'main') as settings`,
     [email],
   )
-  return u ? { id: u.data.id, name: u.data.name, roleId: u.data.role } : null
+  if (r.is_owner) {
+    if (!r.settings) throw new HttpError(500, 'Faltan los ajustes de la tienda')
+    return { operator: { id: OWNER_ID, name: r.settings.owner?.name?.trim() || r.staff_name?.trim() || OWNER_NAME, roleId: ADMIN_ROLE_ID }, settings: r.settings }
+  }
+  return { operator: r.usuario ? { id: r.usuario.id, name: r.usuario.name, roleId: r.usuario.role } : null, settings: r.settings }
+}
+
+/** Who signs in with this email: an owner, or the active user it belongs to — else nobody. */
+export async function accountOperator(q: Sql, email: string): Promise<Operator | null> {
+  return (await accountOf(q, email)).operator
+}
+
+/** A person by id (the owner's `OWNER_ID`, or a usuario's), with what their role lets them do — nobody
+ * if that user is gone or inactive. For a sale made without internet, sent later by whoever was signed in
+ * then: its permissions are those of the person who made it, not of who sends it. */
+export async function operatorById(q: Sql, id: string): Promise<{ operator: Operator; needs: Set<string> } | null> {
+  const [r] = await q.query<{ usuario: Usuario | null; settings: Settings | null; staff_name: string | null }>(
+    `select (select data from public.usuarios where id = $1) as usuario,
+            (select data from public.settings where key = 'main') as settings,
+            (select name from public.staff order by created_at, email limit 1) as staff_name`,
+    [id],
+  )
+  if (!r.settings) return null
+  const roles = resolveRoles(r.settings.roles)
+  if (id === OWNER_ID) {
+    const name = r.settings.owner?.name?.trim() || r.staff_name?.trim() || OWNER_NAME
+    return { operator: { id: OWNER_ID, name, roleId: ADMIN_ROLE_ID }, needs: new Set(needsOfRole(roles, ADMIN_ROLE_ID)) }
+  }
+  if (!r.usuario || !r.usuario.active) return null
+  return { operator: { id: r.usuario.id, name: r.usuario.name, roleId: r.usuario.role }, needs: new Set(needsOfRole(roles, r.usuario.role)) }
 }
 
 /** Whether this signed-in session may use the store: the account is an owner's or an active user's,
@@ -103,9 +140,10 @@ export async function checkAccount(q: Sql, auth: AuthInfo): Promise<void> {
 
 /** Who is behind a request: the person whose account is signed in on that device. */
 export async function actorOf(q: Sql, auth: AuthInfo): Promise<Actor> {
-  const operator = await accountOperator(q, auth.email)
+  const { operator, settings } = await accountOf(q, auth.email)
   if (!operator) throw new HttpError(403, 'Esta cuenta no tiene acceso a la tienda')
-  return { sessionId: auth.sessionId, operator, needs: new Set(needsOfRole(await rolesOf(q), operator.roleId)) }
+  if (!settings) throw new HttpError(500, 'Faltan los ajustes de la tienda')
+  return { sessionId: auth.sessionId, operator, needs: new Set(needsOfRole(resolveRoles(settings.roles), operator.roleId)) }
 }
 
 /** Whether the actor may do it on their own (no approval) — for what a response may show. */
@@ -129,10 +167,13 @@ export async function requireNeed(q: Sql, actor: Actor, need: Need): Promise<str
   throw new HttpError(403, need === 'admin' ? 'Esto solo lo puede hacer un administrador' : `"${permissionLabel(need)}" necesita la autorización de alguien con permiso`, { need })
 }
 
+/** The three cleanups in one statement (a data-modifying CTE runs even when nothing reads it). */
 async function sweep(q: Sql): Promise<void> {
-  await q.query(`delete from private.counter_sessions where expires_at < now() - interval '1 day'`)
-  await q.query(`delete from private.approvals where expires_at < now()`)
-  await q.query(`delete from private.pin_guard where scope <> 'global' and window_start < now() - interval '1 day' and (locked_until is null or locked_until < now())`)
+  await q.query(
+    `with s as (delete from private.counter_sessions where expires_at < now() - interval '1 day'),
+          a as (delete from private.approvals where expires_at < now())
+     delete from private.pin_guard where scope <> 'global' and window_start < now() - interval '1 day' and (locked_until is null or locked_until < now())`,
+  )
 }
 
 /** Binds this session to the person whose account it is (RLS reads it), or renews the binding; the

@@ -2,7 +2,7 @@ import { useMemo } from 'react'
 import { Pencil, ShoppingCart } from 'lucide-react'
 import type { Customer } from '../../../types/customer'
 import { DataTable, type DataColumn } from '../../../shared/components/DataTable'
-import { formatDate, formatMoney, formatQty } from '../../../shared/lib/currency'
+import { formatDate, formatMoney } from '../../../shared/lib/currency'
 import type { SortState } from '../../../shared/lib/sortRows'
 import type { CustomerWithSpent } from '../hooks/useCustomersWithSpent'
 import type { CustomerSortKey } from '../lib/customerSort'
@@ -29,9 +29,9 @@ export function CustomerTable({ rows, sort, onSort, resetKey, onOpen, onEdit, on
         min: 220,
         grow: true,
         sortKey: 'name',
-        cell: ({ customer: c, spent }) => (
+        cell: ({ customer: c }) => (
           <div className="flex max-w-full items-center gap-2.5">
-            <CustomerAvatar name={c.name} spent={spent} size={30} />
+            <CustomerAvatar name={c.name} size={30} />
             <span className="truncate text-[13px] font-semibold" title={c.name}>
               {c.name}
             </span>
@@ -48,15 +48,6 @@ export function CustomerTable({ rows, sort, onSort, resetKey, onOpen, onEdit, on
         align: 'right',
         sortKey: 'spent',
         cell: ({ spent }) => <span className="font-mono text-[12.5px] font-bold text-lime">{formatMoney(spent)}</span>,
-      },
-      { key: 'pts', label: 'Puntos', min: 78, align: 'right', sortKey: 'pts', cell: ({ pts }) => <span className="font-mono text-txt2">{formatQty(pts)}</span> },
-      {
-        key: 'tier',
-        label: 'Nivel',
-        min: 92,
-        align: 'center',
-        sortKey: 'tier',
-        cell: ({ tier: t }) => <span className={`rounded-full border px-2 py-0.5 text-[10.5px] font-semibold ${t.badgeClass}`}>{t.label}</span>,
       },
       { key: 'last', label: 'Última compra', min: 140, align: 'right', sortKey: 'last', cell: ({ lastPurchase }) => <span className="whitespace-nowrap text-txt2">{lastPurchase ? formatDate(lastPurchase) : '—'}</span> },
       {

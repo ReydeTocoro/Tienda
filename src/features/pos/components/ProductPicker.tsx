@@ -1,38 +1,29 @@
-import { useMemo, useState } from 'react'
-import { Tag } from 'lucide-react'
-import type { Product } from '../../../types/product'
+import { useMemo } from 'react'
 import type { CartItem } from '../../../types/cartItem'
+import type { Product } from '../../../types/product'
 import { nextSort, type SortState } from '../../../shared/lib/sortRows'
-import { ALL, DEFAULT_SALE_SORT, filterSaleProducts, sortSaleProducts, type SaleSortKey } from '../lib/saleProducts'
+import { ALL, type SaleList, type SaleSortKey } from '../lib/saleProducts'
 import { SaleProductTable } from './SaleProductTable'
 
 interface ProductPickerProps {
-  products: Product[]
+  /** The list as built by the page (it also moves around in it with the keyboard). */
+  list: SaleList
+  /** How many products there are in all. */
+  total: number
   cart: CartItem[]
   search: string
-  activeCat: string
+  sort: SortState<SaleSortKey>
+  onSort: (sort: SortState<SaleSortKey>) => void
   onSetCat: (cat: string) => void
   onPick: (p: Product) => void
-  /** Absent in contexts with no "producto sin registrar" concept. */
-  onOpenFree?: () => void
-  lowStockOnly?: boolean
+  /** The product the arrow keys are on in the search box. */
+  activeCode?: string
 }
 
-/** The left half of Venta: the products to put in the cart, as a table under its category filter. */
-export function ProductPicker({ products, cart, search, activeCat, onSetCat, onPick, onOpenFree, lowStockOnly = false }: ProductPickerProps) {
-  const [sort, setSort] = useState<SortState<SaleSortKey>>(DEFAULT_SALE_SORT)
-
-  const catCounts = useMemo(() => {
-    const m = new Map<string, number>()
-    for (const p of products) m.set(p.cat || '', (m.get(p.cat || '') ?? 0) + 1)
-    return m
-  }, [products])
-  const cats = useMemo(() => [...catCounts.keys()].sort((a, b) => (a === '' ? 1 : b === '' ? -1 : a.localeCompare(b, 'es'))), [catCounts])
-  // The chosen category can vanish (its last product recategorized or deleted from another device):
-  // fall back to "all" rather than an empty table under a blank selector.
-  const cat = activeCat === ALL || catCounts.has(activeCat) ? activeCat : ALL
-
-  const rows = useMemo(() => sortSaleProducts(filterSaleProducts(products, { search, cat, lowStockOnly }), sort), [products, search, cat, lowStockOnly, sort])
+/** The left half of Venta: the products to put in the cart, as a table under its category filter. What is typed in
+ * the search box narrows this very table and is marked in yellow in it. */
+export function ProductPicker({ list, total, cart, search, sort, onSort, onSetCat, onPick, activeCode }: ProductPickerProps) {
+  const { cat, cats, catCounts, rows } = list
   const inCart = useMemo(() => new Map(cart.map((i) => [i.code, i.qty])), [cart])
 
   return (
@@ -45,7 +36,7 @@ export function ProductPicker({ products, cart, search, activeCat, onSetCat, onP
           aria-label="Filtrar por categoría"
           className={`input w-auto min-w-0 max-w-[230px] py-1 text-[12px] ${cat !== ALL ? 'border-lime' : ''}`}
         >
-          <option value={ALL}>Todas ({products.length})</option>
+          <option value={ALL}>Todas ({total})</option>
           {cats.map((c) => (
             <option key={c || '__none__'} value={c}>
               {c || 'Sin categoría'} ({catCounts.get(c)})
@@ -57,28 +48,23 @@ export function ProductPicker({ products, cart, search, activeCat, onSetCat, onP
       {!rows.length ? (
         <div className="flex flex-1 items-center justify-center p-7 text-center text-muted">
           <div>
-            <p className="text-[13px]">Sin resultados</p>
+            <p className="text-[13px]">{search.trim() ? `Sin resultados para "${search.trim()}"` : 'Sin resultados'}</p>
           </div>
         </div>
       ) : (
+        // The table has the whole height under the filter: nothing else shares the column with it.
         <div className="flex min-h-0 flex-1 flex-col p-2.5 md:p-3">
           <SaleProductTable
             products={rows}
             inCart={inCart}
             sort={sort}
-            onSort={(key) => setSort((s) => nextSort(s, key))}
-            resetKey={`${search}|${cat}|${lowStockOnly}|${sort.key}|${sort.dir}`}
+            onSort={(key) => onSort(nextSort(sort, key))}
+            resetKey={`${search}|${cat}|${sort.key}|${sort.dir}`}
             onPick={onPick}
+            query={search}
+            activeCode={activeCode}
           />
         </div>
-      )}
-      {onOpenFree && (
-        <button
-          onClick={onOpenFree}
-          className="m-2 flex flex-shrink-0 items-center justify-center gap-1.5 rounded-[10px] border border-dashed border-br2 p-2 text-[12px] text-txt2 transition-colors hover:border-br2 hover:bg-s1 hover:text-txt md:m-3"
-        >
-          <Tag size={14} /> Producto sin registrar
-        </button>
       )}
     </div>
   )

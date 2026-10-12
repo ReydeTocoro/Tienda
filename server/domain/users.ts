@@ -6,7 +6,7 @@ import { cleanEmail, newPasswordProblem } from '../../src/shared/lib/account'
 import { cleanPhoto } from '../../src/shared/lib/photo'
 import type { Accounts } from '../accounts'
 import type { Sql } from '../db'
-import { deleteRow, getRow, listAll, putRow } from '../routes/generic'
+import { deleteRow, getRow, listAll, putRow, text } from '../routes/generic'
 import { HttpError } from '../routes/http'
 import { assertNewPin, refreshCounterPerms, requireNeed, storePin, type Actor } from './counter'
 
@@ -169,8 +169,6 @@ export async function deleteUsuario(sql: Sql, actor: Actor, id: string, accounts
   // Without the secret key their account stays in Supabase Auth, but it no longer opens anything.
   if (existing?.email && accounts.enabled) await accounts.remove(existing.email)
 }
-
-const text = (v: unknown, max: number): string => (typeof v === 'string' ? v.trim().slice(0, max) : '')
 
 function cleanBusiness(input: unknown): BusinessInfo {
   const b = (input && typeof input === 'object' ? input : {}) as Record<string, unknown>

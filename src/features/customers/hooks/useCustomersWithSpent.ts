@@ -1,18 +1,16 @@
 import { useMemo } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../../../db/index'
-import { getSpent, getPts, tier } from '../../../shared/lib/loyalty'
+import { getSpent } from '../../../shared/lib/customerSpend'
 import type { Customer } from '../../../types/customer'
 import type { Sale } from '../../../types/sale'
 
 export interface CustomerWithSpent {
   customer: Customer
   spent: number
-  pts: number
   salesCount: number
   /** ISO date of the customer's latest sale; absent while they have none. */
   lastPurchase?: string
-  tier: ReturnType<typeof tier>
 }
 
 /** One pass over all sales to compute lifetime spend/points per customer — replaces the
@@ -21,12 +19,13 @@ export interface CustomerWithSpent {
  * whole sales list for every customer. */
 export function useCustomersWithSpent(): CustomerWithSpent[] {
   const customers = useLiveQuery(() => db.customers.toArray(), [], []) as Customer[]
-  const sales = useLiveQuery(() => db.sales.toArray(), [], []) as Sale[]
+  // Only the sales that have a customer (the index leaves out the rest): a counter sale has nothing to add here.
+  const sales = useLiveQuery(() => db.sales.where('customerId').above('').toArray(), [], []) as Sale[]
 
   return useMemo(() => {
     const byCustomer = new Map<string, Sale[]>()
     for (const s of sales) {
-      if (!s.customerId) continue
+      if (!s.customerId || s.voided) continue
       const own = byCustomer.get(s.customerId)
       if (own) own.push(s)
       else byCustomer.set(s.customerId, [s])
@@ -37,10 +36,8 @@ export function useCustomersWithSpent(): CustomerWithSpent[] {
       return {
         customer,
         spent,
-        pts: getPts(own, customer.id),
         salesCount: own.length,
         lastPurchase: own.reduce<string | undefined>((last, s) => (!last || s.date > last ? s.date : last), undefined),
-        tier: tier(spent),
       }
     })
   }, [customers, sales])

@@ -1,12 +1,12 @@
 import { useMemo, useState } from 'react'
-import { Banknote, Smartphone, Handshake, Trash2, FileText, ShoppingCart, X } from 'lucide-react'
+import { Banknote, Smartphone, Handshake, Tag, Trash2, FileText, ShoppingCart, X } from 'lucide-react'
 import type { Product } from '../../../types/product'
-import { useActiveCart, useCartStore } from '../../../store/useCartStore'
+import { selectActiveCart, useActiveCart, useCartStore } from '../../../store/useCartStore'
 import { toast } from '../../../store/useToastStore'
 import { useCartTotals } from '../hooks/useFinalizeSale'
-import { useSelectedCustomerLoyalty } from '../hooks/useSelectedCustomerLoyalty'
-import { formatMoney, formatQty } from '../../../shared/lib/currency'
+import { formatMoney } from '../../../shared/lib/currency'
 import { BottomSheet } from '../../../shared/components/BottomSheet'
+import { AccountPicker } from '../../../shared/components/AccountPicker'
 import { MoneyInput } from '../../../shared/components/MoneyInput'
 import { CartTabs } from './CartTabs'
 import { ClientBar } from './ClientBar'
@@ -32,16 +32,18 @@ const PAY_METHODS: Array<{ key: 'efectivo' | 'transferencia' | 'fiado'; label: s
 export function CartPanel({ products, onEditMeasured, onOpenDiscount, onCheckout }: CartPanelProps) {
   const items = useActiveCart((c) => c.items)
   const changeQty = useCartStore((s) => s.changeQty)
+  const setQty = useCartStore((s) => s.setQty)
   const setItemPrice = useCartStore((s) => s.setItemPrice)
   const removeItem = useCartStore((s) => s.removeItem)
   const clear = useCartStore((s) => s.clear)
   const payMethod = useActiveCart((c) => c.payMethod)
   const setPayMethod = useCartStore((s) => s.setPayMethod)
+  const transferAccount = useActiveCart((c) => c.transferAccount)
+  const setTransferAccount = useCartStore((s) => s.setTransferAccount)
   const fiadoName = useActiveCart((c) => c.fiadoName)
   const setFiadoName = useCartStore((s) => s.setFiadoName)
   const notes = useActiveCart((c) => c.notes)
   const setNotes = useCartStore((s) => s.setNotes)
-  const manualDiscountPct = useActiveCart((c) => c.manualDiscountPct)
   const customerId = useActiveCart((c) => c.customerId)
   const chargeOverride = useActiveCart((c) => c.chargeOverride)
   const setChargeOverride = useCartStore((s) => s.setChargeOverride)
@@ -56,16 +58,21 @@ export function CartPanel({ products, onEditMeasured, onOpenDiscount, onCheckout
   const [totalUnlocked, setTotalUnlocked] = useState(false)
   const { can, requirePermission } = usePermission()
   const canEditTotal = can('ventas.cambiarTotal') || totalUnlocked
-  const { pts: loyaltyPts } = useSelectedCustomerLoyalty()
-  const { subtotal, discount, discountLabel, total, chargeAmount, roundingAdjustment } = useCartTotals(loyaltyPts)
+  const { subtotal, discount, total, chargeAmount, roundingAdjustment } = useCartTotals()
 
   const productByCode = useMemo(() => new Map(products.map((p) => [p.code, p])), [products])
   const totalItems = countItems(items)
 
-  const discLabel = discountLabel === 'manual' ? `Desc. manual (${manualDiscountPct}%)` : discountLabel === 'loyalty' ? `Desc. cliente (${formatQty(loyaltyPts)} pts)` : ''
 
   const change = amountReceived - chargeAmount
-  const insufficientCash = payMethod === 'efectivo' && amountReceived > 0 && change < 0
+  // A cash sale can't be charged until the cashier has said what the customer paid with — and it must cover the total.
+  // (A sale that costs nothing needs no cash.)
+  const cashShort = payMethod === 'efectivo' && chargeAmount > 0 && change < 0
+  // A transfer says which account it came into, so the day's close can tell them apart.
+  const accountMissing = payMethod === 'transferencia' && chargeAmount > 0 && !transferAccount
+
+  /** A bill pressed adds to what was already received; read from the store so two quick taps never use a stale figure. */
+  const addBill = (value: number) => setAmountReceived(selectActiveCart(useCartStore.getState()).amountReceived + value)
 
   function startCheckout() {
     if (!items.length) {
@@ -73,6 +80,9 @@ export function CartPanel({ products, onEditMeasured, onOpenDiscount, onCheckout
       return
     }
     setTotalUnlocked(false)
+    // Starts from nothing every time: the bills add up, so what a previous try left would be added to.
+    setAmountReceived(0)
+    setTransferAccount(null)
     setCheckoutOpen(true)
   }
 
@@ -90,7 +100,7 @@ export function CartPanel({ products, onEditMeasured, onOpenDiscount, onCheckout
   }
 
   function confirmCheckout() {
-    if (insufficientCash) return
+    if (cashShort || accountMissing) return
     setCheckoutOpen(false)
     onCheckout()
   }
@@ -122,9 +132,10 @@ export function CartPanel({ products, onEditMeasured, onOpenDiscount, onCheckout
                 key={i}
                 item={item}
                 // The product's own prices as they are now: a line can be charged at any of them.
-                prices={product && !item.isFree ? priceOptions(product) : undefined}
+                prices={product ? priceOptions(product) : undefined}
                 onChangePrice={(price) => setItemPrice(i, price)}
                 onChangeQty={(delta) => changeQty(i, delta, product?.stock)}
+                onSetQty={(qty) => setQty(i, qty, product?.stock)}
                 onRemove={() => removeItem(i)}
                 onEditMeasured={() => onEditMeasured(i)}
               />
@@ -163,7 +174,7 @@ export function CartPanel({ products, onEditMeasured, onOpenDiscount, onCheckout
           </div>
           {discount > 0 && (
             <div className="mb-1.5 flex items-center justify-between text-[13px]">
-              <span className="rounded-md bg-yellow px-1.5 py-0.5 text-[11px] font-semibold text-on-yellow">{discLabel}</span>
+              <span className="rounded-md bg-yellow px-1.5 py-0.5 text-[11px] font-semibold text-on-yellow">Descuento</span>
               <span className="font-mono text-green">-{formatMoney(discount)}</span>
             </div>
           )}
@@ -200,9 +211,18 @@ export function CartPanel({ products, onEditMeasured, onOpenDiscount, onCheckout
 
         {payMethod === 'efectivo' && (
           <div className="mb-3.5">
-            <p className="mb-2 field-label">Efectivo recibido</p>
+            <div className="mb-2 flex items-center justify-between">
+              <p className="field-label">Efectivo recibido</p>
+              {amountReceived > 0 ? (
+                <button type="button" onClick={() => setAmountReceived(0)} className="text-[12px] font-semibold text-txt2 hover:text-red">
+                  Borrar
+                </button>
+              ) : (
+                <span className="text-[11px] text-muted">Toca los billetes: se van sumando</span>
+              )}
+            </div>
             <MoneyInput
-              placeholder="0"
+              autoFocus placeholder="0"
               className="input mb-2 text-right font-mono text-[22px] font-bold"
               value={amountReceived}
               onChange={(v) => setAmountReceived(v ?? 0)}
@@ -211,12 +231,10 @@ export function CartPanel({ products, onEditMeasured, onOpenDiscount, onCheckout
               {BILLS.map(({ value, img }) => (
                 <button
                   key={value}
-                  onClick={() => setAmountReceived(value)}
+                  onClick={() => addBill(value)}
                   aria-label={formatMoney(value)}
                   title={formatMoney(value)}
-                  className={`overflow-hidden rounded-md shadow-xs transition active:scale-[0.96] ${
-                    amountReceived === value ? 'ring-2 ring-lime' : 'ring-1 ring-br2 hover:ring-lime/50'
-                  }`}
+                  className="overflow-hidden rounded-md shadow-xs ring-1 ring-br2 transition hover:ring-lime/50 active:scale-[0.96]"
                 >
                   <img src={img} alt="" draggable={false} className="block aspect-[2.2/1] w-full bg-s2 object-contain" />
                 </button>
@@ -258,6 +276,12 @@ export function CartPanel({ products, onEditMeasured, onOpenDiscount, onCheckout
             </button>
           ))}
         </div>
+        {payMethod === 'transferencia' && (
+          <div className="mb-3.5">
+            <p className="mb-2 field-label">¿A qué cuenta llegó?</p>
+            <AccountPicker value={transferAccount} onChange={setTransferAccount} />
+          </div>
+        )}
         {payMethod === 'fiado' && !customerId && (
           <div className="mb-3.5">
             <label className="mb-1 block field-label">Nombre (fiado)</label>
@@ -284,17 +308,17 @@ export function CartPanel({ products, onEditMeasured, onOpenDiscount, onCheckout
           <button onClick={() => setNotesOpen((o) => !o)} title="Agregar nota" className="rounded-[10px] border border-br2 px-3 py-2.5 text-txt2 transition-colors hover:border-br2 hover:bg-s2">
             <FileText size={16} />
           </button>
-          <button onClick={openDiscount} title="Descuento manual" className="rounded-[10px] border border-br2 px-3 py-2.5 text-txt2 transition-colors hover:border-br2 hover:bg-s2">
-            %
+          <button onClick={openDiscount} title="Descuento en dinero" aria-label="Descuento en dinero" className="rounded-[10px] border border-br2 px-3 py-2.5 text-txt2 transition-colors hover:border-br2 hover:bg-s2">
+            <Tag size={16} />
           </button>
           <button
-            onClick={confirmCheckout}
-            disabled={insufficientCash}
+            data-enter onClick={confirmCheckout}
+            disabled={cashShort || accountMissing}
             className={`flex-1 rounded-[10px] py-2.5 text-[14px] font-bold transition-transform active:scale-[0.98] ${
-              insufficientCash ? 'cursor-not-allowed bg-br2 text-muted' : 'bg-lime text-on-solid hover:brightness-110'
+              cashShort || accountMissing ? 'cursor-not-allowed bg-br2 text-muted' : 'bg-lime text-on-solid hover:brightness-110'
             }`}
           >
-            {insufficientCash ? `Falta ${formatMoney(-change)}` : 'Confirmar cobro'}
+            {accountMissing ? 'Elige la cuenta' : cashShort ? (amountReceived > 0 ? `Falta ${formatMoney(-change)}` : 'Indica con cuánto paga') : 'Confirmar cobro'}
           </button>
         </div>
       </BottomSheet>

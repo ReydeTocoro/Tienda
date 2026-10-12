@@ -4,10 +4,11 @@ import type { EntradaRecord } from '../../src/types/entrada'
 import type { Db } from '../db'
 import { authOf } from '../auth'
 import { actorOf, requireNeed } from '../domain/counter'
-import { getRow, putRow, insertAutoRow, roundQty } from './generic'
+import { getRow, getRowsByKey, putRow, insertAutoRow, insertAutoRows, roundQty, setStocks } from './generic'
 import { HttpError, handle } from './http'
 
 const TABLE = 'entradas'
+const MAX_BULK_ENTRIES = 5000
 
 function quantity(v: unknown): number {
   const n = roundQty(Number(v))
@@ -45,21 +46,30 @@ export function entradasRouter(db: Db) {
     '/bulk',
     handle(async (req) => {
       const { entries, source: rawSource } = (req.body ?? {}) as { entries: Array<{ code: string; qty: number }>; source?: string }
-      if (!Array.isArray(entries) || entries.length > 5000) throw new HttpError(400, 'No hay entradas para registrar')
+      if (!Array.isArray(entries)) throw new HttpError(400, 'No hay entradas para registrar')
+      if (entries.length > MAX_BULK_ENTRIES) throw new HttpError(400, `Registra hasta ${MAX_BULK_ENTRIES.toLocaleString('es-CO')} productos por vez (hay ${entries.length.toLocaleString('es-CO')}): hazlo en partes`)
       const clean = entries.map((e) => ({ code: String(e?.code ?? ''), qty: quantity(e?.qty) }))
       return db.tx(async (q) => {
         await requireNeed(q, await actorOf(q, authOf(req)), 'stock.entradas')
+        // Every product in one trip, the arithmetic here (a code that appears twice adds up in order, each
+        // record showing the stock before and after it), and the stocks and records written in one trip each —
+        // a trip per product made a scan of fifty products wait for a hundred and fifty.
+        const products = await getRowsByKey<Product>(q, 'products', 'code', clean.map((e) => e.code))
+        const stock = new Map([...products].map(([code, p]) => [code, p.stock || 0]))
+        const records: Array<Omit<EntradaRecord, 'id'>> = []
+        const date = new Date().toISOString()
         let totalUnidades = 0
         for (const e of clean) {
-          const p = await getRow<Product>(q, 'products', 'code', e.code)
+          const p = products.get(e.code)
           if (!p) continue
-          const stockAntes = p.stock || 0
+          const stockAntes = stock.get(e.code)!
           const stockDespues = roundQty(stockAntes + e.qty)
-          await putRow(q, 'products', 'code', e.code, { ...p, stock: stockDespues })
-          const record: EntradaRecord = { code: e.code, name: p.name, qty: e.qty, stockAntes, stockDespues, date: new Date().toISOString(), source: source(rawSource) ?? 'masivo' }
-          await insertAutoRow(q, TABLE, record)
+          stock.set(e.code, stockDespues)
+          records.push({ code: e.code, name: p.name, qty: e.qty, stockAntes, stockDespues, date, source: source(rawSource) ?? 'masivo' })
           totalUnidades += e.qty
         }
+        await setStocks(q, [...new Set(records.map((r) => r.code))].map((code) => ({ code, stock: stock.get(code)! })))
+        await insertAutoRows(q, TABLE, records)
         return { totalUnidades }
       })
     }),

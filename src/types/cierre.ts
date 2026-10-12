@@ -1,3 +1,5 @@
+import type { TransferBreak } from '../shared/lib/transferAccounts'
+
 export interface PayBreak {
   efectivo: number
   transferencia: number
@@ -29,6 +31,8 @@ export interface Cierre {
   totalExOut: number
   netDay: number
   payBreak: PayBreak
+  /** What came in by transfer, account by account (absent on closings made before the accounts existed). */
+  transferBreak?: TransferBreak
   arqueo: Arqueo
   /** Moved to Caja Mayor at closing, and what stayed in the drawer for tomorrow. */
   traslado?: number

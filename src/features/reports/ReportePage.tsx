@@ -6,6 +6,8 @@ import type { Sale } from '../../types/sale'
 import { useDayAggregation } from '../../shared/hooks/useDayAggregation'
 import { formatMoney, todayKey, formatDateTime } from '../../shared/lib/currency'
 import { ReceiptSheet } from '../../shared/components/ReceiptSheet'
+import { TransferByAccount } from '../../shared/components/TransferByAccount'
+import { transferRows } from '../../shared/lib/transferAccounts'
 import { formatSaleId } from '../../shared/lib/id'
 import { ReporteXModal } from './components/ReporteXModal'
 import { CierreZModal } from './components/CierreZModal'
@@ -39,9 +41,8 @@ export function ReportePage() {
   }
 
   // Global fiado portfolio (all-time), independent of the selected date.
-  const allSales = useLiveQuery(() => db.sales.toArray(), [], [] as Sale[])
+  const fiadoSales = useLiveQuery(() => db.sales.where('payMethod').equals('fiado').filter((s) => !s.voided).toArray(), [], [] as Sale[])
   const fiadoStats = useMemo(() => {
-    const fiadoSales = allSales.filter((s) => s.payMethod === 'fiado')
     const debt = fiadoSales.reduce((a, s) => {
       const paid = (s.fiadoPagos || []).reduce((x, p) => x + p.amount, 0)
       return a + Math.max(0, s.total - paid)
@@ -59,7 +60,7 @@ export function ReportePage() {
         .map((s) => s.customerId || s.fiadoName || '?'),
     ).size
     return { debt, paid, debtors }
-  }, [allSales])
+  }, [fiadoSales])
 
   const fiadosToday = agg.ventasDay.filter((s) => s.payMethod === 'fiado')
 
@@ -117,6 +118,14 @@ export function ReportePage() {
               </span>
             </div>
           </div>
+          {transferRows(agg.transferBreak).length > 0 && (
+            <>
+              <p className="mb-2 field-label">Transferencias por cuenta (ventas y abonos)</p>
+              <div className="mb-3.5 space-y-1.5 rounded-[14px] border border-br bg-s1 p-3.5 text-[13px] shadow-xs">
+                <TransferByAccount breakdown={agg.transferBreak} />
+              </div>
+            </>
+          )}
         </div>
 
         <div>
