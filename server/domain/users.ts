@@ -186,7 +186,7 @@ function cleanOwner(input: unknown): OwnerProfile | undefined {
 /** What a settings patch may touch, and who may touch it. The master PIN, the PIN length, the caja's
  * base and the last cashier have their own routes (counter and cierre), never this one. */
 const ANYONE = new Set(['theme'])
-const ADMIN_ONLY = new Set(['storeName', 'business', 'roles', 'access', 'hidScannerEnabled', 'owner'])
+const ADMIN_ONLY = new Set(['storeName', 'business', 'roles', 'access', 'hidScannerEnabled', 'owner', 'servicePaid'])
 
 /** Merges a settings patch into the 'main' row, cleaning what has rules: `roles` (catalog
  * permissions only, built-ins kept, none removed while someone still has it) and `access`. */
@@ -219,6 +219,10 @@ export async function applySettingsPatch(sql: Sql, actor: Actor, patch: Record<s
     next.roles = roles
   }
   if ('access' in patch) next.access = sanitizeAccess(patch.access)
+  if ('servicePaid' in patch) {
+    if (typeof patch.servicePaid !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(patch.servicePaid)) throw new HttpError(400, 'La fecha del pago no es válida')
+    next.servicePaid = patch.servicePaid
+  }
   await putRow(sql, 'settings', 'key', 'main', next)
   if ('roles' in patch) await refreshCounterPerms(sql)
   return next

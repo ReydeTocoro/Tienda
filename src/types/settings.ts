@@ -37,4 +37,7 @@ export interface Settings {
   access?: AccessSettings
   /** The owner's name and picture. Absent = the name of their `staff` row (else "Propietario"), no picture. */
   owner?: OwnerProfile
+  /** The due day ('YYYY-MM-DD') of the system's monthly payment the Administrador marked "Ya pagué": that month's
+   * reminder is gone from every device and from the phone notifications (src/features/notifications). */
+  servicePaid?: string
 }

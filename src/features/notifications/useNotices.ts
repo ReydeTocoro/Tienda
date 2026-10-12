@@ -5,7 +5,7 @@ import { useSecureLoaded, useSecureTable } from '../../db/secure'
 import { getFiadoDebt } from '../../db/repositories/sales'
 import { useOutboxCounts } from '../../offline/outbox'
 import { todayKey } from '../../shared/lib/currency'
-import { useNoticesStore } from '../../store/useNoticesStore'
+import { getSettings } from '../../db/repositories/settings'
 import { useSessionStore } from '../../store/useSessionStore'
 import { groupFiados, groupTotals } from '../fiados/lib/fiadoGrouping'
 import { usePermission } from '../pin/usePermission'
@@ -18,7 +18,7 @@ import { buildNotices, type Notice } from './lib/notices'
  * read (the payables downloaded too), so the daily sheet doesn't open on half the picture. */
 export function useNotices(): { notices: Notice[]; ready: boolean } {
   const { can, isAdmin, ready: permsReady } = usePermission()
-  const dismissed = useNoticesStore((s) => s.dismissed)
+  const servicePaid = useLiveQuery(() => getSettings().then((s) => s.servicePaid ?? ''))
   const serverReady = useSessionStore((s) => s.serverReady)
   const seePagos = can('proveedores.gestionar')
   const seeStock = can('stock.ver')
@@ -62,11 +62,11 @@ export function useNotices(): { notices: Notice[]; ready: boolean } {
         debtors: seeFiados ? debtors : undefined,
         caja: seeCaja ? caja : undefined,
         outbox,
-        servicePayment: isAdmin ? { dismissed } : undefined,
+        servicePayment: isAdmin ? { paid: servicePaid || undefined } : undefined,
       }),
-    [today, seePagos, payables, orders, seeStock, products, seeFiados, debtors, seeCaja, caja, outbox, isAdmin, dismissed],
+    [today, seePagos, payables, orders, seeStock, products, seeFiados, debtors, seeCaja, caja, outbox, isAdmin, servicePaid],
   )
 
-  const ready = permsReady && serverReady && products !== undefined && fiadoSales !== undefined && caja !== undefined && (!seePagos || payablesLoaded)
+  const ready = permsReady && serverReady && products !== undefined && fiadoSales !== undefined && caja !== undefined && servicePaid !== undefined && (!seePagos || payablesLoaded)
   return { notices, ready }
 }

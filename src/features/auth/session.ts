@@ -7,6 +7,7 @@ import { useConnectionStore } from '../../store/useConnectionStore'
 import { useMayorStore } from '../../store/useMayorStore'
 import { useSessionStore } from '../../store/useSessionStore'
 import { endCounterSession, forgetRemembered, refreshCounterSession } from '../pin/counterSession'
+import { disablePush } from '../notifications/push'
 
 let pendingNotice: string | undefined
 
@@ -39,6 +40,8 @@ export async function signOut({ forget = false, notice }: { forget?: boolean; no
   // Without the internet nobody could sign in afterwards, so signing out would only lock the till. Said up front instead of
   // trusting what Supabase's client does when its own refresh has been failing for a while (it sometimes signed out anyway).
   if (!(navigator.onLine && useConnectionStore.getState().reachable) && !(await probeNow())) throw new Error(NEEDS_INTERNET)
+  // A device that stops being used stops getting the Administrador's phone notifications too.
+  if (forget) await disablePush().catch(() => {})
   pendingNotice = notice
   await endCounterSession()
   // A connection that leads nowhere must not leave the button spinning for minutes.

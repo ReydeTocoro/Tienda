@@ -31,7 +31,7 @@ export async function getSettings(): Promise<Settings> {
 /** What the settings route takes (server/domain/users.ts): the theme from anyone, the rest from the
  * Administrador (`owner` replaces the owner's whole profile). The master PIN, the caja's base and the
  * last cashier have their own routes. */
-export type SettingsPatch = Partial<Pick<Settings, 'theme' | 'storeName' | 'business' | 'roles' | 'access' | 'hidScannerEnabled' | 'owner'>>
+export type SettingsPatch = Partial<Pick<Settings, 'theme' | 'storeName' | 'business' | 'roles' | 'access' | 'hidScannerEnabled' | 'owner' | 'servicePaid'>>
 
 export async function updateSettings(patch: SettingsPatch): Promise<void> {
   await apiPut('/api/settings', patch)

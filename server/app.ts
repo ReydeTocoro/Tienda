@@ -13,6 +13,8 @@ import { payablesRouter } from './routes/payables'
 import { productsRouter } from './routes/products'
 import { purchaseOrdersRouter } from './routes/purchaseOrders'
 import { publicReceiptRouter, receiptsRouter } from './routes/receipts'
+import { pushRouter } from './routes/push'
+import type { PushSend } from './domain/push'
 import { salesRouter } from './routes/sales'
 import { settingsRouter } from './routes/settings'
 import { suppliersRouter } from './routes/suppliers'
@@ -22,9 +24,10 @@ import { usuariosRouter } from './routes/usuarios'
  * (src/sync), where RLS only serves the secret tables to whoever may see them. Every route checks
  * the permission of whoever is signed in on the requesting device (server/domain/counter.ts).
  * `accounts` manages the sign-in accounts of the users (server/accounts.ts) and `mailer` sends the
- * store's e-mails (server/mailer.ts). Shared by the local dev server (server/index.ts) and the
+ * store's e-mails (server/mailer.ts), `push` the Administrador's phone notifications (server/domain/push.ts; null
+ * without Firebase). Shared by the local dev server (server/index.ts) and the
  * Firebase Function (functions/index.js, via server/serverApp.ts). */
-export function createApp(db: Db, auth: RequestHandler, accounts: Accounts = noAccounts, mailer: Mailer = noMailer) {
+export function createApp(db: Db, auth: RequestHandler, accounts: Accounts = noAccounts, mailer: Mailer = noMailer, push: PushSend | null = null) {
   const app = express()
   app.disable('x-powered-by')
   // Answers can carry purchase prices or who is signed in: never kept by a browser or a proxy cache.
@@ -86,6 +89,7 @@ export function createApp(db: Db, auth: RequestHandler, accounts: Accounts = noA
   app.use('/api/purchaseOrders', purchaseOrdersRouter(db))
   app.use('/api/payables', payablesRouter(db))
   app.use('/api/recibos', receiptsRouter(db, mailer))
+  app.use('/api/push', pushRouter(db, push))
   app.use('/api', (_req, res) => {
     res.status(404).json({ error: 'Ruta no encontrada' })
   })

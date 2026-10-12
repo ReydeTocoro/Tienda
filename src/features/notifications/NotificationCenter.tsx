@@ -1,11 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { safeToReload } from '../../app/appUpdate'
+import { ADMIN_ROLE_ID } from '../../shared/lib/permissions'
 import { todayKey } from '../../shared/lib/currency'
 import { useBusyStore } from '../../store/useBusyStore'
 import { useNoticesStore } from '../../store/useNoticesStore'
 import { useSessionStore } from '../../store/useSessionStore'
 import { hasSynced } from '../../sync'
 import { NoticesSheet } from './NoticesSheet'
+import { refreshPush } from './push'
 import { RestScreen } from './RestScreen'
 import { useNotices } from './useNotices'
 
@@ -58,6 +61,34 @@ export function NotificationCenter() {
   useEffect(() => {
     useNoticesStore.getState().setNotices(notices)
   }, [notices])
+
+  // A phone notification tapped: the app opens on "Pendientes de hoy" (a new window: `?avisos=1`; one already open:
+  // the service worker's message — public/push-sw.js — so a sale in progress isn't lost to a reload).
+  const [params, setParams] = useSearchParams()
+  useEffect(() => {
+    if (!params.has('avisos')) return
+    useNoticesStore.getState().setSheetOpen(true)
+    setParams(
+      (p) => {
+        p.delete('avisos')
+        return p
+      },
+      { replace: true },
+    )
+  }, [params, setParams])
+  useEffect(() => {
+    const onMessage = (e: MessageEvent) => {
+      if ((e.data as { type?: unknown } | null)?.type === 'avisos') useNoticesStore.getState().setSheetOpen(true)
+    }
+    navigator.serviceWorker?.addEventListener('message', onMessage)
+    return () => navigator.serviceWorker?.removeEventListener('message', onMessage)
+  }, [])
+
+  // The Administrador's device keeps its notifications token current (the browser may renew it).
+  const isAdmin = useSessionStore((s) => s.serverReady && s.operator?.roleId === ADMIN_ROLE_ID)
+  useEffect(() => {
+    if (isAdmin) void refreshPush().catch(() => {})
+  }, [isAdmin])
 
   const wake = useCallback(() => {
     restingRef.current = false

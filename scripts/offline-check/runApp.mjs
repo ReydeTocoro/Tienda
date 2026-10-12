@@ -707,17 +707,42 @@ async function mainFlow(appUrl, webDir) {
       await ev(clickText('Ya pagué', "document.querySelector('dialog[open]')"))
       await waitFor("[...document.querySelectorAll('dialog[open]')].some((d) => d.innerText.includes('¿Ya hiciste el pago de este mes?'))", 5000)
       await ev(clickText('Sí, ya pagué', "[...document.querySelectorAll('dialog[open]')].find((d) => d.innerText.includes('¿Ya hiciste el pago'))"))
-      check('12 "Ya pagué" (confirmado) lo quita de la lista y de la campana', (await waitFor(`document.querySelectorAll('dialog[open]').length === 1 && !(document.querySelector('dialog[open]')?.innerText||'').includes('Pago mensual del sistema') && (${bell})?.innerText.trim() === '3'`, 5000)).ok, await dialogText())
+      await waitFor("document.querySelectorAll('dialog[open]').length === 1", 5000)
+      await sleep(800) // the save to the server
       await ev(clickText('Entendido', "document.querySelector('dialog[open]')"))
+      // The setting comes back the way every change does (Realtime, which the stand-in doesn't play: a reload pulls it).
       await send('Page.reload')
       await waitFor("!!document.querySelector('#venta-search-input')", 30000)
       await sleep(1500)
       await ev(`(${bell}).click()`)
       await waitFor("(document.querySelector('dialog[open]')?.innerText||'').includes('Pendientes de hoy')", 5000)
-      check('12 y sigue oculto al recargar (hasta el mes que viene)', !(await dialogText()).includes('Pago mensual del sistema'), await dialogText())
+      check('12 "Ya pagué" (confirmado) lo quita de la lista y de la campana hasta el mes que viene (queda guardado en el servidor)', !(await dialogText()).includes('Pago mensual del sistema') && (await ev(`(${bell})?.innerText.trim()`)) === '3', await dialogText())
       await ev(clickText('Entendido', "document.querySelector('dialog[open]')"))
       await sleep(300)
     }
+
+    // 13. The Administrador's phone notifications: the app's service worker shows what the Function sends through
+    // Firebase (data: title, body, link — functions/index.js), and opening one lands on "Pendientes de hoy".
+    const origin = new URL(appUrl).origin
+    await ev(`(${bell}).click()`)
+    await waitFor("(document.querySelector('dialog[open]')?.innerText||'').includes('Pendientes de hoy')", 5000)
+    check('13 el Administrador ve cómo recibir estos avisos en el celular, a sus horas', (await dialogText()).includes('Recibe estos pendientes en este equipo aunque la app esté cerrada: 7:00 a. m., 12:20 p. m., 5:00 p. m., 6:00 p. m. y 8:00 p. m.'), await dialogText())
+    await ev(clickText('Entendido', "document.querySelector('dialog[open]')"))
+    await send('Browser.grantPermissions', { origin, permissions: ['notifications'] })
+    await send('ServiceWorker.enable')
+    let registrationId
+    for (let i = 0; i < 40 && !registrationId; i++) {
+      registrationId = c.swEvents.flatMap((e) => e.params?.registrations ?? []).find((r) => r.scopeURL.startsWith(origin) && !r.isDeleted)?.registrationId
+      if (!registrationId) await sleep(250)
+    }
+    const fcmData = { data: { title: 'Pendientes: 3 asuntos por atender', body: 'Productos agotados: 1 producto sin unidades', link: '/?avisos=1' }, from: '358472149721', fcmMessageId: 'prueba' }
+    await send('ServiceWorker.deliverPushMessage', { origin, registrationId: String(registrationId), data: JSON.stringify(fcmData) })
+    const shown = await waitFor("navigator.serviceWorker.ready.then((r) => r.getNotifications()).then((ns) => ns.map((x) => x.title + ' | ' + x.body + ' | ' + x.data?.link).join('\\n'))", 8000)
+    check('13 un aviso que llega por Firebase se muestra como notificación del sistema, con su texto', shown.ok && shown.value.includes('Pendientes: 3 asuntos por atender | Productos agotados: 1 producto sin unidades | /?avisos=1'), { registrationId, shown })
+    await send('Page.navigate', { url: origin + '/?avisos=1' })
+    check('13 tocarlo abre la app en "Pendientes de hoy"', (await waitFor("(document.querySelector('dialog[open]')?.innerText||'').includes('Pendientes de hoy') && location.search === ''", 30000)).ok, await ev('location.href'))
+    await ev(clickText('Entendido', "document.querySelector('dialog[open]')"))
+    await sleep(300)
 
     const errors = c.logs.filter((l) => /EXC/.test(l))
     check('sin errores de JavaScript en toda la prueba', errors.length === 0, errors.slice(0, 5))

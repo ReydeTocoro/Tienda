@@ -1,9 +1,12 @@
 import { useNavigate } from 'react-router-dom'
+import { updateSettings } from '../../db/repositories/settings'
 import { BottomSheet } from '../../shared/components/BottomSheet'
 import { formatMoney } from '../../shared/lib/currency'
 import { useConfirm } from '../../store/useConfirmStore'
 import { useNoticesStore } from '../../store/useNoticesStore'
+import { usePermission } from '../pin/usePermission'
 import { Countdown } from './Countdown'
+import { PushRow } from './PushRow'
 import type { Notice } from './lib/notices'
 import { longDate, TONE_BOX, TONE_TEXT, useCanOpen } from './noticeUi'
 
@@ -15,6 +18,7 @@ export function NoticesSheet() {
   const close = () => useNoticesStore.getState().setSheetOpen(false)
   const navigate = useNavigate()
   const canOpen = useCanOpen()
+  const { isAdmin } = usePermission()
 
   return (
     <BottomSheet open={open} onClose={close} maxWidthClass="max-w-[620px]">
@@ -24,7 +28,7 @@ export function NoticesSheet() {
       {notices.length === 0 ? (
         <p className="mt-4 rounded-lg bg-s2 px-3 py-3 text-center text-[13px] text-muted">Todo al día: no hay pendientes.</p>
       ) : (
-        <ul className="mt-3 max-h-[min(62vh,460px)] space-y-2.5 overflow-y-auto pr-0.5">
+        <ul className="mt-3 max-h-[min(56vh,430px)] space-y-2.5 overflow-y-auto pr-0.5">
           {notices.map((n) => (
             <NoticeItem
               key={n.id}
@@ -42,6 +46,8 @@ export function NoticesSheet() {
         </ul>
       )}
 
+      {isAdmin && <PushRow />}
+
       <button data-enter onClick={close} className="mt-4 w-full rounded-[10px] bg-lime py-2.5 text-[13px] font-semibold text-on-solid">
         Entendido
       </button>
@@ -54,8 +60,8 @@ function NoticeItem({ notice: n, onOpen }: { notice: Notice; onOpen?: () => void
   const dismissKey = n.dismissKey
   async function dismiss() {
     if (!dismissKey) return
-    const ok = await confirm({ title: '¿Ya hiciste el pago de este mes?', message: 'El recordatorio se oculta en este equipo hasta el próximo mes.', confirmLabel: 'Sí, ya pagué' })
-    if (ok) useNoticesStore.getState().dismiss(dismissKey)
+    const ok = await confirm({ title: '¿Ya hiciste el pago de este mes?', message: 'El recordatorio se quita en todos los equipos y en los avisos del celular hasta el próximo mes.', confirmLabel: 'Sí, ya pagué' })
+    if (ok) await updateSettings({ servicePaid: dismissKey })
   }
   return (
     <li className={`rounded-lg border px-3 py-2.5 ${TONE_BOX[n.tone]}`}>

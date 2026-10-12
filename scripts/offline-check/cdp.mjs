@@ -29,10 +29,13 @@ async function attach(wsUrl) {
   let id = 0
   const pending = new Map()
   const logs = []
+  /** The service workers Chrome reports (after `ServiceWorker.enable`), for delivering a push message to one. */
+  const swEvents = []
   ws.onmessage = (m) => {
     const d = JSON.parse(m.data)
     if (d.id && pending.has(d.id)) pending.get(d.id)(d)
     else if (d.method === 'Runtime.exceptionThrown') logs.push('EXC: ' + (d.params.exceptionDetails.exception?.description ?? d.params.exceptionDetails.text))
+    else if (d.method?.startsWith('ServiceWorker.')) swEvents.push(d)
   }
   const send = (method, params = {}) =>
     new Promise((resolve) => {
@@ -69,7 +72,7 @@ async function attach(wsUrl) {
   await send('Page.enable')
   await send('Runtime.enable')
   await send('Network.enable')
-  return { send, ev, waitFor, shot, setNetwork, logs, closeSocket: () => ws.close() }
+  return { send, ev, waitFor, shot, setNetwork, logs, swEvents, closeSocket: () => ws.close() }
 }
 
 /** Opens a fresh headless Chrome (own profile, so no IndexedDB or service worker of an earlier run survives). */

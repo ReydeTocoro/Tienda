@@ -38,7 +38,8 @@ export interface Notice {
   more: number
   /** A moment it counts down to (ms since the epoch). */
   deadline?: number
-  /** Whoever saw it can hide it with this key ("Ya pagué"): it stays hidden on that device until the key changes. */
+  /** The system's monthly payment: the due day 'YYYY-MM-DD' that "Ya pagué" stores (`settings.servicePaid`), which
+   * hides that month's reminder on every device and in the push. */
   dismissKey?: string
 }
 
@@ -51,8 +52,8 @@ export interface NoticeInput {
   debtors?: Array<{ name: string; debt: number; since: string }>
   caja?: CajaState | null
   outbox: { pending: number; rejected: number }
-  /** The reminder of the system's monthly payment — for the Administrador only; the keys hidden with "Ya pagué". */
-  servicePayment?: { dismissed: string[] }
+  /** The reminder of the system's monthly payment — for the Administrador only; `paid` = the due day marked paid. */
+  servicePayment?: { paid?: string }
 }
 
 /** The store pays for the system on this day of each month (1–28, so every month has it)… */
@@ -97,11 +98,10 @@ function capped(lines: NoticeLine[]): Pick<Notice, 'lines' | 'more'> {
 
 const LINE_TONE: Partial<Record<PayableStatus, NoticeTone>> = { vencida: 'red', hoy: 'red', proxima: 'orange' }
 
-function mensualidad(today: string, dismissed: string[]): Notice | null {
+function mensualidad(today: string, paid: string | undefined): Notice | null {
   const due = nextServiceDue(today)
   const days = daysBetween(today, due)
-  const dismissKey = `mensualidad:${due}`
-  if (days > SERVICE_REMINDER_DAYS || dismissed.includes(dismissKey)) return null
+  if (days > SERVICE_REMINDER_DAYS || paid === due) return null
   const noon = new Date(`${due}T12:00:00`)
   const date = `${noon.toLocaleDateString('es-CO', { weekday: 'long' })} ${noon.toLocaleDateString('es-CO', { day: 'numeric', month: 'long' })}`
   return {
@@ -110,7 +110,7 @@ function mensualidad(today: string, dismissed: string[]): Notice | null {
     title: 'Pago mensual del sistema',
     detail: `${duePhrase(days)} (el ${date}). Si ya pagaste, omite este mensaje.`,
     deadline: endOfDayMs(due),
-    dismissKey,
+    dismissKey: due,
     lines: [],
     more: 0,
   }
@@ -244,7 +244,7 @@ const TONE_RANK: Record<NoticeTone, number> = { red: 0, orange: 1, blue: 2 }
 export function buildNotices(input: NoticeInput): Notice[] {
   const { today } = input
   const all = [
-    input.servicePayment && mensualidad(today, input.servicePayment.dismissed),
+    input.servicePayment && mensualidad(today, input.servicePayment.paid),
     input.payables && pagos(input.payables, today),
     input.caja !== undefined ? caja(input.caja, today) : null,
     sinInternet(input.outbox),
@@ -258,3 +258,20 @@ export function buildNotices(input: NoticeInput): Notice[] {
 
 /** What the bell counts: what asks for action (red or orange). */
 export const urgentCount = (notices: Notice[]): number => notices.filter((n) => n.tone !== 'blue').length
+
+/** When the phone notifications go out, in Colombia — the schedules of functions/index.js say the same. */
+export const PUSH_HOURS_LABEL = '7:00 a. m., 12:20 p. m., 5:00 p. m., 6:00 p. m. y 8:00 p. m.'
+
+/** Notices a push lists; the rest are counted. */
+const PUSH_NOTICES = 4
+
+/** The phone notification sent at fixed hours (the Function, server/domain/push.ts): the most urgent notices, one per
+ * line — or nothing when none asks for action (no "todo al día" five times a day). */
+export function pushMessage(notices: Notice[]): { title: string; body: string } | null {
+  const urgent = urgentCount(notices)
+  if (!urgent) return null
+  const shown = notices.slice(0, PUSH_NOTICES)
+  const lines = shown.map((n) => `${n.title}${n.amount !== undefined ? ` (${formatMoney(n.amount)})` : ''}: ${n.detail}`)
+  if (notices.length > shown.length) lines.push(`…y ${notices.length - shown.length} más`)
+  return { title: notices[0].id === 'mensualidad' ? 'Recordatorio: pago mensual del sistema' : `Pendientes: ${plural(urgent, 'asunto por atender', 'asuntos por atender')}`, body: lines.join('\n') }
+}

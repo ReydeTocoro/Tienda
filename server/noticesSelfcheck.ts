@@ -3,7 +3,7 @@
  * stock that ran out or reached its minimum, fiados and orders not yet received; each one only when this person may see
  * it, the most serious first. It lives here because this folder is where tsx is set up:  npm run check:notices */
 import assert from 'node:assert/strict'
-import { buildNotices, countdownParts, duePhrase, MAX_LINES, nextServiceDue, OLD_DEBT_DAYS, SERVICE_PAYMENT_DAY, urgentCount, type NoticeInput } from '../src/features/notifications/lib/notices'
+import { buildNotices, countdownParts, duePhrase, MAX_LINES, nextServiceDue, OLD_DEBT_DAYS, pushMessage, SERVICE_PAYMENT_DAY, urgentCount, type NoticeInput } from '../src/features/notifications/lib/notices'
 import { addDaysToKey } from '../src/shared/lib/cash'
 import type { Payable, PurchaseOrder } from '../src/types/purchaseOrder'
 import type { Product } from '../src/types/product'
@@ -173,7 +173,7 @@ assert.equal(nextServiceDue('2026-10-01'), '2026-10-13')
 assert.equal(nextServiceDue('2026-10-13'), '2026-10-13')
 assert.equal(nextServiceDue('2026-10-14'), '2026-11-13')
 assert.equal(nextServiceDue('2026-12-20'), '2027-01-13')
-const admin = (today: string, dismissed: string[] = []) => buildNotices({ ...none, today, servicePayment: { dismissed } }).find((x) => x.id === 'mensualidad')
+const admin = (today: string, paid?: string) => buildNotices({ ...none, today, servicePayment: { paid } }).find((x) => x.id === 'mensualidad')
 assert.equal(admin('2026-10-10'), undefined)
 assert.match(admin('2026-10-11')!.detail, /^Vence en 2 días \(el .*13 de octubre\)\. Si ya pagaste, omite este mensaje\.$/)
 assert.match(admin('2026-10-12')!.detail, /^Vence mañana/)
@@ -181,21 +181,37 @@ assert.match(admin('2026-10-13')!.detail, /^Vence hoy/)
 assert.equal(admin('2026-10-14'), undefined)
 assert.equal(admin('2026-10-13')!.tone, 'red')
 assert.equal(buildNotices({ ...none, today: '2026-10-12' }).length, 0) // without servicePayment: not for this person
-assert.equal(admin('2026-10-12', ['mensualidad:2026-10-13']), undefined)
-assert.ok(admin('2026-11-11', ['mensualidad:2026-10-13']), 'hiding October does not hide November')
-assert.equal(admin('2026-10-12')!.dismissKey, 'mensualidad:2026-10-13')
+assert.equal(admin('2026-10-12', '2026-10-13'), undefined)
+assert.ok(admin('2026-11-11', '2026-10-13'), 'October paid does not hide November')
+assert.equal(admin('2026-10-12')!.dismissKey, '2026-10-13')
 // It counts down to the end of the 13th in Bogotá (UTC-5).
 const deadline = admin('2026-10-11')!.deadline!
 assert.equal(deadline, Date.parse('2026-10-14T05:00:00Z'))
 assert.deepEqual(countdownParts(deadline, Date.parse('2026-10-11T10:00:00-05:00')), { days: 2, hours: 14, minutes: 0, seconds: 0 })
 assert.deepEqual(countdownParts(deadline, Date.parse('2026-10-13T23:58:30-05:00')), { days: 0, hours: 0, minutes: 1, seconds: 30 })
 assert.deepEqual(countdownParts(deadline, deadline + 5000), { days: 0, hours: 0, minutes: 0, seconds: 0 })
-const first = buildNotices({ ...none, today: '2026-10-12', servicePayment: { dismissed: [] }, payables: [payable('Vieja', -1, 10)], caja: { key: 'menor', started: true, open: true, dayKey: day(-3) } })
+const first = buildNotices({ ...none, today: '2026-10-12', servicePayment: {}, payables: [payable('Vieja', -1, 10)], caja: { key: 'menor', started: true, open: true, dayKey: day(-3) } })
 assert.deepEqual(
   first.map((x) => x.id),
   ['mensualidad', 'pagos', 'caja'],
 )
 ok('pago mensual del sistema: del 11 al 13, primero y en rojo, cuenta regresiva hasta el fin del 13, "Ya pagué" lo oculta hasta el mes siguiente')
+
+// The phone notification: nothing when nothing asks for action; else the most urgent, one per line, at most 4.
+assert.equal(pushMessage([]), null)
+assert.equal(pushMessage(buildNotices({ ...none, payables: [payable('Lejos', 20, 1000)], debtors: [{ name: 'Ana', debt: 5000, since: TODAY }] })), null)
+const push = pushMessage(first)!
+assert.equal(push.title, 'Recordatorio: pago mensual del sistema')
+assert.deepEqual(push.body.split('\n'), [
+  'Pago mensual del sistema: Vence mañana (el martes 13 de octubre). Si ya pagaste, omite este mensaje.',
+  'Pagos a proveedores ($10,00): 1 cuenta por pagar · vence en los próximos 7 días $10,00',
+  'Caja sin cerrar: ' + first[2].detail,
+])
+const busy = pushMessage(all)!
+assert.equal(busy.title, 'Pendientes: 4 asuntos por atender')
+assert.equal(busy.body.split('\n').length, 5)
+assert.equal(busy.body.split('\n')[4], '…y 3 más')
+ok('aviso al celular: solo si algo pide atención; lo más urgente primero, 4 como máximo')
 
 // Long lists are cut, saying how many were left out.
 const many = one({ products: Array.from({ length: MAX_LINES + 3 }, (_, i) => product(`P${i}`, 0, 0, `Producto ${String(i).padStart(2, '0')}`)) }, 'agotados')!

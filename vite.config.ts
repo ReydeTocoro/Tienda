@@ -55,6 +55,8 @@ export default defineConfig({
         globIgnores: ['**/html2canvas*.js', '**/purify*.js'],
         // The API must always hit the network, never the app-shell fallback.
         navigateFallbackDenylist: [/^\/api\//],
+        // Shows the Administrador's phone notifications (src/features/notifications/push.ts).
+        importScripts: ['push-sw.js'],
       },
     }),
   ],
