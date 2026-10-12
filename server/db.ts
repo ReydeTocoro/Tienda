@@ -27,6 +27,11 @@ const WRITE_LOCK = 4207
  * not carry `sslmode`, which would override this. */
 export function pgDb(connectionString: string, maxConnections = 3): Db {
   const pool = new pg.Pool({ connectionString, max: maxConnections, idleTimeoutMillis: 30_000, ssl: { ca: SUPABASE_CA, rejectUnauthorized: true } })
+  // The pooler can drop a connection that sits idle (a network blip, the machine waking from sleep): the
+  // pool then emits 'error' for it, and with no listener Node treats that as fatal — the whole API dies
+  // (ECONNRESET). The pool already discards that client and opens another on the next query, so the
+  // drop only needs to be noted. A query on a connection that fails while in use still rejects as usual.
+  pool.on('error', (err) => console.error('Se perdió una conexión inactiva con la base de datos (se abrirá otra):', err.message))
   const wrap = (c: pg.Pool | pg.PoolClient): Sql => ({
     async query<R>(text: string, params?: unknown[]) {
       return (await c.query(text, params)).rows as R[]
