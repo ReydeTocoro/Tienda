@@ -2,14 +2,17 @@ import type { Product } from '../../../types/product'
 import type { PurchaseOrder } from '../../../types/purchaseOrder'
 import { round2 } from '../../../shared/lib/cash'
 
-/** Local, throwaway state of the order being put together (picked products, quantities, costs).
+/** Local, throwaway state of the order being put together (picked products, quantities, costs, selling prices).
  * It is a reducer — and not server data — because nothing here is real until "Guardar"/"Enviar":
- * only then does the server validate it and store it as a purchase order. */
+ * only then does the server validate it and store it as a purchase order. It lives in `useOrderDraftStore`
+ * (memory), so it survives moving to another module and back. */
 export interface DraftLine {
   code: string
   name: string
   qty: number
   unitCost: number
+  /** The selling price (Precio 1) to set when it arrives; absent = the product keeps its own. */
+  salePrice?: number
 }
 
 export interface Draft {
@@ -25,6 +28,7 @@ export type DraftAction =
   | { type: 'toggle'; line: DraftLine }
   | { type: 'setQty'; code: string; qty: number }
   | { type: 'setCost'; code: string; unitCost: number }
+  | { type: 'setSalePrice'; code: string; salePrice: number | undefined }
   | { type: 'setNotes'; notes: string }
   | { type: 'remove'; code: string }
   | { type: 'load'; draft: Draft }
@@ -42,6 +46,8 @@ export function draftReducer(state: Draft, action: DraftAction): Draft {
       return { ...state, lines: state.lines.map((l) => (l.code === action.code ? { ...l, qty: Math.max(0, action.qty) } : l)) }
     case 'setCost':
       return { ...state, lines: state.lines.map((l) => (l.code === action.code ? { ...l, unitCost: Math.max(0, action.unitCost) } : l)) }
+    case 'setSalePrice':
+      return { ...state, lines: state.lines.map((l) => (l.code === action.code ? { ...l, salePrice: action.salePrice } : l)) }
     case 'setNotes':
       return { ...state, notes: action.notes }
     case 'remove':
@@ -66,5 +72,11 @@ export function lineFromProduct(p: Product): DraftLine {
 }
 
 export function draftFromOrder(o: PurchaseOrder): Draft {
-  return { supplierId: o.supplierId, lines: o.lines.map((l) => ({ code: l.code, name: l.name, qty: l.qty, unitCost: l.unitCost })), notes: o.notes ?? '' }
+  return { supplierId: o.supplierId, lines: o.lines.map((l) => ({ code: l.code, name: l.name, qty: l.qty, unitCost: l.unitCost, salePrice: l.salePrice })), notes: o.notes ?? '' }
+}
+
+/** What a line asks the server for: its selling price only when it changes the product's current one. */
+export function lineInput(l: DraftLine, currentPrice: number | undefined): { code: string; qty: number; unitCost: number; salePrice?: number } {
+  const { code, qty, unitCost, salePrice } = l
+  return salePrice !== undefined && salePrice > 0 && salePrice !== currentPrice ? { code, qty, unitCost, salePrice } : { code, qty, unitCost }
 }

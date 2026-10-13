@@ -64,7 +64,13 @@ export function purchaseOrdersRouter(db: Db) {
       db.tx(async (q) => {
         const { actor, by } = await buyer(q, req)
         const input = (req.body ?? {}) as ReceiveInput
-        return receiveOrder(q, Number(req.params.id), { ...input, by: by ?? input.by }, { revealBalance: allowed(actor, 'caja.verEsperado') })
+        return receiveOrder(
+          q,
+          Number(req.params.id),
+          { ...input, by: by ?? input.by },
+          // Changing a selling price is what "Crear y editar productos" allows (or someone allowed approves it with a PIN).
+          { revealBalance: allowed(actor, 'caja.verEsperado'), onPriceChange: () => requireNeed(q, actor, 'stock.editar') },
+        )
       }),
     ),
   )

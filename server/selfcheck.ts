@@ -433,5 +433,59 @@ await fails(() => run((q) => cash.registerMovement(q, { caja: 'menor', direction
 await run((q) => cash.registerMovement(q, { caja: 'menor', direction: 'out', amount: 10, concept: 'x', category: 'mantenimiento' }))
 ok('un egreso solo acepta categorías conocidas')
 
+// --- Precio de venta desde el pedido: cambia el producto al recibir, nunca las ventas ya hechas ---------------------
+const salesBefore = JSON.stringify(await listAll<Sale>(db, 'sales'))
+await putRow(db, 'products', 'code', 'P1', { ...product('P1', 4, 1000), price2: 2500 }) // vende a 2.000 (Precio 2: 2.500)
+const planned = (await run((q) =>
+  buying.createOrder(q, {
+    supplierId: credito.id,
+    send: true,
+    lines: [
+      { code: 'P1', qty: 6, unitCost: 1200, salePrice: 2600 },
+      { code: 'R1', qty: 1, unitCost: 5015, salePrice: 10030 }, // el que ya tiene: no es un cambio
+      { code: 'V2', qty: 2, unitCost: 500 },
+    ],
+  }),
+)) as PurchaseOrder & { id: number }
+assert.deepEqual(
+  planned.lines.map((l) => l.salePrice),
+  [2600, undefined, undefined],
+)
+await fails(() => run((q) => buying.createOrder(q, { supplierId: credito.id, lines: [{ code: 'P1', qty: 1, unitCost: 1, salePrice: -5 }] })), /precio de venta de "Prod P1" no es válido/, 'precio de venta inválido')
+assert.equal((await getRow<Product>(db, 'products', 'code', 'P1'))!.price, 2000, 'pedir no cambia el precio todavía')
+ok('el pedido guarda el precio de venta nuevo de cada producto (el que ya tiene no cuenta como cambio) y todavía no lo aplica')
+
+let priceAsks = 0
+const countAsk = { onPriceChange: async () => void priceAsks++ }
+// V2 no llegó (0): aunque la recepción traiga un precio, no cambia.
+const got = await run((q) => buying.receiveOrder(q, planned.id, { lines: [{ code: 'V2', qtyReceived: 0, unitCost: 500, salePrice: 1500 }], payment: { mode: 'credito' } }, countAsk))
+const p1 = (await getRow<Product>(db, 'products', 'code', 'P1'))!
+assert.equal(p1.price, 2600)
+assert.equal(p1.price2, 2500, 'el Precio 2 se conserva')
+assert.equal(p1.stock, 10)
+assert.equal(await costOf(db, 'P1'), 1200)
+assert.equal((await getRow<Product>(db, 'products', 'code', 'V2'))!.price, 1000, 'lo que no llegó no cambia de precio')
+assert.equal(priceAsks, 1, 'el permiso de cambiar precios se pide una vez')
+assert.deepEqual(
+  got.lines.map((l) => [l.code, l.salePrice, l.priceBefore]),
+  [
+    ['P1', 2600, 2000],
+    ['R1', undefined, undefined],
+    ['V2', undefined, undefined],
+  ],
+)
+assert.equal(JSON.stringify(await listAll<Sale>(db, 'sales')), salesBefore, 'las ventas ya hechas no cambian (ni sus precios)')
+
+const second = (await run((q) => buying.createOrder(q, { supplierId: credito.id, send: true, lines: [{ code: 'P1', qty: 1, unitCost: 1200, salePrice: 2800 }] }))) as PurchaseOrder & { id: number }
+const refuse = { onPriceChange: async () => Promise.reject(new Error('sin permiso para cambiar precios')) }
+await fails(() => run((q) => buying.receiveOrder(q, second.id, { payment: { mode: 'credito' } }, refuse)), /sin permiso para cambiar precios/, 'sin permiso no se cambian precios')
+assert.equal((await getRow<Product>(db, 'products', 'code', 'P1'))!.stock, 10, 'rechazado: no se escribe nada (ni el stock)')
+const backToSame = await run((q) => buying.receiveOrder(q, second.id, { lines: [{ code: 'P1', qtyReceived: 1, unitCost: 1200, salePrice: 2600 }], payment: { mode: 'credito' } }, countAsk))
+assert.equal(priceAsks, 1, 'si la recepción deja el precio que ya tiene, no hay cambio que autorizar')
+assert.equal(backToSame.lines[0].salePrice, undefined)
+assert.equal((await getRow<Product>(db, 'products', 'code', 'P1'))!.price, 2600)
+assert.equal((await getRow<Product>(db, 'products', 'code', 'P1'))!.stock, 11)
+ok('al recibir, el precio de venta pasa al producto junto con el stock y el costo (pide permiso de editar productos), Precio 2 se conserva, lo que no llegó no cambia, el pedido guarda el precio anterior y las ventas hechas quedan igual')
+
 await db.end()
 console.log(`\nTodo en orden: ${n} comprobaciones del dinero pasaron.`)

@@ -125,7 +125,10 @@ export function CartPanel({ products, onEditMeasured, onOpenDiscount, onCheckout
             <p className="text-[11px]">Toca un producto o escanea un código</p>
           </div>
         ) : (
-          items.map((item, i) => {
+          // The last product added on top, where the eye is; each line keeps its index in the cart (the sale and its
+          // receipt keep the order they were added in).
+          [...items.keys()].reverse().map((i) => {
+            const item = items[i]
             const product = productByCode.get(item.code)
             return (
               <CartLine

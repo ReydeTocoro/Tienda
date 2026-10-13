@@ -10,6 +10,11 @@ export interface OrderLine {
   unitCost: number
   /** Filled in when the order is received; may differ from `qty`. */
   qtyReceived?: number
+  /** The selling price (Precio 1) the product takes when this line arrives — set in the order or at reception; absent =
+   * it keeps its own. Sales already made keep the price they were sold at. */
+  salePrice?: number
+  /** On a received line whose selling price changed: the Precio 1 it had before (the order records the change). */
+  priceBefore?: number
 }
 
 export type OrderPayment = { mode: 'contado'; caja: CajaId; movementId: number } | { mode: 'credito'; payableId: number } | { mode: 'ninguno' }

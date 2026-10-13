@@ -5,6 +5,7 @@ import { clearLocalData, setSecurePerms, stopSync } from '../../sync'
 import { clearSearchHistory } from '../../shared/lib/searchHistory'
 import { useConnectionStore } from '../../store/useConnectionStore'
 import { useMayorStore } from '../../store/useMayorStore'
+import { useOrderDraftStore } from '../../store/useOrderDraftStore'
 import { useSessionStore } from '../../store/useSessionStore'
 import { endCounterSession, forgetRemembered, refreshCounterSession } from '../pin/counterSession'
 import { disablePush } from '../notifications/push'
@@ -57,6 +58,7 @@ export async function signOut({ forget = false, notice }: { forget?: boolean; no
   }
   useSessionStore.getState().clear()
   useMayorStore.getState().setOpen(false) // the next person finds the Caja Mayor closed
+  useOrderDraftStore.getState().reset() // and no half-made order with purchase prices
   forgetRemembered()
   await stopSync()
   if (forget) {

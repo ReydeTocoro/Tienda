@@ -110,6 +110,8 @@ export interface OrderLineInput {
   code: string
   qty: number
   unitCost: number
+  /** A new selling price to apply when it arrives (absent, or the product's own = no change). */
+  salePrice?: number | null
 }
 
 export interface OrderInput {
@@ -120,12 +122,21 @@ export interface OrderInput {
   send?: boolean
 }
 
+/** A line's new selling price: absent, empty or the product's own price = no change (`undefined`). */
+function newSalePrice(raw: unknown, p: Product): number | undefined {
+  if (raw === undefined || raw === null || raw === '') return undefined
+  const price = round2(Number(raw))
+  if (!Number.isFinite(price) || price <= 0) throw new Error(`El precio de venta de "${p.name}" no es válido`)
+  return price === p.price ? undefined : price
+}
+
 async function buildLines(sql: Sql, lines: OrderLineInput[]): Promise<OrderLine[]> {
   if (!Array.isArray(lines) || lines.length === 0) throw new Error('Agrega al menos un producto al pedido')
+  const products = await getRowsByKey<Product>(sql, 'products', 'code', lines.map((l) => String(l.code)))
   const seen = new Set<string>()
   const out: OrderLine[] = []
   for (const l of lines) {
-    const p = await getRow<Product>(sql, 'products', 'code', l.code)
+    const p = products.get(String(l.code))
     if (!p) throw new Error(`El producto ${l.code} no existe en el inventario`)
     if (seen.has(p.code)) throw new Error(`"${p.name}" está repetido en el pedido`)
     seen.add(p.code)
@@ -133,7 +144,8 @@ async function buildLines(sql: Sql, lines: OrderLineInput[]): Promise<OrderLine[
     const unitCost = round2(Number(l.unitCost))
     if (!(qty > 0)) throw new Error(`Indica la cantidad de "${p.name}"`)
     if (!Number.isFinite(unitCost) || unitCost < 0) throw new Error(`El costo de "${p.name}" no es válido`)
-    out.push({ code: p.code, name: p.name, qty, unitCost })
+    const salePrice = newSalePrice(l.salePrice, p)
+    out.push(salePrice === undefined ? { code: p.code, name: p.name, qty, unitCost } : { code: p.code, name: p.name, qty, unitCost, salePrice })
   }
   return out
 }
@@ -210,8 +222,9 @@ export async function cancelOrder(sql: Sql, id: number): Promise<PurchaseOrder> 
 }
 
 export interface ReceiveInput {
-  /** What actually arrived and at what unit cost; lines left out are taken as ordered. */
-  lines?: Array<{ code: string; qtyReceived: number; unitCost: number }>
+  /** What actually arrived, at what unit cost and — when given — at what selling price from now on (absent: the one the
+   * order planned, if any); lines left out are taken as ordered. */
+  lines?: Array<{ code: string; qtyReceived: number; unitCost: number; salePrice?: number | null }>
   payment: { mode: 'contado'; caja: CajaId } | { mode: 'credito' }
   by?: string
 }
@@ -219,11 +232,14 @@ export interface ReceiveInput {
 /** `revealBalance`: whether a "not enough money" refusal may say how much the caja holds. */
 export interface PayOptions {
   revealBalance?: boolean
+  /** Called once, before anything is written, when the reception changes a selling price (the route asks for
+   * `stock.editar` there). */
+  onPriceChange?: () => Promise<unknown>
 }
 
-/** The only place stock grows from a purchase. One transaction: stock + entrada records + the
- * payment (cash out of the chosen caja) or the account payable — if any step fails, nothing
- * happens, and a second attempt on the same order is rejected. */
+/** The only place stock grows from a purchase. One transaction: stock, purchase price and selling price + entrada
+ * records + the payment (cash out of the chosen caja) or the account payable — if any step fails, nothing happens, and
+ * a second attempt on the same order is rejected. Only the products change: sales already made keep their prices. */
 export async function receiveOrder(sql: Sql, id: number, input: ReceiveInput, opts: PayOptions = {}): Promise<PurchaseOrder> {
   const o = await getOrder(sql, id)
   if (o.status !== 'pedido') throw new Error(o.status === 'recibido' ? 'Este pedido ya fue recibido' : 'Solo se puede recibir un pedido que ya fue enviado')
@@ -252,16 +268,25 @@ export async function receiveOrder(sql: Sql, id: number, input: ReceiveInput, op
   const date = new Date().toISOString()
   const updatedProducts: Array<{ pk: string; obj: Product }> = []
   const records: Array<Omit<EntradaRecord, 'id'>> = []
+  const priced = new Map<string, { salePrice: number; priceBefore: number }>()
   for (const l of arrived) {
     const qty = l.qtyReceived ?? 0
     const p = products.get(l.code)
     if (!p) throw new Error(`El producto "${l.name}" ya no existe en el inventario`)
     const stockAntes = p.stock || 0
     const stockDespues = roundQty(stockAntes + qty)
+    // The reception's own price when it sends one; else what the order planned, unless the product already has it.
+    const r = overrides.get(l.code)
+    const salePrice = r && 'salePrice' in r ? newSalePrice(r.salePrice, p) : l.salePrice !== p.price ? l.salePrice : undefined
+    if (salePrice !== undefined) priced.set(p.code, { salePrice, priceBefore: p.price })
     // A new purchase price replaces the old one (the products table's trigger files it in "productCosts").
-    updatedProducts.push({ pk: p.code, obj: l.unitCost > 0 ? { ...p, stock: stockDespues, cost: l.unitCost } : { ...p, stock: stockDespues } })
+    updatedProducts.push({
+      pk: p.code,
+      obj: { ...p, stock: stockDespues, ...(l.unitCost > 0 ? { cost: l.unitCost } : {}), ...(salePrice !== undefined ? { price: salePrice } : {}) },
+    })
     records.push({ code: p.code, name: p.name, qty, stockAntes, stockDespues, date, source })
   }
+  if (priced.size) await opts.onPriceChange?.()
   await putRows(sql, 'products', 'code', updatedProducts)
   await insertAutoRows(sql, 'entradas', records)
 
@@ -304,7 +329,9 @@ export async function receiveOrder(sql: Sql, id: number, input: ReceiveInput, op
     }
   }
 
-  return saveOrder(sql, { ...o, status: 'recibido', lines, receivedTotal, receivedAt: new Date().toISOString(), receivedBy: by, payment })
+  // Each line says the selling price it set (and the one it replaced); a planned one that didn't apply goes.
+  const finalLines = lines.map(({ salePrice: _planned, priceBefore: _before, ...l }) => ({ ...l, ...priced.get(l.code) }))
+  return saveOrder(sql, { ...o, status: 'recibido', lines: finalLines, receivedTotal, receivedAt: new Date().toISOString(), receivedBy: by, payment })
 }
 
 // ----------------------------------------------------------------- payables

@@ -619,6 +619,9 @@ async function mainFlow(appUrl, webDir) {
     await ev(goto('Venta'))
     await waitFor("!!document.querySelector('#venta-search-input')", 8000)
     const bell = `[...document.querySelectorAll('button[aria-label="Notificaciones"]')].find((b) => b.offsetParent !== null)`
+    // The device downloads them first (the stand-in plays no Realtime): the daily sheet reads what is on the device.
+    await send('Page.reload')
+    await waitFor(`(${idb('products')}).then((ps) => ps.some((p) => p.code === 'N2'))`, 30000)
     await ev("localStorage.removeItem('mtp-daily-notices')")
     await send('Page.reload')
     await waitFor("!!document.querySelector('#venta-search-input')", 30000)
@@ -743,6 +746,52 @@ async function mainFlow(appUrl, webDir) {
     check('13 tocarlo abre la app en "Pendientes de hoy"', (await waitFor("(document.querySelector('dialog[open]')?.innerText||'').includes('Pendientes de hoy') && location.search === ''", 30000)).ok, await ev('location.href'))
     await ev(clickText('Entendido', "document.querySelector('dialog[open]')"))
     await sleep(300)
+
+    // 14. Proveedores → Nuevo pedido: each line can set the product's new selling price; the order being put together
+    // survives going to another module and back; "Ya llegó" receives it at once (stock, cost and price) — and the sales
+    // already made don't change.
+    const salesBefore14 = JSON.stringify((await control('/__test/state')).sales)
+    await ev(goto('Proveedores'))
+    await waitFor("[...document.querySelectorAll('[role=tab]')].some((t) => t.textContent.startsWith('Nuevo pedido'))", 10000)
+    await ev("[...document.querySelectorAll('[role=tab]')].find((t) => t.textContent.startsWith('Nuevo pedido')).click()")
+    await waitFor("!!document.querySelector('#order-supplier')", 8000)
+    await ev(`(() => { const s = document.querySelector('#order-supplier'); const o = [...s.options].find((x) => x.text === 'Plásticos del Valle'); Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value').set.call(s, o.value); s.dispatchEvent(new Event('change', { bubbles: true })); return true })()`)
+    await waitFor("[...document.querySelectorAll('[role=row]')].some((r) => r.innerText.includes('Vaso'))", 8000)
+    await ev("[...document.querySelectorAll('[role=row]')].find((r) => r.innerText.includes('Vaso')).click()")
+    await waitFor("!!document.querySelector('input[aria-label=\"Precio de venta de Vaso\"]')", 5000)
+    check('14 el pedido tiene la casilla del precio de venta, con el precio de hoy', (await ev("document.querySelector('input[aria-label=\"Precio de venta de Vaso\"]').value")) === '1000')
+    await ev(setInput('input[aria-label="Cantidad de Vaso"]', '10'))
+    await ev(setInput('input[aria-label="Costo unitario de Vaso"]', '600'))
+    await ev(setInput('input[aria-label="Precio de venta de Vaso"]', '1200'))
+    await sleep(300)
+    const panel14 = await ev('document.body.innerText')
+    check('14 dice el margen con el costo y el precio nuevos, y que el precio cambia al recibir', panel14.includes('Venta hoy $1.000,00 · margen 100.0%') && panel14.includes('1 precio de venta cambia al recibir'), panel14.slice(panel14.indexOf('Pedido nuevo'), panel14.indexOf('Pedido nuevo') + 500))
+    await ev(goto('Venta'))
+    await waitFor("!!document.querySelector('#venta-search-input')", 8000)
+    await ev(goto('Proveedores'))
+    await waitFor("!!document.querySelector('#order-supplier')", 8000)
+    const back14 = {
+      supplier: await ev("document.querySelector('#order-supplier').selectedOptions[0]?.text"),
+      qty: await ev("document.querySelector('input[aria-label=\"Cantidad de Vaso\"]')?.value"),
+      cost: await ev("document.querySelector('input[aria-label=\"Costo unitario de Vaso\"]')?.value"),
+      price: await ev("document.querySelector('input[aria-label=\"Precio de venta de Vaso\"]')?.value"),
+    }
+    check('14 al ir a Venta y volver, el pedido sigue ahí (proveedor, producto, cantidad, costo y precio)', back14.supplier === 'Plásticos del Valle' && back14.qty === '10' && back14.cost === '600' && back14.price === '1200', back14)
+    await shot(c, '20-nuevo-pedido-precio-venta')
+    await ev(clickText('Ya llegó'))
+    const sheet14 = await waitFor("(document.querySelector('dialog[open]')?.innerText||'').includes('Recibir pedido')", 15000)
+    check('14 "Ya llegó" registra el pedido y abre su recepción con el precio nuevo', sheet14.ok && (await ev("document.querySelector('dialog[open] input[aria-label=\"Precio de venta de Vaso\"]')?.value")) === '1200', await dialogText())
+    await shot(c, '21-recibir-con-precio')
+    await ev(clickText('Recibir y registrar', "document.querySelector('dialog[open]')"))
+    await waitFor("!document.querySelector('dialog[open]')", 15000)
+    check('14 recibido, el pedido nuevo queda vacío y se vuelve a Pedidos', (await ev("!document.querySelector('input[aria-label=\"Precio de venta de Vaso\"]') && [...document.querySelectorAll('[role=tab]')].find((t) => t.getAttribute('aria-selected') === 'true')?.textContent.startsWith('Pedidos')")) === true)
+    const st14 = await control('/__test/state')
+    check('14 al recibir, el stock sube de una vez (Vaso: 0 → 10)', st14.stocks.N2 === 10, st14.stocks)
+    check('14 y las ventas ya hechas no cambian', JSON.stringify(st14.sales) === salesBefore14)
+    await send('Page.reload')
+    await waitFor("!!document.querySelector('#venta-search-input') || !!document.querySelector('[role=tablist]')", 30000)
+    const vaso = await waitFor(`(${idb('products')}).then((ps) => { const p = ps.find((x) => x.code === 'N2'); return p && p.price === 1200 && p.stock === 10 ? p : null })`, 20000)
+    check('14 el producto queda con su precio de venta nuevo ($1.200)', vaso.ok, vaso)
 
     const errors = c.logs.filter((l) => /EXC/.test(l))
     check('sin errores de JavaScript en toda la prueba', errors.length === 0, errors.slice(0, 5))

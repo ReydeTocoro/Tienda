@@ -1,4 +1,6 @@
 import { useState } from 'react'
+import { useLiveQuery } from 'dexie-react-hooks'
+import { db } from '../../../db/index'
 import { BottomSheet } from '../../../shared/components/BottomSheet'
 import { receiveOrder } from '../../../db/repositories/purchaseOrders'
 import { CAJA_LABEL, dueDateFrom, formatDayKey, round2 } from '../../../shared/lib/cash'
@@ -12,14 +14,18 @@ import { useActorName, useCaja } from '../../cash/hooks/useCaja'
 import { MAYOR_MASK } from '../../cash/mayorEye'
 import { termsLabel } from '../lib/terms'
 
+/** Product, what arrived, its cost and its selling price from now on. */
+const RECEIVE_GRID = 'grid-cols-[minmax(0,1fr)_64px_84px_84px]'
+
 interface ReceiveOrderSheetProps {
   order: PurchaseOrder | null
   onClose: () => void
   onReceived: () => void
 }
 
-/** "Marcar como recibido": confirm what really arrived (the only moment stock grows), then say how
- * it is paid — cash out of a caja right now, or an account payable due on the supplier's terms. */
+/** "Marcar como recibido": confirm what really arrived (the only moment stock grows), at what cost and at what selling
+ * price from now on, then say how it is paid — cash out of a caja right now, or an account payable due on the
+ * supplier's terms. Only the products change: sales already made keep their prices. */
 export function ReceiveOrderSheet({ order, onClose, onReceived }: ReceiveOrderSheetProps) {
   return (
     <BottomSheet open={!!order} onClose={onClose} maxWidthClass="max-w-[560px]">
@@ -33,13 +39,18 @@ function ReceiveForm({ order, onClose, onReceived }: { order: PurchaseOrder; onC
   const actor = useActorName()
   const [qtys, setQtys] = useState<Record<string, string>>(() => Object.fromEntries(order.lines.map((l) => [l.code, String(l.qty)])))
   const [costs, setCosts] = useState<Record<string, string>>(() => Object.fromEntries(order.lines.map((l) => [l.code, String(l.unitCost)])))
+  // Today's selling prices; a field nobody touched shows the one the order planned, else today's.
+  const current = useLiveQuery(() => db.products.bulkGet(order.lines.map((l) => l.code)).then((ps) => new Map(ps.flatMap((p) => (p ? [[p.code, p.price] as [string, number]] : [])))), [order])
+  const [prices, setPrices] = useState<Record<string, string>>({})
+  const priceText = (code: string, planned?: number) => prices[code] ?? String(planned ?? current?.get(code) ?? '')
   const creditAllowed = order.paymentTerms.kind === 'credito'
   const [mode, setMode] = useState<'contado' | 'credito'>(creditAllowed ? 'credito' : 'contado')
   const [caja, setCaja] = useState<CajaId>('mayor')
   const [busy, setBusy] = useState(false)
 
-  const lines = order.lines.map((l) => ({ ...l, qtyReceived: parseFloat(qtys[l.code]) || 0, unitCost: parseFloat(costs[l.code]) || 0 }))
+  const lines = order.lines.map((l) => ({ ...l, qtyReceived: parseFloat(qtys[l.code]) || 0, unitCost: parseFloat(costs[l.code]) || 0, newPrice: parseFloat(priceText(l.code, l.salePrice)) || 0 }))
   const total = round2(lines.reduce((t, l) => t + l.qtyReceived * l.unitCost, 0))
+  const repriced = lines.filter((l) => l.qtyReceived > 0 && l.newPrice > 0 && current && l.newPrice !== current.get(l.code)).length
   const balances = { menor, mayor }
   // A closed Caja Mayor shows no balance (its eye, in Cajas); the server still checks the funds.
   const mayorOpen = useMayorStore((s) => s.open)
@@ -56,7 +67,8 @@ function ReceiveForm({ order, onClose, onReceived }: { order: PurchaseOrder; onC
     setBusy(true)
     try {
       await receiveOrder(order.id!, {
-        lines: lines.map((l) => ({ code: l.code, qtyReceived: l.qtyReceived, unitCost: l.unitCost })),
+        // An empty price is "no change" (null), not "what the order planned".
+        lines: lines.map((l) => ({ code: l.code, qtyReceived: l.qtyReceived, unitCost: l.unitCost, salePrice: l.newPrice > 0 ? l.newPrice : null })),
         payment: mode === 'contado' ? { mode: 'contado', caja } : { mode: 'credito' },
         by: actor,
       })
@@ -78,22 +90,44 @@ function ReceiveForm({ order, onClose, onReceived }: { order: PurchaseOrder; onC
         {order.supplierName} · {termsLabel(order.paymentTerms)}
       </div>
 
-      <div className="mb-1 grid grid-cols-[1fr_72px_88px] gap-2 px-1 text-[10px] text-muted">
+      <div className={`mb-1 grid ${RECEIVE_GRID} gap-2 px-1 text-[10px] text-muted`}>
         <span>Producto (pedido)</span>
         <span className="text-right">Llegó</span>
         <span className="text-right">Costo unit.</span>
+        <span className="text-right">Precio venta</span>
       </div>
-      <div className="mb-3 max-h-[34vh] overflow-y-auto rounded-xl border border-br">
-        {order.lines.map((l) => (
-          <div key={l.code} className="grid grid-cols-[1fr_72px_88px] items-center gap-2 border-b border-br px-2.5 py-2 last:border-b-0">
-            <div className="min-w-0">
-              <div className="truncate text-[13px] font-semibold">{l.name}</div>
-              <div className="text-[10px] text-muted">pedido: {formatQty(l.qty)}</div>
+      <div className="mb-1.5 max-h-[34vh] overflow-y-auto rounded-xl border border-br">
+        {order.lines.map((l) => {
+          const today = current?.get(l.code)
+          const price = priceText(l.code, l.salePrice)
+          const changed = today !== undefined && parseFloat(price) > 0 && parseFloat(price) !== today
+          return (
+            <div key={l.code} className={`grid ${RECEIVE_GRID} items-center gap-2 border-b border-br px-2.5 py-2 last:border-b-0`}>
+              <div className="min-w-0">
+                <div className="truncate text-[13px] font-semibold">{l.name}</div>
+                <div className="truncate text-[10px] text-muted">
+                  pedido: {formatQty(l.qty)}
+                  {today !== undefined && ` · venta hoy ${formatMoney(today)}`}
+                </div>
+              </div>
+              <input className="input px-2 py-1.5 text-right font-mono text-[13px]" type="number" min={0} step="any" aria-label={`Cantidad que llegó de ${l.name}`} value={qtys[l.code]} onChange={(e) => setQtys((s) => ({ ...s, [l.code]: e.target.value }))} />
+              <input className="input px-2 py-1.5 text-right font-mono text-[13px]" type="number" min={0} step="any" aria-label={`Costo unitario de ${l.name}`} value={costs[l.code]} onChange={(e) => setCosts((s) => ({ ...s, [l.code]: e.target.value }))} />
+              <input
+                className={`input px-2 py-1.5 text-right font-mono text-[13px] ${changed ? 'border-lime bg-lime/10 font-bold text-lime' : ''}`}
+                type="number"
+                min={0}
+                step="any"
+                aria-label={`Precio de venta de ${l.name}`}
+                title={changed ? `El precio de venta pasa de ${formatMoney(today)} a ${formatMoney(parseFloat(price))}` : 'Precio de venta desde ahora'}
+                value={price}
+                onChange={(e) => setPrices((s) => ({ ...s, [l.code]: e.target.value }))}
+              />
             </div>
-            <input className="input px-2 py-1.5 text-right font-mono text-[13px]" type="number" min={0} step="any" value={qtys[l.code]} onChange={(e) => setQtys((s) => ({ ...s, [l.code]: e.target.value }))} />
-            <input className="input px-2 py-1.5 text-right font-mono text-[13px]" type="number" min={0} step="any" value={costs[l.code]} onChange={(e) => setCosts((s) => ({ ...s, [l.code]: e.target.value }))} />
-          </div>
-        ))}
+          )
+        })}
+      </div>
+      <div className="mb-3 px-1 text-[11px] leading-snug text-txt2">
+        Al recibir se suma al stock y se actualizan el costo{repriced > 0 ? ` y ${repriced === 1 ? '1 precio de venta' : `${repriced} precios de venta`}` : ''}. Las ventas ya hechas no cambian.
       </div>
 
       <div className="mb-3.5 flex items-center justify-between rounded-lg bg-s2 px-3 py-2.5">

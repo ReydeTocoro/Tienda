@@ -58,6 +58,15 @@ export function OrderDetailSheet({ order, onClose, onEditDraft, onReceive }: Ord
                   <div className="text-[11px] text-muted">
                     {order.status === 'recibido' ? `${formatQty(l.qtyReceived ?? 0)} recibidos de ${formatQty(l.qty)}` : `${formatQty(l.qty)} × ${formatMoney(l.unitCost)}`}
                   </div>
+                  {l.salePrice !== undefined && (
+                    <div className="text-[11px] font-semibold text-lime">
+                      {l.priceBefore !== undefined
+                        ? `Precio de venta: ${formatMoney(l.priceBefore)} → ${formatMoney(l.salePrice)}`
+                        : order.status === 'recibido'
+                          ? ''
+                          : `Precio de venta al recibir: ${formatMoney(l.salePrice)}`}
+                    </div>
+                  )}
                 </div>
                 <div className="flex-shrink-0 font-mono font-semibold">{formatMoney((order.status === 'recibido' ? (l.qtyReceived ?? 0) : l.qty) * l.unitCost)}</div>
               </div>

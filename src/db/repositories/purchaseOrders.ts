@@ -4,14 +4,16 @@ import { apiPost, apiPut } from '../../api/client'
 
 export interface OrderInput {
   supplierId: string
-  lines: Array<{ code: string; qty: number; unitCost: number }>
+  /** `salePrice`: the selling price to set when it arrives (only when it changes the product's). */
+  lines: Array<{ code: string; qty: number; unitCost: number; salePrice?: number }>
   notes?: string
   /** true = save already sent to the supplier; false = keep as a draft. */
   send?: boolean
 }
 
 export interface ReceiveInput {
-  lines?: Array<{ code: string; qtyReceived: number; unitCost: number }>
+  /** `salePrice`: the selling price from now on (null = keep the product's). */
+  lines?: Array<{ code: string; qtyReceived: number; unitCost: number; salePrice?: number | null }>
   payment: { mode: 'contado'; caja: CajaId } | { mode: 'credito' }
   by?: string
 }

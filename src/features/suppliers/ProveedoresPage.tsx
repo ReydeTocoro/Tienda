@@ -1,6 +1,8 @@
-import { useMemo, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, type ReactNode } from 'react'
 import { useLocation, useSearchParams } from 'react-router-dom'
 import { useSecureTable } from '../../db/secure'
+import { useConfirm } from '../../store/useConfirmStore'
+import { useOrderDraftStore, type ProveedoresTab } from '../../store/useOrderDraftStore'
 import { Chip } from '../../shared/components/Chip'
 import { round2 } from '../../shared/lib/cash'
 import { formatMoney, todayKey } from '../../shared/lib/currency'
@@ -14,24 +16,22 @@ import { buildOrderRows } from './lib/orderRows'
 import { buildPayableRows, summarizePayables } from './lib/payableRows'
 import { buildSupplierRows } from './lib/supplierRows'
 
-type Tab = 'pedidos' | 'nuevo' | 'porpagar' | 'proveedores'
+type Tab = ProveedoresTab
 
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`
 
-/** Proveedores y compras: who we buy from, what we ask them for, what arrived, and what we owe. */
+/** Proveedores y compras: who we buy from, what we ask them for, what arrived, and what we owe. The tab and the order
+ * being put together live in `useOrderDraftStore`: leaving for another module and coming back finds them as they were. */
 export function ProveedoresPage() {
+  const tab = useOrderDraftStore((s) => s.tab)
+  const setTab = useOrderDraftStore((s) => s.setTab)
+  const confirm = useConfirm()
   // `?tab=porpagar` (the notices' "Ver") opens Por pagar — also when it is followed while already on this page.
   const [params] = useSearchParams()
   const location = useLocation()
-  const [tab, setTab] = useState<Tab>(() => (params.get('tab') === 'porpagar' ? 'porpagar' : 'pedidos'))
-  const [seenKey, setSeenKey] = useState(location.key)
-  if (location.key !== seenKey) {
-    setSeenKey(location.key)
+  useEffect(() => {
     if (params.get('tab') === 'porpagar') setTab('porpagar')
-  }
-  // `key` forces a fresh draft each time a different order (or a new one) is opened for editing;
-  // `supplierId` is the supplier a new order starts addressed to.
-  const [editing, setEditing] = useState<{ order: PurchaseOrder | null; supplierId: string | null; key: number }>({ order: null, supplierId: null, key: 0 })
+  }, [location.key, params, setTab])
   const orders = useSecureTable('purchaseOrders')
   const payables = useSecureTable('payables')
   const suppliers = useSecureTable('suppliers')
@@ -49,9 +49,26 @@ export function ProveedoresPage() {
   const debt = useMemo(() => summarizePayables(payableRows), [payableRows])
   const inactive = useMemo(() => supplierRows.filter((r) => !r.active).length, [supplierRows])
 
-  function startOrder(order: PurchaseOrder | null, supplierId: string | null = null) {
-    setEditing((e) => ({ order, supplierId, key: e.key + 1 }))
-    setTab('nuevo')
+  /** Opens a saved draft, or a new order for a supplier. What is being put together is never thrown away without asking:
+   * the same order (or a new one without a supplier yet) just shows again. */
+  async function startOrder(order: PurchaseOrder | null, supplierId: string | null = null) {
+    const s = useOrderDraftStore.getState()
+    const same = order ? s.editing?.id === order.id : !s.editing && (!s.draft.supplierId || s.draft.supplierId === supplierId)
+    if (same) {
+      if (supplierId && !s.draft.supplierId) s.dispatch({ type: 'setSupplier', supplierId })
+      return setTab('nuevo')
+    }
+    if (s.draft.lines.length) {
+      const ok = await confirm({
+        title: 'Hay un pedido sin terminar',
+        message: `Tiene ${plural(s.draft.lines.length, 'producto', 'productos')} sin guardar. Si empiezas otro, ese se descarta.`,
+        confirmLabel: 'Descartar y empezar otro',
+        cancelLabel: 'Seguir con el que tenía',
+        danger: true,
+      })
+      if (!ok) return setTab('nuevo')
+    }
+    s.start(order, supplierId)
   }
 
   const tabs: Array<{ key: Tab; label: string; badge?: number; badgeCls?: string }> = [
@@ -108,7 +125,7 @@ export function ProveedoresPage() {
               key={t.key}
               role="tab"
               aria-selected={tab === t.key}
-              onClick={() => (t.key === 'nuevo' ? startOrder(null) : setTab(t.key))}
+              onClick={() => setTab(t.key)}
               className={`flex flex-shrink-0 items-center gap-1.5 border-b-2 px-3.5 py-2 text-[13px] font-semibold transition-colors ${tab === t.key ? 'border-lime text-lime' : 'border-transparent text-txt2 hover:text-txt'}`}
             >
               {t.label}
@@ -117,10 +134,10 @@ export function ProveedoresPage() {
           ))}
         </div>
 
-        {tab === 'pedidos' && <OrderList rows={orderRows} onNew={() => startOrder(null)} onEditDraft={startOrder} />}
-        {tab === 'nuevo' && <NewOrderView key={editing.key} editing={editing.order} supplierId={editing.supplierId} onDone={() => setTab('pedidos')} />}
+        {tab === 'pedidos' && <OrderList rows={orderRows} onNew={() => setTab('nuevo')} onEditDraft={(o) => void startOrder(o)} />}
+        {tab === 'nuevo' && <NewOrderView />}
         {tab === 'porpagar' && <PayablesList rows={payableRows} />}
-        {tab === 'proveedores' && <SupplierList rows={supplierRows} onOrder={(s: Supplier) => startOrder(null, s.id)} />}
+        {tab === 'proveedores' && <SupplierList rows={supplierRows} onOrder={(s: Supplier) => void startOrder(null, s.id)} />}
       </div>
     </div>
   )
