@@ -5,6 +5,7 @@ import { db } from '../../../db/index'
 import type { Product } from '../../../types/product'
 import { UNITS, isMeasuredUnit } from '../../../types/unit'
 import { unitShortLabel } from '../../../shared/lib/units'
+import { formatQty } from '../../../shared/lib/currency'
 import { addProduct, updateProduct } from '../../../db/repositories/products'
 import { useConfirm } from '../../../store/useConfirmStore'
 import { toast } from '../../../store/useToastStore'
@@ -39,6 +40,8 @@ const EMPTY = {
   codigoSuelta: '',
   nombreSuelta: '',
   precioSuelta: '',
+  /** Why the stock of an existing product is changed here (the audit trail keeps it). */
+  stockReason: '',
 }
 
 interface ProductFormProps {
@@ -60,6 +63,8 @@ export function ProductForm({ product, showCosts, onSaved, onCancel, scanSeed, o
   // whoever edits may adjust stock anyway.
   const stockLocked = !!product && !can('stock.ajustar')
   const editing = !!product
+  // The stock of an existing product typed over here: the form asks why, like every other adjustment.
+  const stockChanged = editing && (parseFloat(f.stock) || 0) !== (product!.stock || 0)
   const allProducts = useLiveQuery(() => db.products.toArray(), [], []) as Product[]
 
   useEffect(() => {
@@ -84,6 +89,7 @@ export function ProductForm({ product, showCosts, onSaved, onCancel, scanSeed, o
         codigoSuelta: product.codigoSuelta || '',
         nombreSuelta: product.nombreSuelta || '',
         precioSuelta: product.precioSuelta ? String(product.precioSuelta) : '',
+        stockReason: '',
       })
     } else {
       setF(EMPTY)
@@ -161,6 +167,10 @@ export function ProductForm({ product, showCosts, onSaved, onCancel, scanSeed, o
     }
     if (!code) {
       toast('Escribe el código', 'orange')
+      return
+    }
+    if (stockChanged && !f.stockReason.trim()) {
+      toast('Escribe por qué cambia el stock', 'orange')
       return
     }
     if (codeChange) {
@@ -245,7 +255,7 @@ export function ProductForm({ product, showCosts, onSaved, onCancel, scanSeed, o
     try {
       if (editing) {
         // Stock the person didn't touch isn't sent: the figure loaded with the form may be stale (sales since).
-        await updateProduct(product!.code, prod, { keepStock: stockNum === (product!.stock || 0) })
+        await updateProduct(product!.code, prod, { keepStock: !stockChanged, stockReason: f.stockReason.trim() })
         toast(codeChange ? `Producto actualizado · código nuevo: ${codeChange}` : 'Producto actualizado', 'lime')
       } else {
         await addProduct(prod)
@@ -390,6 +400,11 @@ export function ProductForm({ product, showCosts, onSaved, onCancel, scanSeed, o
             <span className="whitespace-nowrap text-[12px] text-muted">{unitLbl}</span>
           </div>
         </Field>
+        {stockChanged && (
+          <Field label={`¿Por qué cambia el stock? (${formatQty(product!.stock || 0)} → ${formatQty(parseFloat(f.stock) || 0)}) *`} cls="col-span-2 md:col-span-6">
+            <input className="input" value={f.stockReason} maxLength={200} onChange={(e) => set('stockReason', e.target.value)} placeholder="Ej.: conté de nuevo, producto dañado…" aria-label="Motivo del cambio de stock" />
+          </Field>
+        )}
 
         <div className="col-span-2 rounded-xl border border-purple/25 bg-purple/10 p-3 md:col-span-6">
           <label className="mb-2.5 flex cursor-pointer items-center gap-2 text-[12px] font-bold text-purple">

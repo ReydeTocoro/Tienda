@@ -1,12 +1,12 @@
 import { Router } from 'express'
 import type { Product } from '../../src/types/product'
-import type { StockAuditEntry } from '../../src/types/auditLog'
 import { UNITS } from '../../src/types/unit'
 import type { Db } from '../db'
 import { authOf } from '../auth'
 import { actorOf, allowed, requireNeed } from '../domain/counter'
 import { MAX_CODE, assertCodeFree, renameProduct, reviveKey } from '../domain/productCode'
-import { getRow, putRow, deleteRow, insertAutoRow, roundQty, text } from './generic'
+import { logStock, stockEntry } from '../domain/stockAudit'
+import { getRow, putRow, deleteRow, roundQty, text } from './generic'
 import { HttpError, handle } from './http'
 
 const TABLE = 'products'
@@ -84,13 +84,14 @@ export function productsRouter(db: Db) {
       if (!code) throw new HttpError(400, 'Escribe el código')
       return db.tx(async (q) => {
         const actor = await actorOf(q, authOf(req))
-        await requireNeed(q, actor, 'stock.editar')
+        const by = await requireNeed(q, actor, 'stock.editar')
         await assertCodeFree(q, code)
         const product = cleanProduct(raw, code)
         const withCost = 'cost' in raw && allowed(actor, 'costos.ver') ? { ...product, cost: amount(raw.cost, 'El precio de compra') } : product
         // The table's trigger files the cost in "productCosts", out of the row everyone reads.
         await putRow(q, TABLE, 'code', code, withCost)
         await reviveKey(q, code)
+        if (withCost.stock > 0) await logStock(q, [stockEntry(withCost, 0, withCost.stock, 'Producto creado con existencias', by, 'nuevo')])
         return withCost
       })
     }, 201),
@@ -116,39 +117,36 @@ export function productsRouter(db: Db) {
         const withCost = 'cost' in raw && allowed(actor, 'costos.ver') ? { ...product, cost: amount(raw.cost, 'El precio de compra') } : product
         if (code === existing.code) await putRow(q, TABLE, 'code', existing.code, withCost)
         else await renameProduct(q, by, existing, withCost, code)
-        // Stock changed through the form (not through Ajustar / Entrada / Conteo): it leaves a trace like they do.
+        // Stock changed through the form (not through Ajustar / Entrada / Conteo): it leaves a trace like they do, with
+        // the reason the form asks for (an older screen sends none).
         if (withCost.stock !== existing.stock) {
-          const diff = roundQty(withCost.stock - existing.stock)
-          const entry: Omit<StockAuditEntry, 'id'> = {
-            type: diff < 0 ? 'merma' : 'ajuste',
-            date: new Date().toISOString(),
-            code,
-            name: withCost.name,
-            before: existing.stock || 0,
-            after: withCost.stock,
-            diff,
-            reason: 'Cambio de existencias en el formulario del producto',
-            user: by,
-          }
-          await insertAutoRow(q, 'auditLog', entry)
+          const reason = text(raw.stockReason, 200) || 'Cambio de existencias en el formulario del producto'
+          await logStock(q, [stockEntry({ code, name: withCost.name }, existing.stock || 0, withCost.stock, reason, by)])
         }
         return withCost
       })
     }),
   )
 
-  /** adjustStock: signed delta, clamped at 0 (legacy `quickStock`). */
+  /** The quick − / + of the Stock table: a signed delta, clamped at 0, and always with its reason — it goes to the audit
+   * trail with who did it. */
   router.post(
     '/:code/adjust-stock',
     handle(async (req) => {
-      const delta = Number((req.body as { delta?: unknown })?.delta)
-      if (!Number.isFinite(delta)) throw new HttpError(400, 'La cantidad no es válida')
+      const body = (req.body ?? {}) as { delta?: unknown; reason?: unknown }
+      const delta = Number(body.delta)
+      if (!Number.isFinite(delta) || delta === 0) throw new HttpError(400, 'La cantidad no es válida')
       return db.tx(async (q) => {
-        await requireNeed(q, await actorOf(q, authOf(req)), 'stock.ajustar')
+        const by = await requireNeed(q, await actorOf(q, authOf(req)), 'stock.ajustar')
+        const reason = text(body.reason, 200)
+        if (!reason) throw new HttpError(400, 'Escribe el motivo del ajuste')
         const p = await getRow<Product>(q, TABLE, 'code', req.params.code)
         if (!p) throw new Error('Producto no encontrado')
-        const u: Product = { ...p, stock: roundQty(Math.max(0, (p.stock || 0) + delta)) }
+        const before = p.stock || 0
+        const u: Product = { ...p, stock: roundQty(Math.max(0, before + delta)) }
+        if (u.stock === before) throw new HttpError(400, 'El stock ya está en 0')
         await putRow(q, TABLE, 'code', req.params.code, u)
+        await logStock(q, [stockEntry(p, before, u.stock, reason, by)])
         return u
       })
     }),
@@ -158,8 +156,11 @@ export function productsRouter(db: Db) {
     '/:code',
     handle(async (req) => {
       await db.tx(async (q) => {
-        await requireNeed(q, await actorOf(q, authOf(req)), 'stock.eliminar')
+        const by = await requireNeed(q, await actorOf(q, authOf(req)), 'stock.eliminar')
+        const p = await getRow<Product>(q, TABLE, 'code', req.params.code)
         await deleteRow(q, TABLE, 'code', req.params.code)
+        // The units it had leave the inventory with it: that leaves a trace too.
+        if (p && (p.stock || 0) > 0) await logStock(q, [stockEntry(p, p.stock, 0, 'Producto eliminado del inventario', by, 'eliminado')])
       })
     }),
   )

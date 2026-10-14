@@ -272,7 +272,7 @@ async function main() {
   check('T11d un 500 del servidor: la venta no se pierde, queda en el equipo', !!sD && (sD.id ?? 0) < 0 && (await db.outbox.count()) === 1, sD)
   // (e) the server REFUSES the sale (no stock there): not kept — the cashier must know
   await reset()
-  await apiPost('/api/products/B2/adjust-stock', { delta: -2 }) // the server has 1; this device still believes 3
+  await apiPost('/api/products/B2/adjust-stock', { delta: -2, reason: 'prueba' }) // the server has 1; this device still believes 3
   cartItem('B2', 2)
   useToastStore.getState().hide()
   const sE = await finalize()

@@ -1,13 +1,13 @@
 import { Router } from 'express'
 import type { Product } from '../../src/types/product'
-import type { StockAuditEntry } from '../../src/types/auditLog'
 import type { ParsedImportRow, DupAction } from '../../src/features/inventory/lib/importProducts'
 import type { Db } from '../db'
 import { authOf } from '../auth'
 import { actorOf, requireNeed } from '../domain/counter'
 import { reviveKey } from '../domain/productCode'
 import { looseUnitCost } from '../domain/secrets'
-import { getRow, getRowsByKey, putRow, insertAutoRow, insertAutoRows, roundQty, setStocks, text } from './generic'
+import { logStock, stockEntry, type StockEntry } from '../domain/stockAudit'
+import { getRow, getRowsByKey, putRow, roundQty, setStocks, text } from './generic'
 import { HttpError, handle } from './http'
 
 const MAX_IMPORT_ROWS = 3000
@@ -49,7 +49,7 @@ export function inventoryOpsRouter(db: Db) {
     handle(async (req) => {
       const { code, qty } = (req.body ?? {}) as { code: string; qty: number }
       return db.tx(async (q) => {
-        await requireNeed(q, await actorOf(q, authOf(req)), 'stock.ajustar')
+        const by = await requireNeed(q, await actorOf(q, authOf(req)), 'stock.ajustar')
         const p = await getRow<Product>(q, 'products', 'code', code)
         if (!p || !p.esPaquete) throw new Error('El producto no es un paquete')
         if (!(Number(qty) > 0) || !Number.isInteger(Number(qty))) throw new Error('Indica cuántos paquetes abrir')
@@ -57,13 +57,19 @@ export function inventoryOpsRouter(db: Db) {
 
         const nuevasSueltas = qty * (p.unidadesPor || 1)
         await putRow(q, 'products', 'code', code, { ...p, stock: p.stock - qty })
+        const opened = `${qty} paquete${qty !== 1 ? 's' : ''}`
+        const audit = [stockEntry(p, p.stock, p.stock - qty, `Se abrió ${opened} → ${nuevasSueltas} unidades sueltas`, by, 'paquete')]
 
         const suelta = p.codigoSuelta ? await getRow<Product>(q, 'products', 'code', p.codigoSuelta) : undefined
         if (suelta) {
           await putRow(q, 'products', 'code', suelta.code, { ...suelta, stock: (suelta.stock || 0) + nuevasSueltas })
+          audit.push(stockEntry(suelta, suelta.stock || 0, (suelta.stock || 0) + nuevasSueltas, `Salieron de abrir ${opened} de ${p.name}`, by, 'paquete'))
         } else if (p.codigoSuelta) {
-          await putRow(q, 'products', 'code', p.codigoSuelta, await newLooseUnit(q, p, nuevasSueltas))
+          const loose = await newLooseUnit(q, p, nuevasSueltas)
+          await putRow(q, 'products', 'code', p.codigoSuelta, loose)
+          audit.push(stockEntry(loose, 0, nuevasSueltas, `Salieron de abrir ${opened} de ${p.name}`, by, 'paquete'))
         }
+        await logStock(q, audit)
         return { sueltaName: p.nombreSuelta || 'unidad', nuevasSueltas }
       })
     }),
@@ -76,19 +82,26 @@ export function inventoryOpsRouter(db: Db) {
     handle(async (req) => {
       const { code } = (req.body ?? {}) as { code: string }
       await db.tx(async (q) => {
-        await requireNeed(q, await actorOf(q, authOf(req)), 'stock.ajustar')
+        const by = await requireNeed(q, await actorOf(q, authOf(req)), 'stock.ajustar')
         const p = await getRow<Product>(q, 'products', 'code', code)
         if (!p || !p.esPaquete || !p.codigoSuelta) throw new Error('El producto no es un paquete')
 
+        const audit: StockEntry[] = []
         let suelta = await getRow<Product>(q, 'products', 'code', p.codigoSuelta)
         if (!suelta || suelta.stock <= 0) {
           if (p.stock <= 0) throw new Error('Sin unidades sueltas ni paquetes')
           const nuevas = p.unidadesPor || 1
           await putRow(q, 'products', 'code', code, { ...p, stock: p.stock - 1 })
-          suelta = suelta ? { ...suelta, stock: (suelta.stock || 0) + nuevas } : await newLooseUnit(q, p, nuevas)
+          audit.push(stockEntry(p, p.stock, p.stock - 1, `Se abrió 1 paquete → ${nuevas} unidades sueltas (para vender una)`, by, 'paquete'))
+          const looseBefore = suelta?.stock || 0
+          suelta = suelta ? { ...suelta, stock: looseBefore + nuevas } : await newLooseUnit(q, p, nuevas)
           await putRow(q, 'products', 'code', suelta.code, suelta)
+          audit.push(stockEntry(suelta, looseBefore, suelta.stock, `Salieron de abrir 1 paquete de ${p.name}`, by, 'paquete'))
         }
-        await putRow(q, 'products', 'code', suelta.code, { ...suelta, stock: Math.max(0, (suelta.stock || 0) - 1) })
+        const left = Math.max(0, (suelta.stock || 0) - 1)
+        await putRow(q, 'products', 'code', suelta.code, { ...suelta, stock: left })
+        audit.push(stockEntry(suelta, suelta.stock || 0, left, 'Vendida 1 unidad suelta desde Stock (no pasó por la caja)', by, 'paquete'))
+        await logStock(q, audit)
       })
     }),
   )
@@ -99,11 +112,12 @@ export function inventoryOpsRouter(db: Db) {
     handle(async (req) => {
       const { code } = (req.body ?? {}) as { code: string }
       await db.tx(async (q) => {
-        await requireNeed(q, await actorOf(q, authOf(req)), 'stock.ajustar')
+        const by = await requireNeed(q, await actorOf(q, authOf(req)), 'stock.ajustar')
         const p = await getRow<Product>(q, 'products', 'code', code)
         if (!p || !p.esPaquete) throw new Error('El producto no es un paquete')
         if (p.stock <= 0) throw new Error('No hay paquetes disponibles')
         await putRow(q, 'products', 'code', code, { ...p, stock: p.stock - 1 })
+        await logStock(q, [stockEntry(p, p.stock, p.stock - 1, 'Vendido 1 paquete completo desde Stock (no pasó por la caja)', by, 'paquete')])
       })
     }),
   )
@@ -121,7 +135,7 @@ export function inventoryOpsRouter(db: Db) {
         // to write the stocks and the audit entries (a code that appears twice is counted in order).
         const products = await getRowsByKey<Product>(q, 'products', 'code', adjustments.map((a) => String(a?.code ?? '')))
         const stock = new Map([...products].map(([code, p]) => [code, p.stock || 0]))
-        const entries: Array<Omit<StockAuditEntry, 'id'>> = []
+        const entries: StockEntry[] = []
         const date = new Date().toISOString()
         for (const a of adjustments) {
           const code = String(a?.code ?? '')
@@ -132,10 +146,10 @@ export function inventoryOpsRouter(db: Db) {
           const diff = counted - before
           if (diff === 0) continue
           stock.set(code, counted)
-          entries.push({ type: diff < 0 ? 'merma' : 'ajuste', date, code, name: p.name, before, after: counted, diff, reason: text(a.reason, 200), user: by })
+          entries.push(stockEntry(p, before, counted, text(a.reason, 200) || 'Conteo cíclico', by, undefined, date))
         }
         await setStocks(q, [...new Set(entries.map((e) => e.code))].map((code) => ({ code, stock: stock.get(code)! })))
-        await insertAutoRows(q, 'auditLog', entries)
+        await logStock(q, entries)
         return { applied: entries.length }
       })
     }),
@@ -156,6 +170,7 @@ export function inventoryOpsRouter(db: Db) {
         let added = 0
         let updated = 0
         let skipped = 0
+        const audit: StockEntry[] = []
 
         for (const raw of parsed) {
           const row = {
@@ -185,19 +200,7 @@ export function inventoryOpsRouter(db: Db) {
               const before = existing.stock || 0
               const after = roundQty(before + row.stock)
               await putRow(q, 'products', 'code', row.code, { ...existing, stock: after })
-
-              const entry: Omit<StockAuditEntry, 'id'> = {
-                type: 'importacion',
-                date: new Date().toISOString(),
-                code: row.code,
-                name: row.name || existing.name,
-                before,
-                after,
-                diff: row.stock,
-                reason: 'Importación CSV/Excel (solo stock)',
-                user: by,
-              }
-              await insertAutoRow(q, 'auditLog', entry)
+              if (after !== before) audit.push(stockEntry({ code: row.code, name: row.name || existing.name }, before, after, 'Importación CSV/Excel (solo stock)', by, 'importacion'))
               updated++
               continue
             }
@@ -216,20 +219,7 @@ export function inventoryOpsRouter(db: Db) {
             // Replacing the stock leaves the same trace as adding to it ("solo stock" above).
             const before = existing.stock || 0
             const after = merged.stock || 0
-            if (after !== before) {
-              const entry: Omit<StockAuditEntry, 'id'> = {
-                type: 'importacion',
-                date: new Date().toISOString(),
-                code: row.code,
-                name: merged.name,
-                before,
-                after,
-                diff: roundQty(after - before),
-                reason: 'Importación CSV/Excel (actualizar)',
-                user: by,
-              }
-              await insertAutoRow(q, 'auditLog', entry)
-            }
+            if (after !== before) audit.push(stockEntry(merged, before, after, 'Importación CSV/Excel (actualizar)', by, 'importacion'))
             updated++
           } else {
             if (!row.name) {
@@ -253,9 +243,11 @@ export function inventoryOpsRouter(db: Db) {
             }
             await putRow(q, 'products', 'code', row.code, newProduct)
             await reviveKey(q, row.code)
+            if (newProduct.stock > 0) audit.push(stockEntry(newProduct, 0, newProduct.stock, 'Importación CSV/Excel (producto nuevo)', by, 'importacion'))
             added++
           }
         }
+        await logStock(q, audit)
         return { added, updated, skipped }
       })
     }),

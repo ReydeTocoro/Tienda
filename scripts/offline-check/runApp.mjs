@@ -340,7 +340,9 @@ async function mainFlow(appUrl, webDir) {
     const refresh = async (what) => {
       await send('Page.reload')
       await waitFor("document.querySelectorAll('[role=row]').length>1", 30000)
-      return (await waitFor(`new Promise((res)=>{const r=indexedDB.open('tienda-pro');r.onsuccess=()=>{const q=r.result.transaction('sales').objectStore('sales').getAll();q.onsuccess=()=>{r.result.close();res((${what})(q.result))}}})`, 15000)).ok
+      const ok = (await waitFor(`new Promise((res)=>{const r=indexedDB.open('tienda-pro');r.onsuccess=()=>{const q=r.result.transaction('sales').objectStore('sales').getAll();q.onsuccess=()=>{r.result.close();res((${what})(q.result))}}})`, 15000)).ok
+      await sleep(800) // and the table on screen catches up with it (a live query re-renders a moment later)
+      return ok
     }
     await ev(goto('Facturas'))
     check('9 Facturas lista las tres ventas, cada una con Corregir y Anular', (await waitFor("document.querySelectorAll('button[aria-label=\"Corregir factura\"]').length===3 && document.querySelectorAll('button[aria-label=\"Anular factura\"]').length===3", 15000)).ok)
@@ -622,10 +624,13 @@ async function mainFlow(appUrl, webDir) {
     // The device downloads them first (the stand-in plays no Realtime): the daily sheet reads what is on the device.
     await send('Page.reload')
     await waitFor(`(${idb('products')}).then((ps) => ps.some((p) => p.code === 'N2'))`, 30000)
-    await ev("localStorage.removeItem('mtp-daily-notices')")
+    // The new page clears the mark before the app starts: cleared from the old page, that page could still show the
+    // sheet (and mark the day again) in the moment before the reload takes it away.
+    const clearMark = await send('Page.addScriptToEvaluateOnNewDocument', { source: "localStorage.removeItem('mtp-daily-notices')" })
     await send('Page.reload')
     await waitFor("!!document.querySelector('#venta-search-input')", 30000)
     const daily = await waitFor("(document.querySelector('dialog[open]')?.innerText||'').includes('Pendientes de hoy')", 20000)
+    await send('Page.removeScriptToEvaluateOnNewDocument', { identifier: clearMark.result.identifier })
     const dailyText = await dialogText()
     check('12 la primera vez del día "Pendientes de hoy" se abre sola con el detalle', daily.ok && dailyText.includes('Productos agotados') && dailyText.includes('Vaso') && dailyText.includes('Stock bajo') && dailyText.includes('Quedan 2 · mínimo 5'), dailyText)
     check('12 con lo que se debe a cada proveedor y cuándo vence, y el pedido por recibir', /Pagos a proveedores[\s\S]*\$49\.000,00/.test(dailyText) && /Distribuidora Andina[\s\S]*Vence en 3 días[\s\S]*\$25\.000,00/.test(dailyText) && dailyText.includes('Pedidos por recibir') && dailyText.includes('Hogar y Más'), dailyText)
@@ -792,6 +797,36 @@ async function mainFlow(appUrl, webDir) {
     await waitFor("!!document.querySelector('#venta-search-input') || !!document.querySelector('[role=tablist]')", 30000)
     const vaso = await waitFor(`(${idb('products')}).then((ps) => { const p = ps.find((x) => x.code === 'N2'); return p && p.price === 1200 && p.stock === 10 ? p : null })`, 20000)
     check('14 el producto queda con su precio de venta nuevo ($1.200)', vaso.ok, vaso)
+
+    // 15. Stock: the quick − / + of the table ask how many and why, and the Auditoría shows every change with who did it.
+    await ev(goto('Stock'))
+    await waitFor("[...document.querySelectorAll('[role=row]')].some((r) => r.innerText.includes('Cuerda'))", 15000)
+    const c3Before = (await control('/__test/state')).stocks.C3
+    await ev("[...document.querySelectorAll('[role=row]')].find((r) => r.innerText.includes('Cuerda')).querySelector('button[title=\"Sumar 1\"]').click()")
+    const adj = await waitFor("(document.querySelector('dialog[open]')?.innerText||'').includes('Sumar al stock')", 8000)
+    check('15 el + de la tabla abre una ventanita que pregunta cuánto y por qué (sin motivo no deja guardar)', adj.ok && (await ev("document.querySelector('dialog[open] button[data-enter]').disabled")) === true, await dialogText())
+    await ev(setInput('dialog[open] input[aria-label="Cantidad"]', '3'))
+    await ev(clickText('Devolución de un cliente', "document.querySelector('dialog[open]')"))
+    await sleep(300)
+    await shot(c, '22-ajuste-con-motivo')
+    await ev("document.querySelector('dialog[open] button[data-enter]').click()")
+    await waitFor("!document.querySelector('dialog[open]')", 8000)
+    check('15 con el motivo, el stock cambia (+3)', (await control('/__test/state')).stocks.C3 === c3Before + 3, (await control('/__test/state')).stocks)
+    await send('Page.reload') // the stand-in plays no Realtime: the new audit lines come with a download
+    await waitFor("[...document.querySelectorAll('button')].some((b) => b.textContent.trim().startsWith('Auditoría'))", 30000)
+    await waitFor(`(${idb('auditLog')}).then((rows) => rows.some((r) => r.reason === 'Devolución de un cliente'))`, 20000)
+    await ev(clickText('Auditoría'))
+    await waitFor("(document.querySelector('dialog[open]')?.innerText||'').includes('Devolución de un cliente')", 8000)
+    const audit15 = await dialogText()
+    check('15 la Auditoría muestra el ajuste: producto, +3, antes → después, el motivo y quién lo hizo', /Cuerda[\s\S]*?\+3[\s\S]*?Ajuste \(suma\)[\s\S]*?Devolución de un cliente[\s\S]*?Propietario/.test(audit15), audit15.slice(0, 700))
+    check('15 y también lo que entró al recibir el pedido del paso 14', /Vaso[\s\S]*?Entrada de mercancía[\s\S]*?Pedido #P\d{4} recibido · Plásticos del Valle[\s\S]*?Propietario/.test(audit15), audit15.slice(0, 1200))
+    await shot(c, '23-auditoria')
+    await ev(setInput('dialog[open] input[type="search"], dialog[open] input[placeholder^="Buscar producto, código, usuario"]', 'devolución'))
+    await sleep(400)
+    const filtered15 = await dialogText()
+    check('15 se puede buscar por motivo', filtered15.includes('Devolución de un cliente') && !filtered15.includes('Plásticos del Valle'), filtered15.slice(0, 600))
+    await ev(`document.querySelector('dialog[open] button[aria-label="Cerrar"]').click()`)
+    await sleep(300)
 
     const errors = c.logs.filter((l) => /EXC/.test(l))
     check('sin errores de JavaScript en toda la prueba', errors.length === 0, errors.slice(0, 5))

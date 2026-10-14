@@ -23,6 +23,7 @@ import type { Product } from '../src/types/product'
 import type { Sale } from '../src/types/sale'
 import type { CashMovement } from '../src/types/cash'
 import type { Payable, PurchaseOrder } from '../src/types/purchaseOrder'
+import type { StockAuditEntry } from '../src/types/auditLog'
 
 const lite = await testDatabase()
 const db = pgliteDb(lite)
@@ -143,6 +144,16 @@ assert.equal(payables[0].dueDate, addDaysToKey(todayKey(), 30))
 assert.equal(payables[0].dueDate, dueDateFrom(new Date(), 30))
 assert.equal(await bal('mayor'), MAYOR_BASE + 40000, 'a crédito no sale dinero')
 ok('recibir suma lo recibido al stock, actualiza el costo y crea la cuenta por pagar a 30 días')
+const arrivals = (await listAll<StockAuditEntry>(db, 'auditLog')).filter((a) => a.type === 'entrada')
+assert.deepEqual(
+  arrivals.map((a) => [a.code, a.before, a.after, a.user]),
+  [
+    ['A1', 10, 18, 'Ana'],
+    ['B2', 0, 5, 'Ana'],
+  ],
+)
+assert.match(arrivals[0].reason, /^Pedido #P\d{4} recibido · Plasticos SAS$/)
+ok('lo que entra al recibir un pedido queda en la auditoría del stock: antes → después, el pedido, el proveedor y quién lo recibió')
 await fails(() => run((q) => buying.receiveOrder(q, order.id, { payment: { mode: 'credito' } })), /ya fue recibido/, 'doble recepción')
 assert.equal(await stock('A1'), 18)
 ok('un pedido no se puede recibir dos veces')

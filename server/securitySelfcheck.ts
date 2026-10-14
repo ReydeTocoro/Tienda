@@ -392,11 +392,55 @@ assert.deepEqual(counted, [
   { type: 'ajuste', before: live + 5, after: live + 10, reason: 'primero' },
   { type: 'merma', before: live + 10, after: live + 4, reason: 'segundo' },
 ])
-okStatus(await post(OWNER, '/api/products/A1/adjust-stock', { delta: live - (live + 4) }), 'y deja el stock como estaba')
-okStatus(await post(OWNER, '/api/products/B2/adjust-stock', { delta: -1 }), 'igual con la ponchera')
+okStatus(await post(OWNER, '/api/products/A1/adjust-stock', { delta: live - (live + 4), reason: 'vuelve a lo de antes' }), 'y deja el stock como estaba')
+okStatus(await post(OWNER, '/api/products/B2/adjust-stock', { delta: -1, reason: 'vuelve a lo de antes' }), 'igual con la ponchera')
 assert.equal(await a1Stock(), live)
 assert.equal(await b2Stock(), b2Now)
 ok('Stock: cada acción pide su permiso en el servidor; una autorización vale para un paso en esa sesión y queda firmada por ambos; sin permiso no se fija el costo ni el stock')
+
+// Every change of the stock outside a sale goes to the audit trail: what, from what to what, why, and who.
+const tombstonesOf = async (pk: string) => (await lite.query<{ table_name: string }>(`select table_name from deletions where pk = $1 order by table_name`, [pk])).rows.map((x) => x.table_name)
+const lastAudit = () =>
+  row<{ type: string; code: string; before: number; after: number; reason: string; user: string }>(
+    `select data ->> 'type' as type, data ->> 'code' as code, (data ->> 'before')::float8 as before, (data ->> 'after')::float8 as after, data ->> 'reason' as reason, data ->> 'user' as "user" from "auditLog" order by id desc limit 1`,
+  )
+const audited = (type: string, code: string, before: number, after: number, reason: string) => ({ type, code, before, after, reason, user: 'Propietario' })
+const auditsBeforeRefusal = await a1Audits()
+r = await post(OWNER, '/api/products/A1/adjust-stock', { delta: 2 })
+assert.equal(r.status, 400, 'el ajuste rápido sin motivo no se hace')
+assert.match(String(r.body.error), /motivo/)
+r = await post(OWNER, '/api/products/A1/adjust-stock', { delta: 2, reason: '   ' })
+assert.equal(r.status, 400, 'ni con un motivo en blanco')
+assert.equal(await a1Stock(), live)
+assert.equal(await a1Audits(), auditsBeforeRefusal)
+okStatus(await post(OWNER, '/api/products/A1/adjust-stock', { delta: 2, reason: 'Devolución de un cliente' }), 'con su motivo, sí')
+assert.deepEqual(await lastAudit(), audited('ajuste', 'A1', live, live + 2, 'Devolución de un cliente'))
+okStatus(await post(OWNER, '/api/products/A1/adjust-stock', { delta: -2, reason: 'Producto dañado' }), 'y para descontar')
+assert.deepEqual(await lastAudit(), audited('merma', 'A1', live + 2, live, 'Producto dañado'))
+okStatus(await post(OWNER, '/api/entradas', { code: 'A1', qty: 4 }), 'una entrada de mercancía')
+assert.deepEqual(await lastAudit(), audited('entrada', 'A1', live, live + 4, 'Entrada de mercancía'))
+okStatus(await put(OWNER, '/api/products/A1', { code: 'A1', name: 'Balde grande', price: 2500, stock: live, min: 2, unit: 'unidad', esPaquete: false, stockReason: 'Conté de nuevo' }), 'el formulario manda el motivo del cambio de stock')
+assert.deepEqual(await lastAudit(), audited('merma', 'A1', live + 4, live, 'Conté de nuevo'))
+okStatus(await post(OWNER, '/api/products', { code: 'AUD1', name: 'Para auditar', price: 100, stock: 3 }), 'un producto nuevo con existencias')
+assert.deepEqual(await lastAudit(), audited('nuevo', 'AUD1', 0, 3, 'Producto creado con existencias'))
+okStatus(await call(OWNER, 'DELETE', '/api/products/AUD1'), 'y eliminarlo')
+assert.deepEqual(await lastAudit(), audited('eliminado', 'AUD1', 3, 0, 'Producto eliminado del inventario'))
+needs(await post(ANA, '/api/products/A1/adjust-stock', { delta: 1, reason: 'prueba' }), 'stock.ajustar', 'quien no puede ajustar sigue sin poder, aunque escriba un motivo')
+ok('auditoría: el ajuste rápido exige motivo; ajustes, entradas, el formulario, un producto creado o eliminado con existencias quedan con antes → después, motivo y quién lo hizo')
+
+// Three days of stock movements are kept (today and the two before, in the store's days): the next movement deletes the
+// older ones — and every device is told — while a correction of an invoice stays (Reporte's history reads it).
+const hoursAgo = (h: number) => new Date(Date.now() - h * 3_600_000).toISOString()
+const oldLine = (reason: string, date: string) => JSON.stringify({ type: 'ajuste', date, code: 'A1', name: 'Balde', before: 1, after: 2, diff: 1, reason, user: 'x' })
+await lite.query(`insert into "auditLog" (data) values ($1), ($2), ($3)`, [oldLine('hace 48 horas', hoursAgo(48)), oldLine('hace 72 horas', hoursAgo(72)), oldLine('hace 5 días', hoursAgo(120))])
+await lite.query(`insert into "auditLog" (data) values ($1)`, [JSON.stringify({ type: 'correccion_venta', date: hoursAgo(120), saleId: 1, reason: 'corrección vieja', before: { items: [], subtotal: 0, discount: 0, total: 0 }, after: { items: [], subtotal: 0, discount: 0, total: 0 }, totalDiff: 0 })])
+const kept = async () => (await lite.query<{ r: string }>(`select data ->> 'reason' as r from "auditLog" where data ->> 'reason' in ('hace 48 horas', 'hace 72 horas', 'hace 5 días', 'corrección vieja') order by id`)).rows.map((x) => x.r)
+const oldIds = (await lite.query<{ id: string }>(`select id::text from "auditLog" where data ->> 'reason' in ('hace 72 horas', 'hace 5 días')`)).rows.map((x) => x.id)
+okStatus(await post(OWNER, '/api/products/A1/adjust-stock', { delta: 1, reason: 'otro movimiento' }), 'el siguiente movimiento')
+assert.deepEqual(await kept(), ['hace 48 horas', 'corrección vieja'], 'se borra lo de antes de anteayer; queda lo de los tres días y la corrección de factura')
+for (const id of oldIds) assert.deepEqual(await tombstonesOf(id), ['auditLog'], 'y cada equipo se entera de que se borró')
+okStatus(await post(OWNER, '/api/products/A1/adjust-stock', { delta: -1, reason: 'vuelve' }), 'y vuelve')
+ok('la auditoría del stock guarda tres días: el siguiente movimiento borra lo más viejo (en todos los equipos) y las correcciones de facturas se conservan')
 
 // ─── 6. Sales ───────────────────────────────────────────────────────────────────────────────────
 const sale = (items: Array<{ code: string; price: number; qty: number; isFree?: boolean; name?: string }>, extra: Record<string, unknown> = {}) => {
@@ -666,6 +710,14 @@ assert.match(String(r.body.error), /reservado/)
 r = await put(OWNER, '/api/products/B2-NUEVO', full({ code: 'PQ1-S' }))
 assert.equal(r.status, 409, 'tampoco cambiando el código de uno')
 okStatus(await post(OWNER, '/api/inventory/open-package', { code: 'PQ1', qty: 1 }), 'se abre un paquete')
+assert.deepEqual(
+  (await lite.query<{ code: string; before: number; after: number; type: string }>(`select data ->> 'code' as code, (data ->> 'before')::float8 as before, (data ->> 'after')::float8 as after, data ->> 'type' as type from "auditLog" order by id desc limit 2`)).rows.reverse(),
+  [
+    { code: 'PQ1', before: 3, after: 2, type: 'paquete' },
+    { code: 'PQ1-S', before: 0, after: 6, type: 'paquete' },
+  ],
+  'abrir un paquete deja las dos huellas: el paquete que sale y las unidades sueltas que entran',
+)
 assert.equal((await row<{ p: string }>(`select data ->> 'codigoPaquete' as p from products where code = 'PQ1-S'`))!.p, 'PQ1')
 okStatus(await put(OWNER, '/api/products/PQ1', { code: 'PQ9', name: 'Paquete', price: 600, stock: 2, esPaquete: true, unidadesPor: 6, codigoSuelta: 'PQ1-S', nombreSuelta: 'Suelta', precioSuelta: 120 }), 'se cambia el código del paquete')
 assert.equal((await row<{ p: string }>(`select data ->> 'codigoPaquete' as p from products where code = 'PQ1-S'`))!.p, 'PQ9', 'su unidad suelta lo sigue')

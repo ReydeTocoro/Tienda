@@ -1,13 +1,23 @@
 import type { CartItem } from './cartItem'
 
+/** The kinds of stock movement (`StockAuditEntry`); only these are deleted after `STOCK_AUDIT_DAYS`. */
+export const STOCK_AUDIT_TYPES = ['importacion', 'ajuste', 'merma', 'entrada', 'paquete', 'nuevo', 'eliminado'] as const
+
+/** Days of stock movements kept, today included (the store's days): older ones are deleted. Invoice corrections,
+ * annulments and code changes are kept — Reporte's history of corrections reads them. */
+export const STOCK_AUDIT_DAYS = 3
+
 interface AuditLogBase {
   id?: number
   date: string
 }
 
-/** Stock-quantity changes: bulk import dedup, cyclic count adjustment, or shrinkage ("merma"). */
+/** A change of a product's stock outside a sale (sales are in Facturas): a manual adjustment up ("ajuste") or down
+ * ("merma") — the quick buttons, the product form, the cyclic count —, goods that arrived ("entrada": stock-in, a
+ * received purchase order), a package opened or sold from Stock ("paquete"), an import, a product created with stock
+ * ("nuevo") or deleted with stock ("eliminado"). Always with who did it and why. */
 export interface StockAuditEntry extends AuditLogBase {
-  type: 'importacion' | 'ajuste' | 'merma'
+  type: (typeof STOCK_AUDIT_TYPES)[number]
   code: string
   name: string
   before: number

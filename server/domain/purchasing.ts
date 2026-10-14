@@ -10,6 +10,7 @@ import { formatOrderId } from '../../src/shared/lib/id'
 import type { Sql } from '../db'
 import { deleteRow, getRow, getRowsByKey, insertAutoRow, insertAutoRows, listAll, putRow, putRows, roundQty } from '../routes/generic'
 import { insertMovement, isCaja, requireFunds } from './cash'
+import { logStock, stockEntry, type StockEntry } from './stockAudit'
 
 /** Suppliers, purchase orders and accounts payable. Same contract as `./cash`: runs inside the
  * caller's transaction. Stock only ever changes in `receiveOrder`, in the same transaction that
@@ -260,6 +261,7 @@ export async function receiveOrder(sql: Sql, id: number, input: ReceiveInput, op
   const receivedTotal = round2(lines.reduce((t, l) => t + (l.qtyReceived ?? 0) * l.unitCost, 0))
 
   const source = `Pedido ${formatOrderId(id)}`
+  const by = input.by?.trim() || undefined
   // Every product of the order in one trip, and the new stocks and the entry records written in one trip
   // each (a trip per line made a twenty-line order wait for sixty). A product that is gone fails before
   // anything is written.
@@ -268,6 +270,7 @@ export async function receiveOrder(sql: Sql, id: number, input: ReceiveInput, op
   const date = new Date().toISOString()
   const updatedProducts: Array<{ pk: string; obj: Product }> = []
   const records: Array<Omit<EntradaRecord, 'id'>> = []
+  const audit: StockEntry[] = []
   const priced = new Map<string, { salePrice: number; priceBefore: number }>()
   for (const l of arrived) {
     const qty = l.qtyReceived ?? 0
@@ -285,13 +288,14 @@ export async function receiveOrder(sql: Sql, id: number, input: ReceiveInput, op
       obj: { ...p, stock: stockDespues, ...(l.unitCost > 0 ? { cost: l.unitCost } : {}), ...(salePrice !== undefined ? { price: salePrice } : {}) },
     })
     records.push({ code: p.code, name: p.name, qty, stockAntes, stockDespues, date, source })
+    audit.push(stockEntry(p, stockAntes, stockDespues, `${source} recibido · ${o.supplierName}`, by ?? '', 'entrada', date))
   }
   if (priced.size) await opts.onPriceChange?.()
   await putRows(sql, 'products', 'code', updatedProducts)
   await insertAutoRows(sql, 'entradas', records)
+  await logStock(sql, audit)
 
   let payment: OrderPayment = { mode: 'ninguno' }
-  const by = input.by?.trim() || undefined
   if (receivedTotal > 0) {
     const pay = input.payment as { mode?: string; caja?: unknown } | undefined
     if (pay?.mode === 'contado') {

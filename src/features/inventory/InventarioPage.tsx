@@ -3,7 +3,8 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { ClipboardCheck, Download, EyeOff, FileSpreadsheet, FileText, Lock, PackagePlus, ScrollText, Upload, X } from 'lucide-react'
 import { db } from '../../db/index'
 import type { Product } from '../../types/product'
-import { adjustStock, deleteProduct } from '../../db/repositories/products'
+import { deleteProduct } from '../../db/repositories/products'
+import { StockAdjustSheet } from './components/StockAdjustSheet'
 import { ProductForm } from './components/ProductForm'
 import { ProductTable } from './components/ProductTable'
 import { PackageCard } from './components/PackageCard'
@@ -19,7 +20,7 @@ import { SearchInput } from '../../shared/components/SearchInput'
 import { nextSort } from '../../shared/lib/sortRows'
 import { useConfirm } from '../../store/useConfirmStore'
 import { toast } from '../../store/useToastStore'
-import { formatMoney, formatQty } from '../../shared/lib/currency'
+import { formatMoney } from '../../shared/lib/currency'
 import { useBarcodeScanner } from '../../shared/hooks/useBarcodeScanner'
 import { CameraOverlay } from '../../shared/components/CameraOverlay'
 import { exportExcel, exportCSV, downloadImportTemplate } from './lib/exportProducts'
@@ -77,6 +78,7 @@ export function InventarioPage() {
   // Advanced tools
   const [cyclicOpen, setCyclicOpen] = useState(false)
   const [auditOpen, setAuditOpen] = useState(false)
+  const [adjusting, setAdjusting] = useState<{ product: Product; direction: 1 | -1 } | null>(null)
   const [importFileName, setImportFileName] = useState('')
   const [importRows, setImportRows] = useState<ParsedImportRow[]>([])
   const [importErrors, setImportErrors] = useState<string[]>([])
@@ -219,6 +221,7 @@ export function InventarioPage() {
     if (await requirePermission(need, title, subtitle)) action()
   }
 
+  /** The − / + of a row: asks how many and why (`StockAdjustSheet`), which the audit trail keeps. */
   async function quickStock(p: Product, delta: number) {
     const ok = await requirePermission('stock.ajustar', 'Ajustar existencias', 'Sumar o restar unidades requiere permiso.')
     if (!ok) return
@@ -226,8 +229,7 @@ export function InventarioPage() {
       toast('Ya está en 0', 'orange')
       return
     }
-    const next = await adjustStock(p.code, delta)
-    toast(`${delta > 0 ? '+' : ''}${formatQty(delta)} → Stock: ${formatQty(next)}`, delta > 0 ? 'green' : 'orange')
+    setAdjusting({ product: p, direction: delta > 0 ? 1 : -1 })
   }
 
   async function handleDelete(p: Product) {
@@ -424,6 +426,7 @@ export function InventarioPage() {
       />
       <CyclicCountModal open={cyclicOpen} onClose={() => setCyclicOpen(false)} products={products} />
       <AuditLogModal open={auditOpen} onClose={() => setAuditOpen(false)} />
+      <StockAdjustSheet product={adjusting?.product ?? null} direction={adjusting?.direction ?? 1} onClose={() => setAdjusting(null)} />
       <CameraOverlay
         open={cameraOpen}
         videoRef={scanner.videoRef}
