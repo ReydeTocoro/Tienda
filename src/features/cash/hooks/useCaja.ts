@@ -22,12 +22,16 @@ export function useCaja() {
   const state = useLiveQuery(() => db.cajaState.get('menor').then((s) => s ?? null))
   const movements = useSecureTable('cashMovements')
   const balancesKnown = useSecureLoaded('cashMovements')
+  const sessions = useSecureTable('cashSessions')
   const menor = useMemo(() => balanceOf(movements, 'menor'), [movements])
   const mayor = useMemo(() => balanceOf(movements, 'mayor'), [movements])
   const session: OpenCaja | undefined = useMemo(
     () => (state?.open ? { id: state.sessionId, dayKey: state.dayKey ?? '', openedAt: state.openedAt ?? '', openedBy: state.openedBy ?? '' } : undefined),
     [state],
   )
+  // With how much the open workday was opened (the cash counted then). It sits in "cashSessions", which — like the ledger —
+  // only reaches whoever may see the expected cash: `undefined` for anyone else (a blind count never learns it) and while it arrives.
+  const openingCash = useMemo(() => (session?.id === undefined ? undefined : sessions.find((s) => s.id === session.id)?.openingCash), [sessions, session])
   return {
     /** False until the local copy has answered, so screens don't flash "caja cerrada" on load. */
     ready: state !== undefined,
@@ -36,6 +40,8 @@ export function useCaja() {
     mayor,
     balancesKnown,
     session,
+    /** What the open workday was opened with — for whoever may see the expected cash only (else `undefined`). */
+    openingCash,
     /** No caja has ever been opened: the next opening is the starting point of the books. */
     firstOpening: !state?.started,
   }

@@ -41,7 +41,7 @@ export function CierreZModal({ open, dayKey, onClose, onClosed }: CierreZModalPr
 
 function CierreZForm({ dayKey, onClose, onClosed }: Omit<CierreZModalProps, 'open'>) {
   const agg = useDayAggregation(dayKey, { onlyOpen: true })
-  const { menor, session } = useCaja()
+  const { menor, session, openingCash } = useCaja()
   const settings = useLiveQuery(() => getSettings())
   const { currentUserName, can, operator } = usePermission()
   // Blind count (arqueo ciego) without "ver el efectivo esperado": the cashier counts and types the
@@ -148,6 +148,7 @@ function CierreZForm({ dayKey, onClose, onClosed }: Omit<CierreZModalProps, 'ope
             <Stat label="Ventas" value={formatMoney(agg.totalVentas)} color="text-green" />
             {showProfit && <Stat label="Ganancia" value={formatMoney(agg.totalGanancia)} color="text-lime" />}
             <Stat label="Transacc." value={String(agg.numTx)} color="text-blue" />
+            {openingCash !== undefined && <Stat label="Abrió con" value={formatMoney(openingCash)} color="text-txt" />}
             <Stat label="Efectivo esperado en caja" value={formatMoney(menor)} color="text-txt" />
             {agg.totalExIn > 0 && <Stat label="Otros ingresos (abonos, etc.)" value={formatMoney(agg.totalExIn)} color="text-lime" />}
             {agg.totalExOut > 0 && <Stat label="Egresos de caja" value={formatMoney(agg.totalExOut)} color="text-orange" />}

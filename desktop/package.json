@@ -1,0 +1,13 @@
+{
+  "name": "plastimax-desktop",
+  "version": "1.0.1",
+  "private": true,
+  "description": "Windows shell (.exe) of Plastimax F.R.: the packaged web app in its own window. Built with `npm run build:exe` from the repo root.",
+  "type": "module",
+  "scripts": {
+    "build": "node build.mjs"
+  },
+  "devDependencies": {
+    "@electron/packager": "^20.3.0"
+  }
+}

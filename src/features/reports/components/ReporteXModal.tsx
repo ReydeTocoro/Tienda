@@ -8,6 +8,7 @@ import { TransferByAccount } from '../../../shared/components/TransferByAccount'
 import { transferRows } from '../../../shared/lib/transferAccounts'
 import { formatMoney } from '../../../shared/lib/currency'
 import { usePermission } from '../../pin/usePermission'
+import { useCaja } from '../../cash/hooks/useCaja'
 
 interface ReporteXModalProps {
   open: boolean
@@ -23,6 +24,7 @@ export function ReporteXModal({ open, dayKey, onClose }: ReporteXModalProps) {
   const settings = useLiveQuery(() => getSettings())
   const agg = useDayAggregation(dayKey, { onlyOpen: false })
   const showProfit = usePermission().can('ganancias.ver')
+  const { openingCash } = useCaja()
 
   if (!open) return null
   const storeName = settings?.storeName ?? 'Mi Tienda Pro'
@@ -39,6 +41,12 @@ export function ReporteXModal({ open, dayKey, onClose }: ReporteXModalProps) {
         <div className="text-center font-display text-[16px] text-blue">{storeName}</div>
         <div className="text-center text-[11px] text-muted">REPORTE X — Lectura Parcial · {dayKey}</div>
         <div className="my-2 border-t border-dashed border-br2" />
+        {openingCash !== undefined && (
+          <>
+            <Row label="Abrió con (base)" value={formatMoney(openingCash)} bold />
+            <div className="my-2 border-t border-dashed border-br2" />
+          </>
+        )}
         <Row label="Transacciones" value={String(agg.numTx)} color="text-blue" />
         <Row label="Ventas brutas" value={formatMoney(agg.totalVentas)} color="text-green" />
         {showProfit && <Row label="Ganancia bruta" value={formatMoney(agg.totalGanancia)} color="text-lime" />}
@@ -75,6 +83,12 @@ export function ReporteXModal({ open, dayKey, onClose }: ReporteXModalProps) {
           <PrintHeader storeName={storeName} business={settings?.business} />
           <div className="text-center text-[10px]">REPORTE X — Lectura Parcial · {dayKey}</div>
           <div className="my-1 border-t border-dashed border-black" />
+          {openingCash !== undefined && (
+            <>
+              <PrintRow label="Abrió con (base)" value={formatMoney(openingCash)} bold />
+              <div className="my-1 border-t border-dashed border-black" />
+            </>
+          )}
           <PrintRow label="Transacciones" value={String(agg.numTx)} />
           <PrintRow label="Ventas brutas" value={formatMoney(agg.totalVentas)} />
           {showProfit && <PrintRow label="Ganancia bruta" value={formatMoney(agg.totalGanancia)} />}

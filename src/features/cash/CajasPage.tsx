@@ -39,7 +39,7 @@ const PERIODS: Record<string, { label: string; days: number | null }> = {
 const PAGE = 40
 
 export function CajasPage() {
-  const { ready, movements, menor, mayor, balancesKnown, session, firstOpening } = useCaja()
+  const { ready, movements, menor, mayor, balancesKnown, session, openingCash, firstOpening } = useCaja()
   const [sheet, setSheet] = useState<Sheet>(null)
   const [cierreOpen, setCierreOpen] = useState(false)
   const [reporteXOpen, setReporteXOpen] = useState(false)
@@ -100,6 +100,7 @@ export function CajasPage() {
           accent={session ? 'text-green' : 'text-txt2'}
         >
           <div className="mb-3 grid grid-cols-2 gap-2 text-[12px]">
+            {session && openingCash !== undefined && <MiniStat wide label="Abrió con" value={formatMoney(openingCash)} color="text-txt" />}
             <MiniStat label="Ventas y abonos hoy" value={formatMoney(todayStats.ventas)} color="text-green" />
             <MiniStat label="Egresos hoy" value={formatMoney(todayStats.egresos)} color="text-red" />
           </div>
@@ -242,9 +243,10 @@ function CajaCard({
   )
 }
 
-function MiniStat({ label, value, color }: { label: string; value: string; color: string }) {
+/** `wide`: one line across the card — the label on the left, the figure on the right. */
+function MiniStat({ label, value, color, wide = false }: { label: string; value: string; color: string; wide?: boolean }) {
   return (
-    <div className="rounded-lg bg-s2 px-3 py-2">
+    <div className={`rounded-lg bg-s2 px-3 py-2 ${wide ? 'col-span-2 flex items-center justify-between gap-2' : ''}`}>
       <div className="field-label">{label}</div>
       <div className={`font-mono text-[14px] font-bold ${color}`}>{value}</div>
     </div>

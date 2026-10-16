@@ -707,7 +707,28 @@ async function mainFlow(appUrl, webDir) {
       rows11b,
     )
     check('11b y las dos cajas cuadran: la Menor tiene la base y la Mayor la misma cantidad menos', open11b.cash.menor === base11b && open11b.cash.mayor === closed11b.cash.mayor - base11b, open11b.cash)
+
     await ev(`${eye}.click()`) // the eye as it was: closed
+    await sleep(400)
+
+    // 11c. "Abrió con": what the workday was opened with is kept in sight — on the Caja Menor card, in the Reporte X and
+    // in the Cierre Z — so the expected cash (base + what came in − what went out) can be followed all day.
+    // (The stand-in plays no Realtime: a reload brings what the opening wrote.)
+    await send('Page.reload')
+    await waitFor("!!document.querySelector('#venta-search-input')", 30000)
+    await ev(goto('Cajas'))
+    check('11c la tarjeta de la Caja Menor dice con cuánto se abrió', (await waitFor("/Abrió con[^$]*[$]3[.]000,00/.test(document.body.innerText)", 8000)).ok, (await ev('document.body.innerText')).slice(0, 500))
+    await sleep(300)
+    await shot(c, '16f-abrio-con')
+    await ev(clickText('Reporte X'))
+    await waitFor("(document.querySelector('dialog[open]')?.innerText||'').includes('LECTURA PARCIAL')", 8000)
+    const x11c = await ev("document.querySelector('dialog[open]')?.innerText||''")
+    check('11c el Reporte X empieza por "Abrió con (base)" y la cifra', /Abrió con [(]base[)][^$]*[$]3[.]000,00/.test(x11c) && x11c.indexOf('Abrió con') < x11c.indexOf('Transacciones'), x11c.slice(0, 400))
+    await ev(clickText('Cerrar', "document.querySelector('dialog[open]')"))
+    await sleep(400)
+    const z11c = await openCierre(c)
+    check('11c el Cierre Z muestra con cuánto se abrió junto al efectivo esperado', z11c.found && /Abrió con[^$]*[$]3[.]000,00/.test(z11c.text), z11c.text?.slice(0, 500))
+    await ev(clickText('Cancelar', "document.querySelector('dialog[open]')"))
     await sleep(400)
 
     // 12. The notices: "Pendientes de hoy" opens by itself once a day per person and the bell opens it again; after 3

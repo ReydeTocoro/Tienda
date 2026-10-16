@@ -9,3 +9,5 @@ MIOS/
 firebase-debug.log*
 supabase/.temp/
 inventario/
+desktop/build/
+desktop/out/
