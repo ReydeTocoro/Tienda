@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
+import { Eye } from 'lucide-react'
 import { useDayAggregation } from '../../../shared/hooks/useDayAggregation'
 import { BottomSheet } from '../../../shared/components/BottomSheet'
 import { MoneyInput } from '../../../shared/components/MoneyInput'
@@ -11,7 +12,7 @@ import { round2 } from '../../../shared/lib/cash'
 import { toast } from '../../../store/useToastStore'
 import { useConnectionStore } from '../../../store/useConnectionStore'
 import { useMayorStore } from '../../../store/useMayorStore'
-import { MAYOR_LOCKED } from '../../cash/mayorEye'
+import { MAYOR_LOCKED, openMayor } from '../../cash/mayorEye'
 import { useOutboxCounts } from '../../../offline/outbox'
 import { processOutbox } from '../../../offline/outboxSync'
 import { formatMoney } from '../../../shared/lib/currency'
@@ -206,7 +207,16 @@ function CierreZForm({ dayKey, onClose, onClosed }: Omit<CierreZModalProps, 'ope
             />
             Trasladar fondos a Caja Mayor
           </label>
-          {!mayorOpen && <div className="mt-1.5 text-[11px] text-muted">Caja Mayor cerrada: ábrela con el ojito de Cajas (con PIN) para trasladar.</div>}
+          {/* Taking the cash away without moving it here is what turned into a "faltante" the next morning: this can't pass unnoticed. */}
+          {!mayorOpen && fisico > 0 && (
+            <div className="mt-2.5 rounded-lg border border-orange/30 bg-orange/10 p-2.5 text-[12px] leading-snug text-orange">
+              <b>Caja Mayor cerrada: este cierre no trasladará nada.</b> Si te llevas efectivo (a la caja fuerte, al banco…), ábrela ahora para que quede registrado; si no, mañana al abrir saldrá como faltante.
+              <button type="button" onClick={() => void openMayor()} className="mt-2 flex items-center gap-1.5 rounded-lg border border-orange/40 bg-s1 px-3 py-1.5 text-[12px] font-bold">
+                <Eye size={13} />
+                Abrir Caja Mayor (pide PIN)
+              </button>
+            </div>
+          )}
           {wantsTransfer && (
             <div className="mt-2.5">
               <div className="mb-1 field-label">Monto a trasladar</div>
@@ -229,7 +239,7 @@ function CierreZForm({ dayKey, onClose, onClosed }: Omit<CierreZModalProps, 'ope
       <textarea rows={2} value={notas} onChange={(e) => setNotas(e.target.value)} placeholder="Ej: $20 de faltante por cambio dado sin registrar..." className="input mb-4 resize-none" />
 
       <div className="mb-4 rounded-[10px] border border-red/20 bg-red/10 px-3 py-2.5 text-[12px] text-txt2">
-        El Reporte Z es definitivo. Las ventas de este día quedan marcadas como cerradas (siguen visibles en Facturas/Reporte para siempre) y la caja se cierra.
+        El Reporte Z es definitivo. Las ventas de este día quedan marcadas como cerradas (siguen visibles en Facturas para siempre) y la caja se cierra.
       </div>
 
       <div className="flex gap-2">

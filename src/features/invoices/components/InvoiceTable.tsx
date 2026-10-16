@@ -49,11 +49,13 @@ interface InvoiceTableProps {
   onViewOrder: (o: PurchaseOrder) => void
   /** Purchase invoices are listed (whoever is working may see purchase prices). */
   withPurchases?: boolean
+  /** Shows what each sale earned (whoever is working may see profits). */
+  withProfit?: boolean
 }
 
 /** Facturas list on the shared spreadsheet-style `DataTable`: sales and received supplier
  * orders side by side. A row opens its receipt (sale) or its order detail (purchase). */
-export function InvoiceTable({ rows, sort, onSort, resetKey, onViewSale, onCorrectSale, onVoidSale, onViewOrder, withPurchases = true }: InvoiceTableProps) {
+export function InvoiceTable({ rows, sort, onSort, resetKey, onViewSale, onCorrectSale, onVoidSale, onViewOrder, withPurchases = true, withProfit = false }: InvoiceTableProps) {
   const columns = useMemo<DataColumn<InvoiceRow, InvoiceSortKey>[]>(
     () => [
       {
@@ -70,6 +72,7 @@ export function InvoiceTable({ rows, sort, onSort, resetKey, onViewSale, onCorre
         min: 84,
         align: 'center',
         sortKey: 'kind',
+        drop: 1,
         cell: (r) => <Pill cls={KIND_PILL[r.kind].cls}>{KIND_PILL[r.kind].label}</Pill>,
       },
       {
@@ -88,6 +91,7 @@ export function InvoiceTable({ rows, sort, onSort, resetKey, onViewSale, onCorre
         label: 'Atendió',
         min: 104,
         sortKey: 'seller',
+        drop: 2,
         cell: (r) => (
           <span className="max-w-full truncate text-txt2" title={r.seller}>
             {r.seller || '—'}
@@ -128,6 +132,23 @@ export function InvoiceTable({ rows, sort, onSort, resetKey, onViewSale, onCorre
           <span className={`font-mono text-[12.5px] font-bold ${r.voided ? 'text-muted line-through' : r.kind === 'venta' ? 'text-green' : 'text-red'}`}>{formatMoney(r.total)}</span>
         ),
       },
+      ...(withProfit
+        ? [
+            {
+              key: 'ganancia',
+              label: 'Ganancia',
+              min: 112,
+              align: 'right' as const,
+              sortKey: 'ganancia' as const,
+              cell: (r: InvoiceRow) =>
+                r.ganancia === undefined ? (
+                  <span className="text-muted">—</span>
+                ) : (
+                  <span className={`font-mono text-[12.5px] font-semibold ${r.ganancia < 0 ? 'text-red' : 'text-lime'}`}>{formatMoney(r.ganancia)}</span>
+                ),
+            },
+          ]
+        : []),
       {
         key: 'status',
         label: 'Estado',
@@ -210,7 +231,7 @@ export function InvoiceTable({ rows, sort, onSort, resetKey, onViewSale, onCorre
           ),
       },
     ],
-    [onViewSale, onCorrectSale, onVoidSale, onViewOrder, withPurchases],
+    [onViewSale, onCorrectSale, onVoidSale, onViewOrder, withPurchases, withProfit],
   )
 
   return (

@@ -78,7 +78,7 @@ export const PERMISSION_GROUPS: PermissionGroup[] = [
       {
         key: 'ganancias.ver',
         label: 'Ver ganancias y valor del inventario',
-        hint: 'Cuánto vale el inventario, la ganancia del día y el margen en Venta, Reporte y cierres.',
+        hint: 'Cuánto vale el inventario, la ganancia del día y el margen en Venta, Reporte y cierres, y la ganancia de cada factura en Facturas.',
         requires: ['costos.ver'],
       },
     ],
@@ -112,7 +112,7 @@ export const PERMISSION_GROUPS: PermissionGroup[] = [
   {
     label: 'Facturas',
     permissions: [
-      { key: 'facturas.ver', label: 'Entrar a Facturas', hint: 'Buscar ventas anteriores y volver a imprimir el recibo.' },
+      { key: 'facturas.ver', label: 'Entrar a Facturas', hint: 'Buscar ventas anteriores, volver a imprimir el recibo y ver el historial de correcciones y anulaciones.' },
       { key: 'facturas.corregir', label: 'Corregir facturas', hint: 'Cambiar productos o cantidades de una venta ya hecha.', requires: ['facturas.ver'] },
     ],
   },
@@ -141,7 +141,7 @@ export const PERMISSION_GROUPS: PermissionGroup[] = [
       {
         key: 'reportes.ver',
         label: 'Ver reportes',
-        hint: 'Reporte de caja, Reporte X e historial de cierres, con el efectivo de cada día.',
+        hint: 'Reporte de caja e historial de cierres, con el efectivo de cada día. El Reporte X (lectura parcial) se abre desde Cajas.',
         requires: ['ventas.verTotales', 'caja.verEsperado'],
       },
     ],

@@ -498,5 +498,82 @@ assert.equal((await getRow<Product>(db, 'products', 'code', 'P1'))!.price, 2600)
 assert.equal((await getRow<Product>(db, 'products', 'code', 'P1'))!.stock, 11)
 ok('al recibir, el precio de venta pasa al producto junto con el stock y el costo (pide permiso de editar productos), Precio 2 se conserva, lo que no llegó no cambia, el pedido guarda el precio anterior y las ventas hechas quedan igual')
 
+// --- Apertura: lo que sobra o falta frente al libro puede ser plata que salió de la Caja Mayor o que fue hacia ella ---------
+// Quien se lleva todo al cerrar y cada mañana pone una base: sin decir de dónde sale, esa base quedaba como "sobrante" (y la
+// Mayor seguía contando una plata que ya no está ahí), y el efectivo llevado sin anotar quedaba como "faltante". Al abrir se
+// puede decir que fue la Caja Mayor, y entonces se anota el traslado que faltó.
+const closeDay = async (leave = 0) => {
+  const m = await bal('menor')
+  await run((q) => confirmCierre(q, { dayKey: todayKey(), cajero: 'Ana', notas: '', efectivoFisico: m, trasladar: m - leave }))
+}
+await closeDay() // todo a la Mayor: la Menor queda en 0
+assert.equal(await bal('menor'), 0)
+const mayorA = await bal('mayor')
+assert.ok(mayorA >= 20000, 'la Mayor tiene con qué poner una base')
+let seen = (await movements()).length
+
+const baseOpen = await run((q) => cash.openCaja(q, { countedCash: 7500, by: 'Ana', settleWith: 'mayor', settledBy: 'Ana (autorizó Sofía)' }))
+assert.equal(baseOpen.openDiff, 7500)
+assert.equal(baseOpen.openSettledWith, 'mayor')
+assert.equal(await bal('menor'), 7500)
+assert.equal(await bal('mayor'), mayorA - 7500)
+const baseMoves = (await movements()).slice(seen)
+assert.deepEqual(baseMoves.map((m) => `${m.caja}:${m.type}`).sort(), ['mayor:traslado_salida', 'menor:traslado_entrada'], 'solo el traslado: ningún ajuste de arqueo')
+const [fromMayor, toMenor] = [baseMoves.find((m) => m.caja === 'mayor')!, baseMoves.find((m) => m.caja === 'menor')!]
+assert.equal(fromMayor.transferId, toMenor.transferId, 'las dos puntas van enlazadas')
+assert.equal(toMenor.sessionId, baseOpen.id, 'entra al día que se abre')
+assert.match(toMenor.concept, /Traslado desde Caja Mayor · base al abrir caja/)
+assert.equal(toMenor.by, 'Ana (autorizó Sofía)', 'firmado por quien lo autorizó')
+ok('abrir con una base que salió de la Caja Mayor: se traslada de la Mayor a la Menor (con su motivo y su firma), sin sobrante, y las dos cajas cuadran')
+
+await closeDay()
+const mayorB = await bal('mayor')
+const sessionsBefore = (await listAll(db, 'cashSessions')).length
+await fails(() => run((q) => cash.openCaja(q, { countedCash: mayorB + 1, by: 'Ana', settleWith: 'mayor' })), /Saldo insuficiente en Caja Mayor/, 'la Mayor no tiene tanto')
+assert.equal((await listAll(db, 'cashSessions')).length, sessionsBefore, 'rechazada: ni siquiera queda la sesión')
+assert.equal(await cash.openSession(db), undefined)
+assert.equal(await bal('mayor'), mayorB)
+assert.equal(await bal('menor'), 0)
+ok('si la Caja Mayor no tiene lo que se dice que salió de ella, la apertura se rechaza completa (sin sesión ni movimientos)')
+
+// Efectivo que se llevó sin anotar: el libro tenía 9.000 y al abrir solo hay 3.000 → los 6.000 fueron a la Mayor.
+await run((q) => cash.openCaja(q, { countedCash: 9000, by: 'Ana', settleWith: 'mayor' }))
+await closeDay(9000) // cierra sin trasladar nada: los 9.000 siguen en el libro
+const mayorC = await bal('mayor')
+seen = (await movements()).length
+const lessOpen = await run((q) => cash.openCaja(q, { countedCash: 3000, by: 'Ana', settleWith: 'mayor' }))
+assert.equal(lessOpen.openDiff, -6000)
+assert.equal(lessOpen.openSettledWith, 'mayor')
+assert.equal(await bal('menor'), 3000)
+assert.equal(await bal('mayor'), mayorC + 6000)
+const lessMoves = (await movements()).slice(seen)
+assert.deepEqual(lessMoves.map((m) => `${m.caja}:${m.type}`).sort(), ['mayor:traslado_entrada', 'menor:traslado_salida'], 'ningún faltante: el traslado que faltó anotar')
+assert.match(lessMoves[0].concept, /efectivo llevado antes de abrir caja/)
+ok('abrir con menos de lo que dice el libro y decir que se llevó a la Caja Mayor: se anota el traslado que faltó (sin faltante)')
+
+await closeDay(3000)
+seen = (await movements()).length
+const exactOpen = await run((q) => cash.openCaja(q, { countedCash: 3000, by: 'Ana', settleWith: 'mayor' }))
+assert.equal(exactOpen.openDiff, 0)
+assert.equal(exactOpen.openSettledWith, undefined)
+assert.equal((await movements()).length, seen, 'no se movió nada')
+ok('sin diferencia no hay nada que cuadrar con la Caja Mayor, aunque se pida')
+
+await closeDay()
+seen = (await movements()).length
+const plainOpen = await run((q) => cash.openCaja(q, { countedCash: 2500, by: 'Ana' }))
+assert.equal(plainOpen.openSettledWith, undefined)
+assert.deepEqual((await movements()).slice(seen).map((m) => `${m.type}:${m.concept}`), ['ajuste_arqueo:Sobrante al abrir caja'])
+ok('sin elegir la Caja Mayor, la diferencia se anota como sobrante al abrir caja, como siempre')
+
+// Lo que no se admite: una forma que no existe, y la primera apertura (su efectivo es la base inicial: no sale de ninguna Mayor).
+await closeDay()
+await fails(() => run((q) => cash.openCaja(q, { countedCash: 1, by: 'Ana', settleWith: 'banco' as never })), /no existe/, 'forma desconocida')
+const newStore = pgliteDb(await testDatabase())
+await fails(() => newStore.tx((q) => cash.openCaja(q, { countedCash: 5000, by: 'Ana', settleWith: 'mayor' })), /primera apertura/, 'la primera apertura no sale de la Mayor')
+assert.equal(await cash.isFirstOpening(newStore), true, 'rechazada: sigue sin haber ninguna apertura')
+await newStore.end()
+ok('cuadrar la apertura con la Caja Mayor no admite una forma desconocida ni la primera apertura')
+
 await db.end()
 console.log(`\nTodo en orden: ${n} comprobaciones del dinero pasaron.`)

@@ -56,6 +56,9 @@ export interface CashSession {
   /** What the ledger said the drawer should hold at that moment. */
   systemAtOpen: number
   openDiff: number
+  /** The gap found when opening was settled with the Caja Mayor — a transfer (the day's base taken from it, or cash that
+   * had left the drawer for it) — instead of being booked as a sobrante or faltante. */
+  openSettledWith?: 'mayor'
   closedAt?: string
   closedBy?: string
   expectedCash?: number

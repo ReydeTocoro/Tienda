@@ -21,7 +21,9 @@ export function transferFunds(input: { from: CajaId; to: CajaId; amount: number;
   return apiPost<{ transferId: string }>('/api/cash/transfer', input)
 }
 
-/** `mayorInitial` (first opening only): what the safe and the banks hold at the start of the books. */
-export function openCaja(input: { countedCash: number; by: string; mayorInitial?: number }): Promise<CashSession> {
+/** `mayorInitial` (first opening only): what the safe and the banks hold at the start of the books. `settleWith: 'mayor'`:
+ * the gap against the books is cash that came out of the Caja Mayor (the day's base) or went into it, so the server books it
+ * as a transfer between the cajas instead of a sobrante or faltante. */
+export function openCaja(input: { countedCash: number; by: string; mayorInitial?: number; settleWith?: 'mayor' }): Promise<CashSession> {
   return apiPost<CashSession>('/api/cash/open', input)
 }

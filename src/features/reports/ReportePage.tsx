@@ -1,44 +1,21 @@
 import { useMemo, useState } from 'react'
-import { FileBarChart, Lock, Plus } from 'lucide-react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../../db/index'
 import type { Sale } from '../../types/sale'
 import { useDayAggregation } from '../../shared/hooks/useDayAggregation'
-import { formatMoney, todayKey, formatDateTime } from '../../shared/lib/currency'
-import { ReceiptSheet } from '../../shared/components/ReceiptSheet'
+import { formatMoney, todayKey } from '../../shared/lib/currency'
 import { TransferByAccount } from '../../shared/components/TransferByAccount'
 import { transferRows } from '../../shared/lib/transferAccounts'
-import { formatSaleId } from '../../shared/lib/id'
-import { ReporteXModal } from './components/ReporteXModal'
-import { CierreZModal } from './components/CierreZModal'
-import { MovementFormSheet } from '../cash/components/MovementFormSheet'
 import { CierresHistoryList } from './components/CierresHistoryList'
-import { CorrectionsHistoryList } from './components/CorrectionsHistoryList'
 import { usePermission } from '../pin/usePermission'
-import { useProfits } from '../../shared/hooks/useSecretFigures'
 
 const PAY_LABEL: Record<string, string> = { efectivo: 'Efectivo', transferencia: 'Transferencia' }
 
 export function ReportePage() {
   const [dayKey, setDayKey] = useState(todayKey())
-  const [receiptSale, setReceiptSale] = useState<Sale | null>(null)
-  const [reporteXOpen, setReporteXOpen] = useState(false)
-  const [cierreZOpen, setCierreZOpen] = useState(false)
-  const [extraOpen, setExtraOpen] = useState(false)
-  const { can, requirePermission } = usePermission()
-  const showProfit = can('ganancias.ver')
+  const showProfit = usePermission().can('ganancias.ver')
 
   const agg = useDayAggregation(dayKey, { onlyOpen: false })
-  const profits = useProfits().sales
-
-  async function openCierreZ() {
-    const ok = await requirePermission('caja.cerrar', 'Cierre de caja', 'Cerrar el día requiere permiso.')
-    if (ok) setCierreZOpen(true)
-  }
-
-  async function openMovement() {
-    if (await requirePermission('caja.gestionar', 'Gasto o ingreso de caja', 'Registrar movimientos de caja requiere permiso.')) setExtraOpen(true)
-  }
 
   // Global fiado portfolio (all-time), independent of the selected date.
   const fiadoSales = useLiveQuery(() => db.sales.where('payMethod').equals('fiado').filter((s) => !s.voided).toArray(), [], [] as Sale[])
@@ -175,74 +152,10 @@ export function ReportePage() {
         </div>
       </div>
 
-      <p className="mb-2 mt-3.5 field-label">Ventas del período</p>
-      {!agg.ventasDay.length ? (
-        <div className="p-6 text-center text-muted">
-          <p className="text-[13px]">Sin ventas en esta fecha</p>
-        </div>
-      ) : (
-        <div className="md:grid md:grid-cols-2 md:gap-2.5 xl:grid-cols-3">
-          {[...agg.ventasDay].reverse().map((s) => (
-            <button
-              key={s.id}
-              onClick={() => setReceiptSale(s)}
-              className="mb-2 block w-full rounded-xl border border-br bg-s1 p-3 text-left shadow-xs transition-colors hover:border-br2 hover:bg-s2 md:mb-0"
-            >
-              <div className="flex items-start justify-between">
-                <div>
-                  <div className="font-mono text-[12px] text-lime">{formatSaleId(s.id)}</div>
-                  <div className="text-[10px] text-muted">{formatDateTime(s.date)}</div>
-                </div>
-                <div className="text-right">
-                  <div className="font-mono text-[15px] font-semibold text-green">{formatMoney(s.total)}</div>
-                  {showProfit && <div className="text-[11px] text-lime">G: {formatMoney(profits.get(s.id ?? -1) ?? 0)}</div>}
-                </div>
-              </div>
-            </button>
-          ))}
-        </div>
-      )}
-
-      <div className="mt-2 mb-3.5 md:grid md:grid-cols-3 md:gap-3">
-        <button
-          onClick={() => setReporteXOpen(true)}
-          className="mb-2.5 flex w-full items-center justify-center gap-2 rounded-xl border-2 border-blue/30 bg-blue/10 py-3 text-[13px] font-bold text-blue transition-colors hover:bg-blue/15 md:mb-0"
-        >
-          <FileBarChart size={16} />
-          Reporte X — Lectura parcial (sin cerrar caja)
-        </button>
-        <button
-          onClick={openCierreZ}
-          className="mb-2.5 flex w-full items-center justify-center gap-2 rounded-xl border border-red/30 bg-red/10 py-3.5 text-[15px] font-bold text-red transition-colors hover:bg-red/15 md:mb-0"
-        >
-          <Lock size={16} />
-          Reporte Z — Cierre definitivo de caja
-        </button>
-        <button
-          onClick={openMovement}
-          className="flex w-full items-center justify-center gap-1.5 rounded-[10px] border border-br2 py-2.5 text-[13px] text-txt2 transition-colors hover:bg-s2"
-        >
-          <Plus size={14} />
-          Registrar gasto / ingreso en Caja Menor
-        </button>
+      <p className="mb-2 mt-3.5 field-label">Historial de cierres</p>
+      <div className="md:max-w-xl">
+        <CierresHistoryList />
       </div>
-
-      <div className="md:grid md:grid-cols-2 md:gap-6">
-        <div>
-          <p className="mb-2 mt-5 md:mt-0 field-label">Historial de cierres</p>
-          <CierresHistoryList />
-        </div>
-
-        <div>
-          <p className="mb-2 mt-5 text-[13px] font-bold uppercase tracking-wide text-orange md:mt-0">Correcciones de facturas</p>
-          <CorrectionsHistoryList />
-        </div>
-      </div>
-
-      <ReceiptSheet sale={receiptSale} onClose={() => setReceiptSale(null)} />
-      <ReporteXModal open={reporteXOpen} dayKey={dayKey} onClose={() => setReporteXOpen(false)} />
-      <CierreZModal open={cierreZOpen} dayKey={dayKey} onClose={() => setCierreZOpen(false)} onClosed={() => setCierreZOpen(false)} />
-      <MovementFormSheet open={extraOpen} onClose={() => setExtraOpen(false)} caja="menor" lockCaja />
     </div>
   )
 }

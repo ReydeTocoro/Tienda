@@ -4,7 +4,7 @@ import type { CartItem } from './cartItem'
 export const STOCK_AUDIT_TYPES = ['importacion', 'ajuste', 'merma', 'entrada', 'paquete', 'nuevo', 'eliminado'] as const
 
 /** Days of stock movements kept, today included (the store's days): older ones are deleted. Invoice corrections,
- * annulments and code changes are kept — Reporte's history of corrections reads them. */
+ * annulments and code changes are kept — Facturas' «Correcciones y anulaciones» lists all of them (Stock → Auditoría, only the days it shows). */
 export const STOCK_AUDIT_DAYS = 3
 
 interface AuditLogBase {

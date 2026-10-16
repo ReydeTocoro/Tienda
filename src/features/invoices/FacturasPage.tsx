@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
+import { History } from 'lucide-react'
 import { db } from '../../db/index'
 import { useSecureTable } from '../../db/secure'
 import type { PurchaseOrder } from '../../types/purchaseOrder'
@@ -7,11 +8,13 @@ import type { PayMethod, Sale } from '../../types/sale'
 import { Chip } from '../../shared/components/Chip'
 import { ReceiptSheet } from '../../shared/components/ReceiptSheet'
 import { SearchInput } from '../../shared/components/SearchInput'
+import { useProfits } from '../../shared/hooks/useSecretFigures'
 import { formatMoney, todayKey } from '../../shared/lib/currency'
 import { nextSort, type SortState } from '../../shared/lib/sortRows'
 import { OrderDetailSheet } from '../suppliers/components/OrderDetailSheet'
 import { usePermission } from '../pin/usePermission'
 import { CorrectionModal } from './components/CorrectionModal'
+import { CorrectionsHistorySheet } from './components/CorrectionsHistorySheet'
 import { VoidSheet } from './components/VoidSheet'
 import { InvoiceTable } from './components/InvoiceTable'
 import {
@@ -38,6 +41,7 @@ export function FacturasPage() {
   const [correctingSale, setCorrectingSale] = useState<Sale | null>(null)
   const [voidingSale, setVoidingSale] = useState<Sale | null>(null)
   const [viewOrder, setViewOrder] = useState<PurchaseOrder | null>(null)
+  const [historyOpen, setHistoryOpen] = useState(false)
   const [search, setSearch] = useState('')
   const [kind, setKind] = useState<'todas' | InvoiceKind>('todas')
   const [method, setMethod] = useState<'todos' | PayMethod>('todos')
@@ -62,6 +66,9 @@ export function FacturasPage() {
   const { can, requirePermission } = usePermission()
   // Purchase invoices show what each product cost: only for whoever may see purchase prices.
   const canSeePurchases = can('costos.ver')
+  // What each sale earned: only for whoever may see profits (the figures don't even reach anyone else's device).
+  const canSeeProfit = can('ganancias.ver')
+  const profits = useProfits().sales
 
   async function requestCorrection(sale: Sale) {
     const ok = await requirePermission('facturas.corregir', 'Corregir factura', 'Cambiar una venta ya hecha requiere permiso.')
@@ -77,7 +84,7 @@ export function FacturasPage() {
     setReceiptSale(null)
   }
 
-  const all = useMemo(() => buildInvoiceRows(sales, canSeePurchases ? orders : []), [sales, orders, canSeePurchases])
+  const all = useMemo(() => buildInvoiceRows(sales, canSeePurchases ? orders : [], canSeeProfit ? profits : undefined), [sales, orders, canSeePurchases, canSeeProfit, profits])
   const toReview = useMemo(() => all.filter((r) => r.toReview).length, [all])
   const shownKind = canSeePurchases ? kind : 'todas'
   const rows = useMemo(
@@ -136,6 +143,13 @@ export function FacturasPage() {
               </button>
             )}
           </div>
+          <button
+            onClick={() => setHistoryOpen(true)}
+            className="ml-auto flex items-center gap-1.5 whitespace-nowrap rounded-[10px] border border-br2 bg-s2 px-3 py-1.5 text-[12px] font-semibold text-txt2 transition-colors hover:bg-s3"
+          >
+            <History size={14} />
+            Correcciones y anulaciones
+          </button>
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
@@ -194,6 +208,7 @@ export function FacturasPage() {
             onVoidSale={requestVoid}
             onViewOrder={setViewOrder}
             withPurchases={canSeePurchases}
+            withProfit={canSeeProfit}
           />
         )}
       </div>
@@ -206,6 +221,7 @@ export function FacturasPage() {
       />
       <CorrectionModal sale={correctingSale} onClose={() => setCorrectingSale(null)} onCorrected={() => setCorrectingSale(null)} />
       <VoidSheet sale={voidingSale} onClose={() => setVoidingSale(null)} onVoided={() => setVoidingSale(null)} />
+      <CorrectionsHistorySheet open={historyOpen} onClose={() => setHistoryOpen(false)} />
       {/* Only received orders are listed here, which have no edit/receive actions to offer. */}
       <OrderDetailSheet order={viewOrder} onClose={() => setViewOrder(null)} onEditDraft={() => undefined} onReceive={() => undefined} />
     </div>

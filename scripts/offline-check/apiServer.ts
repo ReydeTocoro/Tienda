@@ -90,7 +90,11 @@ outer.get('/__test/state', async (_req, res) => {
   const stocks = Object.fromEntries((await lite.query<{ code: string; s: string }>(`select code, data ->> 'stock' as s from public.products order by code`)).rows.map((r) => [r.code, Number(r.s)]))
   const sales = (await lite.query<{ data: Record<string, unknown> }>(`select data from public.sales order by id`)).rows.map((r) => r.data)
   const movements = Number((await lite.query<{ c: string }>(`select count(*) as c from public."cashMovements"`)).rows[0].c)
-  res.json({ stocks, sales, movements, mode, log, requests })
+  // The books as they stand: every movement in order, and what each caja holds (always the sum of its movements).
+  const ledger = (await lite.query<{ data: Record<string, unknown> }>(`select data from public."cashMovements" order by id`)).rows.map((r) => r.data)
+  const cash = { menor: 0, mayor: 0 }
+  for (const m of ledger) cash[m.caja as 'menor' | 'mayor'] += (m.direction === 'in' ? 1 : -1) * Number(m.amount)
+  res.json({ stocks, sales, movements, ledger, cash, mode, log, requests })
 })
 
 // The break-the-connection layer, in front of the real API.

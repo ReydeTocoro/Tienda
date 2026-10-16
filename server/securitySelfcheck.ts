@@ -559,7 +559,15 @@ assert.equal(await browserRows(ANA, 'cierres'), 0, 'ni puede leer los cierres')
 assert.equal(await browserRows(SOFIA, 'cierres'), 1, 'la supervisora (Reportes) sí')
 assert.equal(await browserRows(SOFIA, 'profits'), 0, 'pero no las ganancias')
 assert.equal(await browserRows(SOFIA, 'productCosts'), 0, 'ni los costos')
-ok('Caja: abrir pide permiso y es a ciegas (ni la respuesta ni la base de datos le dicen lo esperado); gastos, traslados y cierre piden permiso; todo queda firmado por la cuenta que trabaja')
+// Cuadrar la apertura con la Caja Mayor es mover plata de ella (o hacia ella): lo decide quien gestiona las cajas, no quien solo cuenta el cajón.
+const openSessions = async () => (await row<{ n: number }>(`select count(*)::int as n from "cashSessions" where data ->> 'status' = 'abierta'`))!.n
+needs(await post(ANA, '/api/cash/open', { countedCash: 99_000, settleWith: 'mayor' }), 'caja.gestionar', 'la cajera no cuadra la apertura con la Caja Mayor')
+assert.equal(await openSessions(), 0, 'rechazado: no se abrió ninguna caja')
+r = await post(SOFIA, '/api/cash/open', { countedCash: 99_000, settleWith: 'mayor' })
+assert.equal(r.status, 400, 'la supervisora sí puede pedirlo, pero la Caja Mayor no tiene tanto')
+assert.match(String(r.body.error), /Saldo insuficiente en Caja Mayor/)
+assert.equal(await openSessions(), 0, 'y tampoco se abrió nada')
+ok('Caja: abrir pide permiso y es a ciegas (ni la respuesta ni la base de datos le dicen lo esperado); gastos, traslados y cierre piden permiso, y cuadrar la apertura con la Caja Mayor también; todo queda firmado por la cuenta que trabaja')
 
 // ─── 8. Proveedores, settings, users ────────────────────────────────────────────────────────────
 needs(await post(SOFIA, '/api/suppliers', { name: 'X', paymentTerms: { kind: 'contado' } }), 'proveedores.gestionar', 'la supervisora no gestiona proveedores')

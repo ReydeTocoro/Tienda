@@ -36,6 +36,9 @@ export interface InvoiceRow {
   total: number
   /** Fiado balance still owed (sales only). */
   debt: number
+  /** What the sale earned (what was charged minus what the goods cost). Only for whoever may see profits, and
+   * only for a sale that counts: absent for purchases, annulled sales and sales whose figure hasn't arrived. */
+  ganancia?: number
   corrected: boolean
   /** Annulled: it stays in the list but counts in no total. */
   voided: boolean
@@ -69,7 +72,7 @@ function finish(row: Omit<InvoiceRow, 'haystack'>): InvoiceRow {
   return { ...row, haystack: [row.number, row.party, row.detail, row.seller, METHOD_LABEL[row.method], row.account ? ACCOUNT_LABEL[row.account] : '', STATUS_LABEL[row.status], row.toReview ? 'por revisar' : ''].join(' ').toLowerCase() }
 }
 
-export function buildInvoiceRows(sales: Sale[], orders: PurchaseOrder[]): InvoiceRow[] {
+export function buildInvoiceRows(sales: Sale[], orders: PurchaseOrder[], profits?: Map<number, number>): InvoiceRow[] {
   const ventas = sales.map((s) => {
     const debt = s.payMethod === 'fiado' ? getFiadoDebt(s) : 0
     return finish({
@@ -86,6 +89,7 @@ export function buildInvoiceRows(sales: Sale[], orders: PurchaseOrder[]): Invoic
       account: s.payMethod === 'transferencia' ? s.transferAccount : undefined,
       total: s.total,
       debt,
+      ganancia: s.voided || s.id === undefined ? undefined : profits?.get(s.id),
       corrected: !!s.corrected,
       voided: !!s.voided,
       toReview: !!s.reviewNotes?.length && !s.reviewedAt && !s.voided,
@@ -121,7 +125,7 @@ export function buildInvoiceRows(sales: Sale[], orders: PurchaseOrder[]): Invoic
   return [...ventas, ...compras]
 }
 
-export type InvoiceSortKey = 'number' | 'date' | 'kind' | 'party' | 'seller' | 'method' | 'total' | 'status'
+export type InvoiceSortKey = 'number' | 'date' | 'kind' | 'party' | 'seller' | 'method' | 'total' | 'ganancia' | 'status'
 
 /** Newest first — the order the old history list had. */
 export const DEFAULT_INVOICE_SORT: SortState<InvoiceSortKey> = { key: 'date', dir: 'desc' }
@@ -142,6 +146,8 @@ function sortValue(r: InvoiceRow, key: InvoiceSortKey): string | number {
       return METHOD_LABEL[r.method]
     case 'total':
       return r.total
+    case 'ganancia':
+      return r.ganancia ?? 0
     case 'status':
       return STATUS_LABEL[r.status]
   }

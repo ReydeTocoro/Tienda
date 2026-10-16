@@ -125,6 +125,8 @@ export interface TransferInput {
   to: CajaId
   amount: number
   by?: string
+  /** Why, when the transfer has a reason of its own: it follows the usual concept ("Traslado a Caja Menor · base al abrir caja"). */
+  note?: string
 }
 
 /** Moves money between cajas as two linked movements, atomically (both or neither). */
@@ -135,8 +137,10 @@ export async function transferFunds(sql: Sql, input: TransferInput): Promise<{ t
   await requireFunds(sql, input.from, amount)
   const transferId = randomUUID()
   const by = input.by?.trim() || undefined
-  await insertMovement(sql, { caja: input.from, direction: 'out', type: 'traslado_salida', amount, concept: `Traslado a ${CAJA_LABEL[input.to]}`, transferId, by })
-  await insertMovement(sql, { caja: input.to, direction: 'in', type: 'traslado_entrada', amount, concept: `Traslado desde ${CAJA_LABEL[input.from]}`, transferId, by })
+  const note = input.note?.trim().slice(0, 80)
+  const why = note ? ` · ${note}` : ''
+  await insertMovement(sql, { caja: input.from, direction: 'out', type: 'traslado_salida', amount, concept: `Traslado a ${CAJA_LABEL[input.to]}${why}`, transferId, by })
+  await insertMovement(sql, { caja: input.to, direction: 'in', type: 'traslado_entrada', amount, concept: `Traslado desde ${CAJA_LABEL[input.from]}${why}`, transferId, by })
   return { transferId }
 }
 
@@ -150,8 +154,16 @@ export async function isFirstOpening(sql: Sql): Promise<boolean> {
 }
 
 /** Opens the Caja Menor workday by counting what is physically in the drawer; any gap against
- * the ledger is booked as an explicit arqueo adjustment instead of silently disappearing. */
-export async function openCaja(sql: Sql, input: { countedCash: number; by: string; mayorInitial?: number }): Promise<CashSession> {
+ * the ledger is booked as an explicit arqueo adjustment instead of silently disappearing.
+ *
+ * With `settleWith: 'mayor'` the gap is not a sobrante or a faltante but money that moved between the cajas without
+ * being recorded — the day's base taken out of the Caja Mayor (more cash than the books had), or cash that was carried
+ * to it after closing (less) — so it is booked as the transfer it was and both cajas stay right. Nothing happens when
+ * there is no gap; it can't be used on the first opening, whose cash is the starting point of the books. */
+export async function openCaja(
+  sql: Sql,
+  input: { countedCash: number; by: string; mayorInitial?: number; settleWith?: 'mayor'; settledBy?: string },
+): Promise<CashSession> {
   const counted = round2(input.countedCash)
   if (!Number.isFinite(counted) || counted < 0) throw new Error('Cuenta el efectivo de la caja (no puede ser negativo)')
   const by = (input.by ?? '').trim()
@@ -162,9 +174,12 @@ export async function openCaja(sql: Sql, input: { countedCash: number; by: strin
   const mayorInitial = round2(input.mayorInitial ?? 0)
   if (!Number.isFinite(mayorInitial) || mayorInitial < 0) throw new Error('El saldo inicial de la Caja Mayor no es válido')
   if (mayorInitial > 0 && !first) throw new Error('El saldo inicial de la Caja Mayor solo se registra en la primera apertura. Después usa un ingreso o un traslado.')
+  if (input.settleWith !== undefined && input.settleWith !== 'mayor') throw new Error('Esa forma de cuadrar la apertura no existe')
+  if (input.settleWith && first) throw new Error('En la primera apertura el efectivo es la base inicial: no sale de la Caja Mayor.')
 
   const system = await cajaBalance(sql, 'menor')
   const diff = round2(counted - system)
+  const viaMayor = input.settleWith === 'mayor' && diff !== 0
   const now = new Date()
   const base: Omit<CashSession, 'id'> = {
     status: 'abierta',
@@ -174,9 +189,19 @@ export async function openCaja(sql: Sql, input: { countedCash: number; by: strin
     openingCash: counted,
     systemAtOpen: system,
     openDiff: diff,
+    ...(viaMayor ? { openSettledWith: 'mayor' as const } : {}),
   }
   const session = await insertAutoRow(sql, SESSIONS, base)
-  if (diff !== 0) {
+  if (viaMayor) {
+    // The transfer checks the funds of the caja it leaves: with too little in the Caja Mayor the whole opening is refused.
+    await transferFunds(sql, {
+      from: diff > 0 ? 'mayor' : 'menor',
+      to: diff > 0 ? 'menor' : 'mayor',
+      amount: Math.abs(diff),
+      by: input.settledBy ?? by,
+      note: diff > 0 ? 'base al abrir caja' : 'efectivo llevado antes de abrir caja',
+    })
+  } else if (diff !== 0) {
     await insertMovement(sql, {
       caja: 'menor',
       direction: diff > 0 ? 'in' : 'out',

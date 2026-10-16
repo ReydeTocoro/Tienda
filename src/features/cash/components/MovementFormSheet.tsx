@@ -12,7 +12,7 @@ interface MovementFormSheetProps {
   open: boolean
   onClose: () => void
   caja?: CajaId
-  /** Fixes the caja (e.g. when opened from a caja's own card or from Reporte). */
+  /** Fixes the caja (e.g. when opened from a caja's own card). */
   lockCaja?: boolean
   direction?: 'in' | 'out'
 }

@@ -35,22 +35,26 @@ export function cashRouter(db: Db) {
       const input = (req.body ?? {}) as TransferInput
       return db.tx(async (q) => {
         const by = await requireNeed(q, await actorOf(q, authOf(req)), 'caja.gestionar')
-        return transferFunds(q, { ...input, by })
+        // Only these fields: a transfer from this route carries no note of its own.
+        return transferFunds(q, { from: input.from, to: input.to, amount: input.amount, by })
       })
     }, 201),
   )
 
   /** Opening the drawer only needs `caja.abrir` — it's counting it. Setting the Caja Mayor's opening
-   * balance (first opening only) is managing the cajas. */
+   * balance (first opening only) and settling the opening's gap with the Caja Mayor (`settleWith: 'mayor'`: the day's base
+   * taken from it, or cash carried to it) are managing the cajas: they move money in or out of the Caja Mayor. */
   router.post(
     '/open',
     handle(async (req) => {
-      const { countedCash, mayorInitial } = (req.body ?? {}) as { countedCash: number; mayorInitial?: number }
+      const { countedCash, mayorInitial, settleWith } = (req.body ?? {}) as { countedCash: number; mayorInitial?: number; settleWith?: unknown }
       return db.tx(async (q) => {
         const actor = await actorOf(q, authOf(req))
         await requireNeed(q, actor, 'caja.abrir')
         if (Number(mayorInitial) > 0) await requireNeed(q, actor, 'caja.gestionar')
-        const session = await openCaja(q, { countedCash, by: actor.operator.name, mayorInitial })
+        // Signed with whoever allowed it, if someone did ("Ana (autorizó Sofía)").
+        const settledBy = settleWith === undefined ? undefined : await requireNeed(q, actor, 'caja.gestionar')
+        const session = await openCaja(q, { countedCash, by: actor.operator.name, mayorInitial, ...(settleWith === undefined ? {} : { settleWith: settleWith as 'mayor', settledBy }) })
         return allowed(actor, 'caja.verEsperado') ? session : blindSession(session)
       })
     }, 201),

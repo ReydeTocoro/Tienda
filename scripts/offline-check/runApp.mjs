@@ -432,6 +432,31 @@ async function mainFlow(appUrl, webDir) {
     await closeSheet(c)
     check('9d con el equipo recargado se sigue viendo anulada (viene del servidor)', (await ev(idb('sales'))).find((x) => x.id === venta1.id)?.voided === true)
 
+    // 9f. What each sale earned is a column of Facturas (the owner may see profits), and every correction and annulment
+    // is in "Correcciones y anulaciones" — all of them, with what changed, why and who did it.
+    const headers9 = await ev("[...document.querySelectorAll('[role=columnheader]')].map(h=>h.innerText.trim())")
+    check('9f Facturas tiene la columna Ganancia (el dueño ve las ganancias)', headers9.includes('Ganancia'), headers9)
+    const gananciaPorFila = await ev(`(()=>{const i=[...document.querySelectorAll('[role=columnheader]')].findIndex(h=>h.innerText.trim()==='Ganancia');return [...document.querySelectorAll('[role=row]')].slice(1).map(r=>[r.querySelectorAll('[role=cell]')[0]?.innerText.trim(),r.querySelectorAll('[role=cell]')[i]?.innerText.trim()])})()`)
+    check('9f cada venta que cuenta muestra su ganancia y la anulada muestra "—"', gananciaPorFila.length >= 3 && gananciaPorFila.every(([n, g]) => (n === num1 ? g === '—' : /^[$].?-?[0-9]/.test(g))), gananciaPorFila)
+    await shot(c, '10b-facturas-ganancia')
+    await ev(clickText('Correcciones y anulaciones'))
+    check('9f el botón "Correcciones y anulaciones" abre el historial', (await waitFor("(document.querySelector('dialog[open]')?.innerText||'').includes('Correcciones y anulaciones de facturas')", 8000)).ok)
+    const hist = await dialogText()
+    const pos = (s) => hist.indexOf(s)
+    check('9f lista la anulación y las dos correcciones de esa factura, de la más reciente a la más antigua', pos('venta hecha por error') > -1 && pos('se devolvió la ponchera') > pos('venta hecha por error') && pos('el cliente llevó más') > pos('se devolvió la ponchera'), hist)
+    check('9f cada una dice qué cambió (antes y después) y quién lo hizo', /Antes.{1,3}[$].?11[.]000[^]*después.{1,3}[$].?6[.]000/.test(hist) && /Anuló: [^ ]/.test(hist) && /Corrigió: [^ ]/.test(hist) && !hist.includes('sin registrar'), hist)
+    await sleep(400) // let the sheet finish opening before the picture
+    await shot(c, '10c-historial-correcciones')
+    await ev(setInput('dialog[open] input[aria-label="Buscar"]', 'ponchera'))
+    await sleep(300)
+    const soloUna = await dialogText()
+    check('9f buscar por motivo deja solo esa corrección', soloUna.includes('se devolvió la ponchera') && !soloUna.includes('venta hecha por error') && !soloUna.includes('el cliente llevó más'), soloUna)
+    await ev(setInput('dialog[open] input[aria-label="Buscar"]', 'zzzz'))
+    await sleep(300)
+    check('9f si nada coincide lo dice', (await dialogText()).includes('Nada coincide con la búsqueda'))
+    await ev("document.querySelector('dialog[open] button[aria-label=\"Cerrar\"]').click()")
+    check('9f el historial se cierra con su X', (await waitFor("!document.querySelector('dialog[open]')", 8000)).ok)
+
     // 9e. A transfer says which account it came into (Nequi / Bancolombia), and the day's close shows them apart.
     await ev(goto('Venta'))
     await waitFor("!!document.querySelector('#venta-search-input')", 10000)
@@ -570,6 +595,16 @@ async function mainFlow(appUrl, webDir) {
     await shot(c, '16-caja-mayor-cerrada')
     const body11 = await ev('document.body.innerText')
     check('11 y sus movimientos no se ven (el traslado aparece solo del lado de la Caja Menor)', body11.includes('Traslado a Caja Mayor') && !body11.includes('Traslado desde Caja Menor'), body11.slice(0, 600))
+    check('11 la lista de movimientos no trae ventas ni abonos (eso es de Facturas y Fiados), aunque hoy hubo varias', !/Venta #[0-9]|Abono de fiado|Corrección de venta/.test(body11), body11.slice(0, 600))
+    await ev(clickText('Reporte X'))
+    check('11 Cajas ofrece el Reporte X: abre la lectura parcial del día', (await waitFor("(document.querySelector('dialog[open]')?.innerText||'').includes('LECTURA PARCIAL')", 8000)).ok)
+    const x11 = await ev("document.querySelector('dialog[open]')?.innerText||''")
+    check('11 trae transacciones, ventas brutas, flujo neto y se puede imprimir', /Transacciones/.test(x11) && /Ventas brutas/.test(x11) && /FLUJO NETO/.test(x11) && /Imprimir/.test(x11), x11)
+    await sleep(400)
+    await shot(c, '16b-reporte-x')
+    await ev(clickText('Cerrar', "document.querySelector('dialog[open]')"))
+    await sleep(400)
+    check('11 y la caja sigue abierta: no se cerró nada', (await ev("!document.querySelector('dialog[open]') && document.body.innerText.includes('Cerrar caja (Cierre Z)')")) === true)
     await ev(clickText('Trasladar a Caja Mayor'))
     await sleep(400)
     check('11 con la Caja Mayor cerrada no deja trasladar: avisa y no abre nada', (await ev("!document.querySelector('dialog[open]')")) === true && (await ev("document.body.innerText.includes('La Caja Mayor está cerrada')")) === true)
@@ -601,7 +636,78 @@ async function mainFlow(appUrl, webDir) {
     await ev("document.querySelector('dialog[open] input[type=checkbox]').click()")
     await sleep(300)
     check('11 y la casilla de trasladar no se deja marcar', (await ev("document.querySelector('dialog[open] input[type=checkbox]').checked")) === false)
+    check('11 el aviso dice que este cierre no trasladará nada y trae el botón para abrir la Caja Mayor ahí mismo', cz2.includes('este cierre no trasladará nada') && cz2.includes('mañana al abrir saldrá como faltante') && cz2.includes('Abrir Caja Mayor'), cz2)
+    await sleep(300)
+    await shot(c, '16c-cierre-mayor-cerrada')
+    await ev(clickText('Abrir Caja Mayor', "document.querySelector('dialog[open]')"))
+    check('11 ese botón pide el PIN', (await waitFor("[...document.querySelectorAll('dialog[open]')].some(d => d.innerText.includes('Abrir la Caja Mayor'))", 8000)).ok)
+    await typePin('4821')
+    check(
+      '11 con el PIN la Caja Mayor se abre dentro del cierre: desaparece el aviso y ya ofrece trasladar (casilla marcada)',
+      (await waitFor("(()=>{const d=[...document.querySelectorAll('dialog[open]')].find(x=>x.innerText.includes('Reporte Z'));return !!d && !d.innerText.includes('este cierre no trasladará nada') && d.querySelector('input[type=checkbox]')?.checked === true})()", 10000)).ok,
+      await ev("[...document.querySelectorAll('dialog[open]')].map(d=>d.innerText).join(' --- ')"),
+    )
     await ev(clickText('Cancelar', "document.querySelector('dialog[open]')"))
+    await sleep(400)
+    await ev(`${eye}.click()`) // the eye as it was: closed
+    await sleep(400)
+    // Reporte only reports: no list of the day's sales, no Reporte X / Z, no gasto button (Cajas has them).
+    await ev(goto('Reporte'))
+    await waitFor("document.body.innerText.includes('Historial de cierres')", 15000)
+    const rep = await ev('document.body.innerText')
+    check('11 Reporte muestra solo reportes: sin lista de ventas, sin Reporte X ni Z, sin botón de gasto', rep.includes('Flujo neto del día') && !/Ventas del período|Reporte X|Cierre definitivo de caja|Registrar gasto|CORRECCIONES DE FACTURAS/i.test(rep), rep.slice(0, 600))
+    await ev(goto('Cajas'))
+    await waitFor("document.body.innerText.includes('Movimientos')", 15000)
+
+    // 11b. Opening the caja with a gap against the books: the person says where the base came from (or where the cash
+    // went). The store's routine: everything goes to the Caja Mayor at closing and a base comes back every morning —
+    // which used to be booked as a "sobrante" while the Caja Mayor kept counting that cash.
+    const before11b = await control('/__test/state')
+    const today11b = await ev(TODAY_IN_PAGE)
+    await jsonPost('/api/cierres', { dayKey: today11b, cajero: 'Propietario', notas: '', efectivoFisico: before11b.cash.menor, trasladar: before11b.cash.menor })
+    const closed11b = await control('/__test/state')
+    check('11b el cierre llevó todo a la Caja Mayor: la Menor quedó en 0', closed11b.cash.menor === 0 && closed11b.cash.mayor === before11b.cash.mayor + before11b.cash.menor, { antes: before11b.cash, ahora: closed11b.cash })
+    const base11b = 3000
+    check('11b (la Caja Mayor tiene con qué poner la base)', closed11b.cash.mayor >= base11b, closed11b.cash)
+    await send('Page.reload')
+    await waitFor("!!document.querySelector('#venta-search-input')", 30000)
+    await ev(goto('Cajas'))
+    check('11b con la caja cerrada se ofrece "Abrir caja"', (await waitFor("[...document.querySelectorAll('button')].some(b => b.textContent.trim().startsWith('Abrir caja'))", 15000)).ok)
+    await ev(clickText('Abrir caja'))
+    check('11b se abre la hoja de apertura', (await waitFor("(document.querySelector('dialog[open]')?.innerText||'').includes('Abrir Caja Menor')", 8000)).ok)
+    const aperturaSheet = "document.querySelector('dialog[open]')"
+    // First a base bigger than what the Caja Mayor holds…
+    await ev(setInput('dialog[open] input[placeholder="0"]', String(closed11b.cash.mayor + 1000)))
+    check('11b al contar más de lo que dice el sistema pregunta de dónde salió ese efectivo', (await waitFor(`(${aperturaSheet}?.innerText||'').includes('¿De dónde salió ese efectivo?')`, 8000)).ok, await ev(`${aperturaSheet}?.innerText||''`))
+    check('11b y no deja abrir mientras no se elija una opción', (await ev(clickText('Abrir caja', aperturaSheet))) === false)
+    await sleep(400)
+    await shot(c, '16d-abrir-caja-eligiendo')
+    await ev(clickText('Lo saqué de la Caja Mayor', aperturaSheet))
+    check('11b elegir la Caja Mayor pide el PIN (está cerrada)', (await waitFor("[...document.querySelectorAll('dialog[open]')].some(d => d.innerText.includes('Abrir la Caja Mayor'))", 8000)).ok)
+    await typePin('4821')
+    check(
+      '11b ya abierta, ve que la Mayor no tiene tanto: apaga esa opción y sigue sin dejar abrir',
+      (await waitFor("[...document.querySelectorAll('[role=radio]')].some(r => r.disabled && r.innerText.includes('solo tiene'))", 10000)).ok && (await ev(clickText('Abrir caja', aperturaSheet))) === false,
+      await ev(`${aperturaSheet}?.innerText||''`),
+    )
+    // …and then a base the Caja Mayor can give.
+    await ev(setInput('dialog[open] input[placeholder="0"]', String(base11b)))
+    check('11b con una base que sí alcanza, la opción se enciende', (await waitFor("[...document.querySelectorAll('[role=radio]')].some(r => !r.disabled && r.innerText.includes('Lo saqué de la Caja Mayor'))", 8000)).ok)
+    await ev(clickText('Lo saqué de la Caja Mayor', aperturaSheet))
+    check('11b y queda elegida (sin pedir otro PIN: la Mayor ya está abierta)', (await waitFor("[...document.querySelectorAll('[role=radio][aria-checked=true]')].some(r => r.innerText.includes('Lo saqué de la Caja Mayor'))", 8000)).ok)
+    await sleep(300)
+    await shot(c, '16e-abrir-caja-de-la-mayor')
+    await ev(clickText('Abrir caja', aperturaSheet))
+    check('11b y la caja se abre', (await waitFor("!document.querySelector('dialog[open]')", 15000)).ok)
+    const open11b = await control('/__test/state')
+    const rows11b = open11b.ledger.slice(closed11b.ledger.length)
+    check(
+      '11b el servidor anotó un traslado de la Caja Mayor a la Menor por la base (sin sobrante ni ajuste de arqueo)',
+      rows11b.length === 2 && rows11b.every((m) => m.type.startsWith('traslado') && m.amount === base11b) && rows11b.some((m) => m.caja === 'mayor' && m.direction === 'out') && rows11b.some((m) => m.caja === 'menor' && m.direction === 'in' && /base al abrir caja/.test(m.concept)),
+      rows11b,
+    )
+    check('11b y las dos cajas cuadran: la Menor tiene la base y la Mayor la misma cantidad menos', open11b.cash.menor === base11b && open11b.cash.mayor === closed11b.cash.mayor - base11b, open11b.cash)
+    await ev(`${eye}.click()`) // the eye as it was: closed
     await sleep(400)
 
     // 12. The notices: "Pendientes de hoy" opens by itself once a day per person and the bell opens it again; after 3

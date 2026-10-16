@@ -1,11 +1,13 @@
 import { useMemo, useState, type ReactNode } from 'react'
-import { ArrowLeftRight, Eye, EyeOff, Lock, LockOpen, Minus, Plus } from 'lucide-react'
+import { ArrowLeftRight, Eye, EyeOff, FileBarChart, Lock, LockOpen, Minus, Plus } from 'lucide-react'
 import { addDaysToKey, CAJA_LABEL, round2 } from '../../shared/lib/cash'
 import { formatDateTime, formatMoney, todayKey } from '../../shared/lib/currency'
 import { useMayorStore } from '../../store/useMayorStore'
 import { toast } from '../../store/useToastStore'
 import type { CajaId, MovementType } from '../../types/cash'
 import { CierreZModal } from '../reports/components/CierreZModal'
+import { ReporteXModal } from '../reports/components/ReporteXModal'
+import { usePermission } from '../pin/usePermission'
 import { useCaja } from './hooks/useCaja'
 import { MovementList } from './components/MovementList'
 import { MovementFormSheet } from './components/MovementFormSheet'
@@ -17,13 +19,15 @@ type Sheet = { kind: 'open' } | { kind: 'move'; caja: CajaId; direction: 'in' | 
 
 const GROUPS: Record<string, { label: string; types: MovementType[] | null }> = {
   todos: { label: 'Todos los tipos', types: null },
-  ventas: { label: 'Ventas y abonos', types: ['venta', 'ajuste_venta', 'abono_fiado'] },
   egresos: { label: 'Egresos', types: ['egreso'] },
   ingresos: { label: 'Ingresos', types: ['ingreso'] },
   traslados: { label: 'Traslados', types: ['traslado_salida', 'traslado_entrada'] },
   proveedores: { label: 'Pagos a proveedores', types: ['pago_proveedor'] },
   ajustes: { label: 'Ajustes de arqueo', types: ['ajuste_arqueo'] },
 }
+
+/** What a sale (or a payment on a fiado) leaves in the ledger: Facturas and Fiados already list it, so the movements list skips it — the balances and "Ventas y abonos hoy" still count it. */
+const FROM_SALES: ReadonlySet<MovementType> = new Set(['venta', 'ajuste_venta', 'abono_fiado'])
 
 const PERIODS: Record<string, { label: string; days: number | null }> = {
   hoy: { label: 'Hoy', days: 0 },
@@ -38,6 +42,9 @@ export function CajasPage() {
   const { ready, movements, menor, mayor, balancesKnown, session, firstOpening } = useCaja()
   const [sheet, setSheet] = useState<Sheet>(null)
   const [cierreOpen, setCierreOpen] = useState(false)
+  const [reporteXOpen, setReporteXOpen] = useState(false)
+  // The Reporte X is a report, so it asks for the same permission as the Reporte page it used to sit in.
+  const canReport = usePermission().can('reportes.ver')
   const [cajaFilter, setCajaFilter] = useState<'todas' | CajaId>('todas')
   const [group, setGroup] = useState('todos')
   const [period, setPeriod] = useState('hoy')
@@ -61,7 +68,7 @@ export function CajasPage() {
     const days = PERIODS[period].days
     const sinceKey = days === null ? null : addDaysToKey(today, -days)
     return (mayorOpen ? movements : movements.filter((m) => m.caja !== 'mayor'))
-      .filter((m) => (cajaFilter === 'todas' || m.caja === cajaFilter) && (!types || types.includes(m.type)) && (days === 0 ? m.dayKey === today : sinceKey === null || m.dayKey >= sinceKey))
+      .filter((m) => !FROM_SALES.has(m.type) && (cajaFilter === 'todas' || m.caja === cajaFilter) && (!types || types.includes(m.type)) && (days === 0 ? m.dayKey === today : sinceKey === null || m.dayKey >= sinceKey))
       .sort((a, b) => (a.date < b.date ? 1 : -1))
   }, [movements, mayorOpen, cajaFilter, group, period, today])
 
@@ -73,7 +80,7 @@ export function CajasPage() {
       if (m.dayKey !== today) continue
       if (m.caja === 'mayor' && m.medio === 'transferencia') transferencias += m.direction === 'in' ? m.amount : -m.amount
       if (m.caja !== 'menor') continue
-      if (m.type === 'venta' || m.type === 'abono_fiado' || m.type === 'ajuste_venta') ventas += m.direction === 'in' ? m.amount : -m.amount
+      if (FROM_SALES.has(m.type)) ventas += m.direction === 'in' ? m.amount : -m.amount
       else if (m.type === 'egreso' || m.type === 'pago_proveedor') egresos += m.amount
     }
     return { ventas: round2(ventas), egresos: round2(egresos), transferencias: round2(transferencias) }
@@ -102,6 +109,7 @@ export function CajasPage() {
             ) : (
               <ActionButton icon={LockOpen} label={firstOpening ? 'Iniciar cajas' : 'Abrir caja'} tone="green" onClick={() => open({ kind: 'open' })} />
             )}
+            {canReport && <ActionButton icon={FileBarChart} label="Reporte X (lectura parcial)" tone="blue" onClick={() => setReporteXOpen(true)} />}
             <ActionButton icon={Minus} label="Egreso" onClick={() => open({ kind: 'move', caja: 'menor', direction: 'out' })} />
             <ActionButton icon={Plus} label="Ingreso" onClick={() => open({ kind: 'move', caja: 'menor', direction: 'in' })} />
             <ActionButton icon={ArrowLeftRight} label="Trasladar a Caja Mayor" locked={!mayorOpen} onClick={whenMayorOpen(() => open({ kind: 'transfer', from: 'menor' }))} />
@@ -185,6 +193,7 @@ export function CajasPage() {
       />
       <TransferSheet open={sheet?.kind === 'transfer'} onClose={() => setSheet(null)} from={sheet?.kind === 'transfer' ? sheet.from : 'menor'} />
       <CierreZModal open={cierreOpen} dayKey={session?.dayKey ?? today} onClose={() => setCierreOpen(false)} onClosed={() => setCierreOpen(false)} />
+      {canReport && <ReporteXModal open={reporteXOpen} dayKey={session?.dayKey ?? today} onClose={() => setReporteXOpen(false)} />}
     </div>
   )
 }
@@ -243,8 +252,15 @@ function MiniStat({ label, value, color }: { label: string; value: string; color
 }
 
 /** `locked`: it works with the Caja Mayor open only — it still answers a click, by saying so. */
-function ActionButton({ icon: Icon, label, onClick, tone, locked = false }: { icon: typeof Plus; label: string; onClick: () => void; tone?: 'red' | 'green'; locked?: boolean }) {
-  const toneClass = tone === 'red' ? 'border-red/30 bg-red/10 text-red hover:bg-red/15' : tone === 'green' ? 'border-green/30 bg-green/10 text-green hover:bg-green/15' : 'border-br2 bg-s2 text-txt2 hover:bg-s3'
+function ActionButton({ icon: Icon, label, onClick, tone, locked = false }: { icon: typeof Plus; label: string; onClick: () => void; tone?: 'red' | 'green' | 'blue'; locked?: boolean }) {
+  const toneClass =
+    tone === 'red'
+      ? 'border-red/30 bg-red/10 text-red hover:bg-red/15'
+      : tone === 'green'
+        ? 'border-green/30 bg-green/10 text-green hover:bg-green/15'
+        : tone === 'blue'
+          ? 'border-blue/30 bg-blue/10 text-blue hover:bg-blue/15'
+          : 'border-br2 bg-s2 text-txt2 hover:bg-s3'
   return (
     <button onClick={onClick} title={locked ? 'Abre la Caja Mayor para usarlo' : undefined} className={`flex items-center gap-1.5 rounded-[10px] border px-3 py-2 text-[12px] font-semibold transition-colors ${toneClass} ${locked ? 'opacity-50' : ''}`}>
       <Icon size={14} />
