@@ -55,6 +55,9 @@ function CierreZForm({ dayKey, onClose, onClosed }: Omit<CierreZModalProps, 'ope
   const mayorOpen = useMayorStore((s) => s.open)
   const [trasladarInput, setTrasladarInput] = useState<number | null>(null)
   const [notas, setNotas] = useState('')
+  // A closing that moves nothing to the Caja Mayor leaves all the counted cash in the books: whoever closes has to say it
+  // stays in the drawer (the amount it was said for, so counting again asks again).
+  const [staysFor, setStaysFor] = useState<number | null>(null)
   const [busy, setBusy] = useState(false)
   // The closing adds up what the server has: sales made without internet must have reached it first. They are
   // sent as soon as this opens, and the closing waits for them — and for the ones the server refused, which a
@@ -80,6 +83,8 @@ function CierreZForm({ dayKey, onClose, onClosed }: Omit<CierreZModalProps, 'ope
   const trasladar = wantsTransfer ? (trasladarInput ?? sugerido) : 0
   const tooMuch = trasladar > fisico + 0.005
   const quedaEnCaja = round2(fisico - trasladar)
+  const leavesAll = hasFisico && fisico > 0 && trasladar <= 0
+  const staysConfirmed = staysFor === fisico
 
   async function confirm() {
     if (pending > 0 || rejected > 0) {
@@ -96,6 +101,11 @@ function CierreZForm({ dayKey, onClose, onClosed }: Omit<CierreZModalProps, 'ope
     }
     if (tooMuch) {
       toast('No puedes trasladar más de lo que contaste', 'orange')
+      return
+    }
+    // Cash that is taken out of the drawer without being moved is what turned into a "faltante" the next morning.
+    if (leavesAll && !staysConfirmed) {
+      toast('Indica qué pasa con el efectivo: trasládalo a la Caja Mayor o marca que se queda en el cajón', 'orange')
       return
     }
     // Counting blind, this device doesn't have the day's cash movements: the server checks it then.
@@ -230,6 +240,12 @@ function CierreZForm({ dayKey, onClose, onClosed }: Omit<CierreZModalProps, 'ope
                 </div>
               )}
             </div>
+          )}
+          {leavesAll && (
+            <label className="mt-2.5 flex cursor-pointer items-start gap-2 rounded-lg border border-orange/30 bg-orange/10 p-2.5 text-[12px] font-semibold leading-snug text-orange">
+              <input type="checkbox" checked={staysConfirmed} onChange={(e) => setStaysFor(e.target.checked ? fisico : null)} className="mt-0.5 h-4 w-4 flex-shrink-0 accent-lime" />
+              <span>El efectivo contado ({formatMoney(fisico)}) se queda en el cajón: no me lo llevo.</span>
+            </label>
           )}
         </div>
       )}

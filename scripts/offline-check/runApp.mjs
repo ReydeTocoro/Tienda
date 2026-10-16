@@ -639,6 +639,31 @@ async function mainFlow(appUrl, webDir) {
     check('11 el aviso dice que este cierre no trasladará nada y trae el botón para abrir la Caja Mayor ahí mismo', cz2.includes('este cierre no trasladará nada') && cz2.includes('mañana al abrir saldrá como faltante') && cz2.includes('Abrir Caja Mayor'), cz2)
     await sleep(300)
     await shot(c, '16c-cierre-mayor-cerrada')
+
+    // 11d. The cash can't just be left in the books: with nothing moved to the Caja Mayor the closing asks to be told that it
+    // stays in the drawer (the cash that left unrecorded is what became a "faltante" the next day).
+    const sentCierres = async () => (await control('/__test/state')).requests['POST /api/cierres'] ?? 0
+    const sent0 = await sentCierres()
+    const stays = "[...document.querySelectorAll('dialog[open] input[type=checkbox]')][1]"
+    check('11d con efectivo contado y nada que trasladar, el cierre trae la casilla "se queda en el cajón", sin marcar', cz2.includes('se queda en el cajón') && (await ev(`${stays}?.checked`)) === false, cz2)
+    await ev(`${stays}?.scrollIntoView({ block: 'center' })`)
+    await sleep(300)
+    await shot(c, '16g-cierre-sin-trasladar')
+    await ev(clickText('Confirmar Cierre Z', "document.querySelector('dialog[open]')"))
+    check('11d sin marcarla no cierra: avisa, la hoja sigue abierta y no se pidió nada al servidor', (await waitFor("document.body.innerText.includes('qué pasa con el efectivo')", 5000)).ok && (await ev("!!document.querySelector('dialog[open]')")) === true && (await sentCierres()) === sent0, { sent0, ahora: await sentCierres() })
+    await ev(`${stays}.click()`)
+    await sleep(300)
+    check('11d la casilla se marca', (await ev(`${stays}?.checked`)) === true)
+    // Ticked, the request goes out — the stand-in refuses it on purpose, so the day is not really closed.
+    await control('/__test/mode', { kind: 'status', status: 409, path: '/api/cierres', times: 1 })
+    await ev(clickText('Confirmar Cierre Z', "document.querySelector('dialog[open]')"))
+    let went = false
+    for (let i = 0; i < 20 && !went; i++) {
+      went = (await sentCierres()) > sent0
+      if (!went) await sleep(250)
+    }
+    check('11d marcada, la petición del cierre sí sale', went, { sent0, ahora: await sentCierres() })
+    await control('/__test/mode', {})
     await ev(clickText('Abrir Caja Mayor', "document.querySelector('dialog[open]')"))
     check('11 ese botón pide el PIN', (await waitFor("[...document.querySelectorAll('dialog[open]')].some(d => d.innerText.includes('Abrir la Caja Mayor'))", 8000)).ok)
     await typePin('4821')
