@@ -12,6 +12,8 @@ export interface SupaControl {
   down: boolean
   /** Seconds a new access token lives. */
   accessTtl: number
+  /** What each `PUT /auth/v1/user` (a password change) carried. */
+  passwordUpdates: Array<{ password?: string; current_password?: string }>
 }
 
 export const TEST_EMAIL = 'dueno@x.com'
@@ -101,6 +103,10 @@ export function startFakeSupabase(lite: PGlite, port: number, ctl: SupaControl) 
     res.status(400).json({ message: 'unsupported' })
   })
   app.get('/auth/v1/user', (_req, res) => res.json(session(TEST_EMAIL).user))
+  app.put('/auth/v1/user', (req, res) => {
+    ctl.passwordUpdates.push(req.body as { password?: string; current_password?: string })
+    res.json(session(TEST_EMAIL).user)
+  })
   app.post('/auth/v1/logout', (_req, res) => res.status(204).end())
   app.post('/rest/v1/rpc/is_staff', (_req, res) => res.json(true))
   app.get('/rest/v1/sync_meta', (req, res) => {

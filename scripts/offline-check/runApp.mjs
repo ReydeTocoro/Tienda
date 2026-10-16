@@ -584,6 +584,37 @@ async function mainFlow(appUrl, webDir) {
     )
     await closeSheet(c)
 
+    // 9i. "Cambiar mi contraseña" asks for the password the account has now before it changes anything.
+    await ev(`document.querySelector('button[aria-haspopup="menu"]').click()`)
+    await sleep(300)
+    await ev(`[...document.querySelectorAll('[role=menuitem]')].find((b) => b.textContent.includes('Cambiar mi contraseña'))?.click()`)
+    check('9i el formulario pide primero la contraseña actual', (await waitFor("!!document.querySelector('dialog[open] #current-password')", 8000)).ok)
+    const updates = async () => (await control('/__test/supa', {})).passwordUpdates
+    const alertText = async () => ev(`document.querySelector('dialog[open] [role=alert]')?.innerText || ''`)
+    const submitPw = async () => {
+      await ev(clickText('Cambiar contraseña', "document.querySelector('dialog[open]')"))
+      await sleep(900)
+    }
+    const fillPw = async (cur, nuevo) => {
+      await ev(setInput('#current-password', cur))
+      await ev(setInput('#new-password', nuevo))
+      await ev(setInput('#new-password2', nuevo))
+    }
+    const n9i = (await updates()).length
+    await submitPw()
+    check('9i sin la actual no cambia nada y lo dice', (await alertText()).includes('Escribe tu contraseña actual') && (await updates()).length === n9i, await alertText())
+    await fillPw('equivocada-1', 'nueva-clave-2026')
+    await submitPw()
+    check('9i con una actual equivocada la rechaza y no cambia nada', (await alertText()).includes('La contraseña actual no es correcta') && (await updates()).length === n9i, await alertText())
+    await fillPw('clave123', 'clave123')
+    await submitPw()
+    check('9i una nueva igual a la actual tampoco pasa', (await alertText()).includes('distinta a la actual') && (await updates()).length === n9i, await alertText())
+    await fillPw('clave123', 'nueva-clave-2026')
+    await submitPw()
+    const sent9i = await updates()
+    check('9i con la actual correcta cambia la contraseña (y se la manda a Supabase, que también la revisa)', sent9i.length === n9i + 1 && sent9i[n9i].password === 'nueva-clave-2026' && sent9i[n9i].current_password === 'clave123', sent9i)
+    check('9i y cierra el formulario con el aviso', (await waitFor("!document.querySelector('dialog[open]')", 5000)).ok && (await ev("document.body.innerText.includes('Contraseña cambiada')")) === true)
+
     // 10. A newer version is published while the app is open: it restarts by itself — but not in the middle of a sale.
     await ev(`document.querySelector('dialog[open] button[aria-label="Cerrar"]')?.click()`)
     await waitFor("!document.querySelector('dialog[open]')", 5000)

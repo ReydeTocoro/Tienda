@@ -60,7 +60,7 @@ type Mode = { kind: 'ok' | 'down' | 'hang' | 'status' | 'lostAnswer' | 'delay'; 
 let mode: Mode = { kind: 'ok' }
 const log: string[] = []
 const requests: Record<string, number> = {}
-const supa: SupaControl = { down: false, accessTtl: 3600 }
+const supa: SupaControl = { down: false, accessTtl: 3600, passwordUpdates: [] }
 
 const outer = express()
 outer.use((req, res, next) => {
