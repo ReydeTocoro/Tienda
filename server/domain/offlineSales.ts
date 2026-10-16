@@ -12,7 +12,7 @@ import { HttpError } from '../routes/http'
 import { recordSaleReceipt } from './cash'
 import { operatorById, type Actor } from './counter'
 import { costsOf } from './secrets'
-import { cleanClientId, cleanLineDiscount, num, saleByClientId } from './sales'
+import { cleanClientId, cleanLineDiscount, FREE_CODE, num, saleByClientId } from './sales'
 
 /** A sale made on a device that had no internet, sent when it came back (src/offline on the app side).
  *
@@ -62,10 +62,12 @@ export async function ingestOfflineSale(sql: Sql, actor: Actor, raw: unknown): P
   for (const r of rawItems as Array<Partial<CartItem>>) {
     const { code, qty, price } = lineOf(r)
     if (!code || !(qty > 0) || qty > 1_000_000 || !(price >= 0) || price > 1e9) throw new HttpError(400, 'La venta tiene una línea inválida')
-    const p = products.get(code)
+    // A product sin registrar typed at the till: kept as it was charged, with no stock behind it.
+    const free = FREE_CODE.test(code)
+    const p = free ? undefined : products.get(code)
     const name = text(r?.name, 120) || p?.name || code
-    if (!p) notes.push(`"${name}" ya no existe en el inventario: la venta se guardó, pero no hay stock que descontar`)
-    else if (!sellingPrices(p).some((x) => samePrice(x, price))) notes.push(`"${name}" se vendió a ${formatMoney(price)}, que no es ninguno de sus precios de hoy (Precio 1: ${formatMoney(p.price)})`)
+    if (!p && !free) notes.push(`"${name}" ya no existe en el inventario: la venta se guardó, pero no hay stock que descontar`)
+    else if (p && !sellingPrices(p).some((x) => samePrice(x, price))) notes.push(`"${name}" se vendió a ${formatMoney(price)}, que no es ninguno de sus precios de hoy (Precio 1: ${formatMoney(p.price)})`)
     // A discount typed on the line is kept (cut to what the line is worth): a sale made without internet is never refused.
     const off = (() => {
       try {
@@ -74,7 +76,7 @@ export async function ingestOfflineSale(sql: Sql, actor: Actor, raw: unknown): P
         return 0
       }
     })()
-    lines.push({ code, name, price, cost: 0, qty, ...(off > 0 ? { discount: off } : {}), brand: text(r?.brand, 60) || p?.brand || '', unit: text(r?.unit, 20) || p?.unit || 'unidad', isFree: false })
+    lines.push({ code, name, price, cost: 0, qty, ...(off > 0 ? { discount: off } : {}), brand: free ? '' : text(r?.brand, 60) || p?.brand || '', unit: free ? 'unidad' : text(r?.unit, 20) || p?.unit || 'unidad', isFree: free })
   }
 
   // ── When. The device's clock decides, unless it is plainly wrong. ──
@@ -138,6 +140,7 @@ export async function ingestOfflineSale(sql: Sql, actor: Actor, raw: unknown): P
   // ── What nobody could authorize without a connection: the sale stands, the owner is told. ──
   if (discount > EPS && !needs.has('ventas.descuentos')) notes.push(`Descuento de ${formatMoney(discount)} sin autorización de alguien con permiso`)
   if (adjusted && !needs.has('ventas.cambiarTotal')) notes.push(`Total cambiado a ${formatMoney(total)} (los productos suman ${formatMoney(base)}) sin autorización de alguien con permiso`)
+  if (lines.some((l) => l.isFree) && !needs.has('ventas.productoLibre')) notes.push('Producto sin registrar vendido sin autorización de alguien con permiso')
   const fiadoName = payMethod === 'fiado' ? text(input.fiadoName, 80) || customerName || '' : ''
   if (payMethod === 'fiado') {
     if (!fiadoName) notes.push('Venta fiada sin el nombre de quien la debe')
@@ -159,7 +162,7 @@ export async function ingestOfflineSale(sql: Sql, actor: Actor, raw: unknown): P
 
   // ── Stock: it goes down by what was sold, never below zero; a shortfall is written down. ──
   const wanted = new Map<string, number>()
-  for (const l of lines) if (products.has(l.code)) wanted.set(l.code, roundQty((wanted.get(l.code) ?? 0) + l.qty))
+  for (const l of lines) if (!l.isFree && products.has(l.code)) wanted.set(l.code, roundQty((wanted.get(l.code) ?? 0) + l.qty))
   const stocks: Array<{ code: string; stock: number }> = []
   for (const [code, qty] of wanted) {
     const p = products.get(code)!
@@ -170,7 +173,7 @@ export async function ingestOfflineSale(sql: Sql, actor: Actor, raw: unknown): P
 
   // ── Profit from the purchase prices, which the device never sees. ──
   const costs = await costsOf(sql, [...wanted.keys()])
-  const items = lines.map((l) => ({ ...l, cost: products.has(l.code) ? (costs.get(l.code) ?? 0) : 0 }))
+  const items = lines.map((l) => ({ ...l, cost: wanted.has(l.code) ? (costs.get(l.code) ?? 0) : 0 }))
   // What was charged minus what the goods cost: a discount (or the rounding of a cash charge) comes off the profit.
   const ganancia = round2(total - items.reduce((c, i) => c + i.cost * i.qty, 0))
 

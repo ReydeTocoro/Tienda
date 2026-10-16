@@ -4,8 +4,8 @@ import type { EntradaRecord } from '../../src/types/entrada'
 import type { CajaId } from '../../src/types/cash'
 import type { PaymentTerms, Supplier } from '../../src/types/supplier'
 import type { OrderLine, OrderPayment, Payable, PurchaseOrder } from '../../src/types/purchaseOrder'
-import { dueDateFrom, payableBalance, round2 } from '../../src/shared/lib/cash'
-import { formatMoney } from '../../src/shared/lib/currency'
+import { addDaysToKey, daysBetween, payableBalance, round2 } from '../../src/shared/lib/cash'
+import { dayKeyOf, formatMoney, noonOfDay } from '../../src/shared/lib/currency'
 import { formatOrderId } from '../../src/shared/lib/id'
 import type { Sql } from '../db'
 import { deleteRow, getRow, getRowsByKey, insertAutoRow, insertAutoRows, listAll, putRow, putRows, roundQty } from '../routes/generic'
@@ -227,7 +227,20 @@ export interface ReceiveInput {
    * order planned, if any); lines left out are taken as ordered. */
   lines?: Array<{ code: string; qtyReceived: number; unitCost: number; salePrice?: number | null }>
   payment: { mode: 'contado'; caja: CajaId } | { mode: 'credito' }
+  /** 'YYYY-MM-DD' the supplier invoiced it (default: today, the reception day; never a future day). The days of credit count
+   * from it, so an order that arrived today but was invoiced four days ago is due four days earlier. */
+  invoiceDate?: string
+  /** 'YYYY-MM-DD' it has to be paid by — credit only; default: the invoice day + the supplier's days. */
+  dueDate?: string
   by?: string
+}
+
+/** A 'YYYY-MM-DD' the screen sent: absent or empty = none; anything else has to be a real day of the calendar. */
+function cleanDay(v: unknown, what: string): string | undefined {
+  if (v === undefined || v === null || v === '') return undefined
+  const s = String(v)
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(s) || addDaysToKey(s, 0) !== s) throw new Error(`${what} no es una fecha válida`)
+  return s
 }
 
 /** `revealBalance`: whether a "not enough money" refusal may say how much the caja holds. */
@@ -244,6 +257,19 @@ export interface PayOptions {
 export async function receiveOrder(sql: Sql, id: number, input: ReceiveInput, opts: PayOptions = {}): Promise<PurchaseOrder> {
   const o = await getOrder(sql, id)
   if (o.status !== 'pedido') throw new Error(o.status === 'recibido' ? 'Este pedido ya fue recibido' : 'Solo se puede recibir un pedido que ya fue enviado')
+
+  // The dates first, before anything is written: the invoice's (the credit counts from it) and, on credit, the due day.
+  const today = dayKeyOf(new Date())
+  const invoiceDate = cleanDay(input.invoiceDate, 'La fecha de la factura')
+  if (invoiceDate && invoiceDate > today) throw new Error('La fecha de la factura no puede ser futura')
+  if (invoiceDate && daysBetween(invoiceDate, today) > 365) throw new Error('La fecha de la factura es de hace más de un año: revísala')
+  const issued = invoiceDate ?? today
+  const typedDue = cleanDay(input.dueDate, 'La fecha de vencimiento')
+  if (typedDue) {
+    if ((input.payment as { mode?: string } | undefined)?.mode !== 'credito') throw new Error('La fecha de vencimiento solo aplica a lo que se deja a crédito')
+    if (typedDue < issued) throw new Error('El vencimiento no puede ser anterior a la fecha de la factura')
+    if (daysBetween(issued, typedDue) > 365) throw new Error('El vencimiento está a más de un año de la factura: revísalo')
+  }
 
   const overrides = new Map((input.lines ?? []).map((l) => [l.code, l]))
   for (const code of overrides.keys()) {
@@ -322,8 +348,8 @@ export async function receiveOrder(sql: Sql, id: number, input: ReceiveInput, op
         orderId: id,
         amount: receivedTotal,
         paid: 0,
-        issuedAt: now.toISOString(),
-        dueDate: dueDateFrom(now, o.paymentTerms.days),
+        issuedAt: issued === today ? now.toISOString() : noonOfDay(issued),
+        dueDate: typedDue ?? addDaysToKey(issued, o.paymentTerms.days),
         payments: [],
       }
       const payable = await insertAutoRow(sql, PAYABLES, base)
@@ -335,7 +361,7 @@ export async function receiveOrder(sql: Sql, id: number, input: ReceiveInput, op
 
   // Each line says the selling price it set (and the one it replaced); a planned one that didn't apply goes.
   const finalLines = lines.map(({ salePrice: _planned, priceBefore: _before, ...l }) => ({ ...l, ...priced.get(l.code) }))
-  return saveOrder(sql, { ...o, status: 'recibido', lines: finalLines, receivedTotal, receivedAt: new Date().toISOString(), receivedBy: by, payment })
+  return saveOrder(sql, { ...o, status: 'recibido', lines: finalLines, receivedTotal, receivedAt: new Date().toISOString(), ...(invoiceDate ? { invoiceDate } : {}), receivedBy: by, payment })
 }
 
 // ----------------------------------------------------------------- payables

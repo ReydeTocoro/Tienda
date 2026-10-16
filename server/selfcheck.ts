@@ -17,7 +17,7 @@ import { lineDiscount, manualDiscountOf } from '../src/shared/lib/discounts'
 import { stockEffect } from '../src/shared/lib/saleStock'
 import { getRow, insertAutoRow, putRow, listAll } from './routes/generic'
 import { addDaysToKey, dueDateFrom } from '../src/shared/lib/cash'
-import { todayKey } from '../src/shared/lib/currency'
+import { dayKeyOf, todayKey } from '../src/shared/lib/currency'
 import { needsOfRole, resolveRoles } from '../src/shared/lib/permissions'
 import type { Product } from '../src/types/product'
 import type { Sale } from '../src/types/sale'
@@ -443,6 +443,51 @@ ok('un descuento en dinero se aplica a un producto de la venta: se guarda en su 
 await fails(() => run((q) => cash.registerMovement(q, { caja: 'menor', direction: 'out', amount: 10, concept: 'x', category: 'inventada' as never })), /categoría/i, 'categoría desconocida')
 await run((q) => cash.registerMovement(q, { caja: 'menor', direction: 'out', amount: 10, concept: 'x', category: 'mantenimiento' }))
 ok('un egreso solo acepta categorías conocidas')
+
+// --- Fecha de la factura y vencimiento: el crédito cuenta desde cuando se facturó, no desde cuando llegó ---------------
+await putRow(db, 'products', 'code', 'F1', product('F1', 0, 1000))
+const invoicedOn = addDaysToKey(todayKey(), -4)
+const orderF = async () => (await run((q) => buying.createOrder(q, { supplierId: credito.id, send: true, lines: [{ code: 'F1', qty: 1, unitCost: 1000 }] }))) as PurchaseOrder & { id: number }
+const payableOf = async (orderId: number) => (await listAll<Payable>(db, 'payables')).find((p) => p.orderId === orderId)
+const stockF1 = async () => (await getRow<Product>(db, 'products', 'code', 'F1'))!.stock
+// Llegó hoy pero se lo facturaron hace cuatro días: los 30 días de crédito corren desde la factura.
+const f1 = await orderF()
+const gotF1 = await run((q) => buying.receiveOrder(q, f1.id, { payment: { mode: 'credito' }, invoiceDate: invoicedOn }))
+assert.equal((await payableOf(f1.id))!.dueDate, addDaysToKey(invoicedOn, 30))
+assert.equal(dayKeyOf((await payableOf(f1.id))!.issuedAt), invoicedOn, 'la cuenta queda facturada ese día')
+assert.equal(gotF1.invoiceDate, invoicedOn)
+assert.equal(dayKeyOf(gotF1.receivedAt!), todayKey(), 'lo que llegó (el pedido, el stock) sigue siendo de hoy')
+assert.equal(await stockF1(), 1)
+// Sin fecha, como siempre: hoy + los días del proveedor, y el pedido no inventa una fecha de factura.
+const f2 = await orderF()
+const gotF2 = await run((q) => buying.receiveOrder(q, f2.id, { payment: { mode: 'credito' } }))
+assert.equal((await payableOf(f2.id))!.dueDate, addDaysToKey(todayKey(), 30))
+assert.equal(gotF2.invoiceDate, undefined)
+// El vencimiento se puede poner a mano; y una factura vieja deja la cuenta vencida desde el primer día.
+const f3 = await orderF()
+await run((q) => buying.receiveOrder(q, f3.id, { payment: { mode: 'credito' }, invoiceDate: invoicedOn, dueDate: addDaysToKey(invoicedOn, 45) }))
+assert.equal((await payableOf(f3.id))!.dueDate, addDaysToKey(invoicedOn, 45))
+const f4 = await orderF()
+await run((q) => buying.receiveOrder(q, f4.id, { payment: { mode: 'credito' }, invoiceDate: addDaysToKey(todayKey(), -40) }))
+assert.equal((await payableOf(f4.id))!.dueDate, addDaysToKey(todayKey(), -10))
+// Lo que no tiene sentido se rechaza antes de escribir nada.
+const f5 = await orderF()
+const stockBeforeF = await stockF1()
+const rejectedDates: Array<[Partial<buying.ReceiveInput>, RegExp]> = [
+  [{ invoiceDate: addDaysToKey(todayKey(), 1) }, /no puede ser futura/],
+  [{ invoiceDate: '31/10/2026' }, /no es una fecha válida/],
+  [{ invoiceDate: '2026-02-30' }, /no es una fecha válida/],
+  [{ invoiceDate: addDaysToKey(todayKey(), -400) }, /más de un año/],
+  [{ invoiceDate: invoicedOn, dueDate: addDaysToKey(invoicedOn, -1) }, /anterior a la fecha de la factura/],
+  [{ invoiceDate: invoicedOn, dueDate: addDaysToKey(invoicedOn, 400) }, /más de un año/],
+  [{ dueDate: 'mañana' }, /no es una fecha válida/],
+  [{ payment: { mode: 'contado', caja: 'menor' }, dueDate: todayKey() }, /solo aplica a lo que se deja a crédito/],
+]
+for (const [extra, re] of rejectedDates) await fails(() => run((q) => buying.receiveOrder(q, f5.id, { payment: { mode: 'credito' }, ...extra })), re, JSON.stringify(extra))
+assert.equal(await stockF1(), stockBeforeF, 'rechazada: el stock no se mueve')
+assert.equal((await getRow<PurchaseOrder>(db, 'purchaseOrders', 'id', f5.id))!.status, 'pedido')
+assert.equal(await payableOf(f5.id), undefined)
+ok('al recibir a crédito se puede poner el día de la factura (el vencimiento corre desde ahí, aunque lo recibido sea de hoy) y el día de vencimiento a mano; sin fechas todo sigue igual, y una fecha futura, inventada, de hace más de un año o un vencimiento antes de la factura se rechazan sin escribir nada')
 
 // --- Precio de venta desde el pedido: cambia el producto al recibir, nunca las ventas ya hechas ---------------------
 const salesBefore = JSON.stringify(await listAll<Sale>(db, 'sales'))

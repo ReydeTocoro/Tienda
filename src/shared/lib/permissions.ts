@@ -12,6 +12,7 @@ export type Permission =
   | 'ventas.fiar'
   | 'ventas.descuentos'
   | 'ventas.cambiarTotal'
+  | 'ventas.productoLibre'
   | 'ventas.verTotales'
   | 'costos.ver'
   | 'ganancias.ver'
@@ -60,6 +61,7 @@ export const PERMISSION_GROUPS: PermissionGroup[] = [
       { key: 'ventas.fiar', label: 'Vender fiado', hint: 'Elegir "Fiado" como forma de pago al cobrar.' },
       { key: 'ventas.descuentos', label: 'Aplicar descuentos', hint: 'Dar un descuento manual (%) a la venta.' },
       { key: 'ventas.cambiarTotal', label: 'Cambiar el total a cobrar', hint: 'Redondear o ajustar el total en el cobro.' },
+      { key: 'ventas.productoLibre', label: 'Vender productos sin registrar', hint: 'Cobrar algo que no está en el inventario, con el nombre y el precio que se escriban.' },
       {
         key: 'ventas.verTotales',
         label: 'Ver cuánto se ha vendido',
@@ -186,6 +188,7 @@ export const DEFAULT_ROLES: Role[] = [
       'ventas.fiar',
       'ventas.descuentos',
       'ventas.cambiarTotal',
+      'ventas.productoLibre',
       'ventas.verTotales',
       'stock.ver',
       'stock.editar',
@@ -207,7 +210,7 @@ export const DEFAULT_ROLES: Role[] = [
   {
     id: CAJERO_ROLE_ID,
     name: 'Cajero',
-    permissions: ['ventas.fiar', 'ventas.descuentos', 'ventas.cambiarTotal', 'clientes.ver', 'clientes.editar', 'fiados.ver', 'facturas.ver', 'caja.abrir'],
+    permissions: ['ventas.fiar', 'ventas.descuentos', 'ventas.cambiarTotal', 'ventas.productoLibre', 'clientes.ver', 'clientes.editar', 'fiados.ver', 'facturas.ver', 'caja.abrir'],
   },
 ]
 

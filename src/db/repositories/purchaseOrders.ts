@@ -15,6 +15,9 @@ export interface ReceiveInput {
   /** `salePrice`: the selling price from now on (null = keep the product's). */
   lines?: Array<{ code: string; qtyReceived: number; unitCost: number; salePrice?: number | null }>
   payment: { mode: 'contado'; caja: CajaId } | { mode: 'credito' }
+  /** 'YYYY-MM-DD' the supplier invoiced it (the credit days count from it) and, on credit, the day it is due. */
+  invoiceDate?: string
+  dueDate?: string
   by?: string
 }
 

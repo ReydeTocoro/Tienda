@@ -11,8 +11,8 @@ export interface CartItem {
   discount?: number
   brand: string
   unit: string
-  /** A free-form line that never touches stock and has no product behind it: the `CORR` line a sale
-   * correction adds, and the "producto libre" lines of sales made before that option was removed
-   * from Venta (a cart can no longer create them — the server only sells inventory products). */
+  /** A free-form line that never touches stock and has no product behind it: a "producto sin registrar"
+   * typed at the till (code `FREE_…`, name and price as typed; needs `ventas.productoLibre`) and the `CORR`
+   * line of old sale corrections. The server decides it from the code, never from this flag. */
   isFree: boolean
 }

@@ -19,9 +19,9 @@ import { costsOf } from './secrets'
 /** Sales, corrections and fiado payments. The browser sends what the cashier rang up; the server
  * re-prices it from the inventory and decides what needs a permission — so a sale can't be saved at
  * a made-up price, with a discount, a changed total or on credit unless whoever is working may do
- * it (or someone allowed approved it with their PIN) — and every line must be an inventory product:
- * a made-up one is refused. The profit is computed here from the purchase prices, which the browser
- * never sees. */
+ * it (or someone allowed approved it with their PIN) — and every line must be an inventory product,
+ * except a "producto sin registrar" (`ventas.productoLibre`). The profit is computed here from the
+ * purchase prices, which the browser never sees. */
 
 const TABLE = 'sales'
 const PAY_METHODS: PayMethod[] = ['efectivo', 'transferencia', 'fiado']
@@ -82,21 +82,34 @@ export async function saleByClientId(sql: Sql, clientId: string): Promise<(Sale 
   return row?.data
 }
 
+/** The code the cart gives a "producto sin registrar": `FREE_` and a random id. It is what makes a line one (`isTracked`). */
+export const FREE_CODE = /^FREE_[0-9A-Za-z-]{8,50}$/
+
 /** The cart lines as they'll be saved: inventory products at one of their current prices (Precio 1,
- * 2 or 3), with their current name and unit. A line that is not an inventory product — the old
- * "producto libre", from a screen that still offers it — is refused like any product that no longer exists. */
-async function priceLines(sql: Sql, items: unknown): Promise<{ lines: CartItem[]; products: Map<string, Product> }> {
+ * 2 or 3), with their current name and unit, and "productos sin registrar" (`FREE_…`) with the name and
+ * price typed at the till, which never touch the stock. Any other line that is not an inventory product
+ * is refused like a product that no longer exists. */
+async function priceLines(sql: Sql, items: unknown): Promise<{ lines: CartItem[]; products: Map<string, Product>; hasFree: boolean }> {
   if (!Array.isArray(items) || items.length === 0) throw new Error('Carrito vacío')
   if (items.length > 500) throw new Error('Demasiados productos en una sola venta')
   const raws = items as Array<Partial<CartItem>>
   // Every product on the ticket in one trip, not one per line.
   const products = await getRowsByKey<Product>(sql, 'products', 'code', raws.map((r) => text(r?.code, 60)))
   const lines: CartItem[] = []
+  let hasFree = false
   for (const raw of raws) {
     const qty = roundQty(num(raw?.qty))
     if (!(qty > 0) || qty > 1_000_000) throw new Error('Hay una cantidad inválida en el carrito')
     const price = num(raw?.price)
     const code = text(raw?.code, 60)
+    if (code.startsWith('FREE_')) {
+      const name = text(raw?.name, 120)
+      if (!FREE_CODE.test(code) || !name || !(price > 0) || price > 1e9) throw new Error('Hay un producto sin registrar sin nombre o sin precio: quítalo del carrito y agrégalo de nuevo')
+      const off = cleanLineDiscount(raw?.discount, price * qty, name)
+      lines.push({ code, name, price, cost: 0, qty, ...(off > 0 ? { discount: off } : {}), brand: '', unit: 'unidad', isFree: true })
+      hasFree = true
+      continue
+    }
     const p = products.get(code)
     if (!p) throw new Error(`"${text(raw?.name, 80) || code}" ya no existe en el inventario: quítalo del carrito`)
     // The line may be charged at any of the product's registered prices (Precio 1, 2 or 3): the
@@ -107,7 +120,7 @@ async function priceLines(sql: Sql, items: unknown): Promise<{ lines: CartItem[]
     const off = cleanLineDiscount(raw?.discount, charged * qty, p.name)
     lines.push({ code: p.code, name: p.name, price: charged, cost: 0, qty, ...(off > 0 ? { discount: off } : {}), brand: p.brand || '', unit: p.unit || 'unidad', isFree: false })
   }
-  return { lines, products }
+  return { lines, products, hasFree }
 }
 
 /** Insert the sale AND decrement stock atomically. */
@@ -121,12 +134,12 @@ export async function finalizeSale(sql: Sql, actor: Actor, input: FinalizeSaleIn
     if (already) return already
   }
   const transferAccount = payMethod === 'transferencia' ? cleanAccount(input.transferAccount) : undefined
-  const { lines, products } = await priceLines(sql, input.items)
+  const { lines, products, hasFree } = await priceLines(sql, input.items)
 
   // Checked here (not just in the browser) because this is the one place two devices selling the
-  // same product at once can't race each other: db.tx serializes writes.
+  // same product at once can't race each other: db.tx serializes writes. A product sin registrar has no stock.
   const wanted = new Map<string, number>()
-  for (const l of lines) wanted.set(l.code, roundQty((wanted.get(l.code) ?? 0) + l.qty))
+  for (const l of lines) if (!l.isFree) wanted.set(l.code, roundQty((wanted.get(l.code) ?? 0) + l.qty))
   for (const [code, qty] of wanted) {
     const p = products.get(code)!
     if (qty > (p.stock || 0)) throw new Error(`Stock insuficiente de "${p.name}" (quedan ${p.stock})`)
@@ -145,6 +158,7 @@ export async function finalizeSale(sql: Sql, actor: Actor, input: FinalizeSaleIn
   // What the lines say was taken off them is part of the sale's discount (a discount an older screen sent for the whole sale is what can be left over).
   if (lines.reduce((a, l) => a + (l.discount ?? 0), 0) > discount + EPS) throw new Error('Los descuentos de los productos no cuadran con el descuento de la venta: revisa el carrito e inténtalo de nuevo')
   if (discount > EPS) await requireNeed(sql, actor, 'ventas.descuentos')
+  if (hasFree) await requireNeed(sql, actor, 'ventas.productoLibre')
 
   const base = subtotal - discount
   const total = num(input.total)
@@ -166,7 +180,7 @@ export async function finalizeSale(sql: Sql, actor: Actor, input: FinalizeSaleIn
     if (amountReceived === 0) amountReceived = undefined
   }
 
-  // Profit from the purchase prices — the browser never sees them.
+  // Profit from the purchase prices — the browser never sees them. A product sin registrar has no cost: it counts whole.
   const costs = await costsOf(sql, [...wanted.keys()])
   const items = lines.map((l) => ({ ...l, cost: costs.get(l.code) ?? 0 }))
   // What was charged minus what the goods cost: a discount (or the rounding of a cash charge) comes off the profit.

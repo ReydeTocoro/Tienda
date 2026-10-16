@@ -76,6 +76,7 @@ export function CartLine({ item, prices, onChangePrice, onChangeQty, onSetQty, o
           <span className="truncate" title={item.name}>
             {item.name}
           </span>
+          {item.isFree && <span className="flex-shrink-0 rounded border border-orange/30 bg-orange/10 px-1 py-px text-[9px] font-bold text-orange">LIBRE</span>}
         </div>
         <div className="flex items-center gap-1 font-mono text-[10px] leading-tight text-muted">
           {pickable ? (
@@ -87,7 +88,7 @@ export function CartLine({ item, prices, onChangePrice, onChangeQty, onSetQty, o
             </span>
           )}
           <span className="min-w-0 truncate">
-            · {item.code}
+            · {item.isFree ? 'Sin registrar' : item.code}
             {item.brand ? ' · ' + item.brand : ''}
           </span>
         </div>

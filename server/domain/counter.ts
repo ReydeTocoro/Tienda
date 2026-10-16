@@ -39,7 +39,7 @@ export const SESSION_TTL_SECONDS = 12 * 60 * 60
 
 /** Sale steps (discount, fiado, changing the total) wait for their sale and are spent by it; any other
  * approval lets its step through for a few minutes (a form being filled). */
-export const SPENT_BY_SALE = new Set<Need>(['ventas.descuentos', 'ventas.fiar', 'ventas.cambiarTotal'])
+export const SPENT_BY_SALE = new Set<Need>(['ventas.descuentos', 'ventas.fiar', 'ventas.cambiarTotal', 'ventas.productoLibre'])
 const SALE_APPROVAL_SECONDS = 15 * 60
 const APPROVAL_SECONDS = 5 * 60
 

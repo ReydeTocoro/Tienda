@@ -52,7 +52,7 @@ export function PayablesTable({ rows, sort, onSort, resetKey, onOpen }: Payables
         ),
       },
       { key: 'order', label: 'Pedido', min: 88, sortKey: 'order', cell: (r) => <span className="font-mono text-[12px] font-semibold text-lime">{r.orderNumber}</span> },
-      { key: 'issued', label: 'Recibido', min: 136, drop: 1, sortKey: 'issued', cell: (r) => <span className="whitespace-nowrap text-txt2">{formatDayKey(r.issuedKey)}</span> },
+      { key: 'issued', label: 'Facturado', min: 136, drop: 1, sortKey: 'issued', cell: (r) => <span className="whitespace-nowrap text-txt2">{formatDayKey(r.issuedKey)}</span> },
       { key: 'due', label: 'Vence', min: 136, sortKey: 'due', cell: (r) => <span className="whitespace-nowrap text-txt2">{formatDayKey(r.dueKey)}</span> },
       { key: 'amount', label: 'Total', min: 116, align: 'right', sortKey: 'amount', cell: (r) => <span className="font-mono text-txt2">{formatMoney(r.amount)}</span> },
       {

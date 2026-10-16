@@ -3,6 +3,7 @@ import type { CartItem } from '../types/cartItem'
 import type { PayMethod } from '../types/sale'
 import type { TransferAccount } from '../shared/lib/transferAccounts'
 import { samePrice } from '../shared/lib/prices'
+import { newClientId } from '../shared/lib/id'
 import { toast } from './useToastStore'
 
 interface AddUnitSource {
@@ -48,6 +49,8 @@ interface CartState {
   // Everything below edits the ACTIVE cart.
   addUnitItem: (p: AddUnitSource, qty?: number) => void
   addWeightedItem: (item: CartItem, stock: number, editIndex?: number | null) => void
+  /** A "producto sin registrar": a line with the name and price typed at the till, no product behind it and no stock. */
+  addFreeItem: (name: string, price: number, qty: number) => void
   changeQty: (index: number, delta: number, maxStock?: number) => void
   /** A quantity typed by hand on a line: whole units, never more than there is (it stops at the stock, and says so). */
   setQty: (index: number, qty: number, maxStock?: number) => void
@@ -175,6 +178,10 @@ export const useCartStore = create<CartState>((set, get) => {
         }
         patchActive({ items: [...items, item] })
       }
+    },
+
+    addFreeItem: (name, price, qty) => {
+      patchActive({ items: [...active().items, { code: 'FREE_' + newClientId(), name, price, qty, brand: '', unit: 'unidad', isFree: true }] })
     },
 
     changeQty: (index, delta, maxStock) => {

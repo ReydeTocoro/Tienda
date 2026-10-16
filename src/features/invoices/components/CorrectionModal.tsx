@@ -159,7 +159,7 @@ function CorrectionForm({ sale, onClose, onCorrected }: { sale: Sale; onClose: (
               </div>
               {over && <div className="mt-0.5 text-[11px] text-red">Solo hay {formatQty(available(it.code) + unitsOf(items, it.code))} disponibles para esta factura.</div>}
               {gone && <div className="mt-0.5 text-[11px] text-muted">Este producto ya no está en el inventario: su cantidad no mueve stock.</div>}
-              {!tracked && <div className="mt-0.5 text-[11px] text-muted">Línea libre de una venta antigua: no mueve stock.</div>}
+              {!tracked && <div className="mt-0.5 text-[11px] text-muted">Producto sin registrar: no mueve stock.</div>}
             </div>
           )
         })}

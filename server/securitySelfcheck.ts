@@ -22,6 +22,7 @@ import { checkAccount, refreshCounterPerms } from './domain/counter'
 import type { HttpError } from './routes/http'
 import { asBrowser, applyMigration, fakeAccounts, testDatabase } from './testDb'
 import { DEFAULT_ROLES, type Role } from '../src/shared/lib/permissions'
+import type { CartItem } from '../src/types/cartItem'
 
 let n = 0
 const ok = (label: string) => console.log(`  ok ${++n} — ${label}`)
@@ -465,15 +466,37 @@ assert.match(String(r.body.error), /Stock insuficiente/)
 needs(await post(PEPE, '/api/sales/finalize', { ...sale([{ code: 'B2', price: 5000, qty: 1 }]), discount: 500, total: 4500 }), 'ventas.descuentos', 'descuento')
 needs(await post(PEPE, '/api/sales/finalize', { ...sale([{ code: 'B2', price: 5000, qty: 1 }]), total: 4000 }), 'ventas.cambiarTotal', 'cambiar el total')
 needs(await post(PEPE, '/api/sales/finalize', { ...sale([{ code: 'B2', price: 5000, qty: 1 }]), payMethod: 'fiado', fiadoName: 'Don José' }), 'ventas.fiar', 'fiar')
-r = await post(OWNER, '/api/sales/finalize', sale([{ code: 'FREE_x1', name: 'Bolsa', price: 300, qty: 1, isFree: true }]))
-assert.equal(r.status, 400, 'un producto que no es del inventario (el antiguo "producto libre") ya no se vende, ni siquiera el dueño')
-assert.match(String(r.body.error), /"Bolsa" ya no existe en el inventario/)
+// A "producto sin registrar": name and price typed at the till, no stock, its permission (or an approval).
+const FREE = 'FREE_0f6c2b9e-41d7-4c55-9a3e-7d2b8c1e5f00'
+needs(await post(PEPE, '/api/sales/finalize', sale([{ code: FREE, name: 'Bolsa', price: 300, qty: 2, isFree: true }])), 'ventas.productoLibre', 'producto sin registrar')
+const b2Before = await b2Stock()
+r = await post(OWNER, '/api/sales/finalize', sale([{ code: FREE, name: 'Bolsa', price: 300, qty: 2, isFree: true }, { code: 'B2', price: 5000, qty: 1 }]))
+okStatus(r, 'el dueño vende un producto sin registrar junto con uno del inventario')
+assert.deepEqual((r.body.items as CartItem[]).map((i) => [i.code, i.name, i.price, i.qty, i.isFree]), [[FREE, 'Bolsa', 300, 2, true], ['B2', 'Ponchera', 5000, 1, false]], 'la línea queda con el nombre y el precio escritos, marcada como libre')
+assert.equal(r.body.total, 5600)
+assert.equal(await b2Stock(), b2Before - 1, 'solo baja el stock del producto del inventario')
+assert.equal((await row<{ g: number }>(`select (data ->> 'ganancia')::int as g from profits where key = $1`, [`sale:${r.body.id}`]))!.g, 600 + 5000 - 3000, 'lo sin registrar cuenta entero en la ganancia (no tiene costo)')
+// Corrected (it stays, with another quantity) and annulled like any invoice: only the inventory product moves stock.
+const freeSale = r.body.id as number
+const freeLines = r.body.items as CartItem[]
+r = await put(OWNER, `/api/sales/${freeSale}/correct`, { newItems: [{ ...freeLines[0], qty: 3 }, freeLines[1]], reason: 'eran tres bolsas' })
+okStatus(r, 'la factura con un producto sin registrar se corrige y la línea se queda')
+assert.equal(r.body.total, 5900)
+assert.equal(await b2Stock(), b2Before - 1, 'corregir la línea libre no mueve el stock')
+okStatus(await post(OWNER, `/api/sales/${freeSale}/void`, { reason: 'prueba' }), 'y se anula')
+assert.equal(await b2Stock(), b2Before, 'al anularla vuelve solo la unidad del producto del inventario')
+for (const [bad, label] of [
+  [{ code: FREE, name: '', price: 300, qty: 1, isFree: true }, 'sin nombre'],
+  [{ code: FREE, name: 'Bolsa', price: 0, qty: 1, isFree: true }, 'sin precio'],
+  [{ code: 'FREE_x1', name: 'Bolsa', price: 300, qty: 1, isFree: true }, 'con un código que no hizo el carrito'],
+  [{ code: 'A1', name: 'Balde', price: 1, qty: 1, isFree: true }, 'un producto del inventario marcado como libre para cobrarlo a otro precio'],
+] as const) assert.equal((await post(OWNER, '/api/sales/finalize', sale([bad]))).status, 400, `no se vende un producto sin registrar ${label}`)
 okStatus(await approve(PEPE, '7310', 'ventas.descuentos'), 'la supervisora autoriza el descuento')
 r = await post(PEPE, '/api/sales/finalize', { ...sale([{ code: 'B2', price: 5000, qty: 1 }]), discount: 500, total: 4500 })
 okStatus(r, 'con la autorización, la venta con descuento pasa')
 assert.equal(r.body.sellerName, 'Pepe', 'y es venta de Pepe')
 needs(await post(PEPE, '/api/sales/finalize', { ...sale([{ code: 'B2', price: 5000, qty: 1 }]), discount: 500, total: 4500 }), 'ventas.descuentos', 'la autorización se gastó en esa venta')
-ok('Ventas: precio, totales y stock se verifican en el servidor y solo se venden productos del inventario; descuento, cambio de total y fiado piden permiso o autorización, que se gasta en una sola venta; la ganancia y el vendedor los pone el servidor')
+ok('Ventas: precio, totales y stock se verifican en el servidor y solo se venden productos del inventario o sin registrar (con su permiso, sin tocar el stock); descuento, cambio de total y fiado piden permiso o autorización, que se gasta en una sola venta; la ganancia y el vendedor los pone el servidor')
 
 // Up to three selling prices: Precio 2 and 3 are kept on the product and a sale line may be charged at
 // any of the product's prices (the cashier picks on the cart line) — with no permission, since the

@@ -552,8 +552,40 @@ async function mainFlow(appUrl, webDir) {
     check('9g al elegir cliente en la venta tampoco se ven puntos ni niveles', picker.includes('Ana Gómez') && !NO_LOYALTY.test(picker), picker)
     await closeSheet(c)
 
-    // 10. A newer version is published while the app is open: it restarts by itself — but not in the middle of a sale.
+    // 9h. "Producto sin registrar", from the cart: a typed name and price, charged like any line, and no stock moves.
     await ev(`document.querySelector('dialog[open] button[aria-label="Cerrar"]')?.click()`) // the customer picker of 9g is still open
+    await waitFor("!document.querySelector('dialog[open]')", 5000)
+    await ev(clickText('Producto sin registrar'))
+    const top9h = "[...document.querySelectorAll('dialog[open]')].pop()"
+    check('9h el botón del carrito abre "Producto sin registrar"', (await waitFor(`(${top9h}?.innerText||'').includes('No está en el inventario')`, 8000)).ok, await ev('document.body.innerText.slice(0, 300)'))
+    check('9h sin nombre ni precio no deja agregarlo', (await ev(`${top9h}.querySelector('button[data-enter]').disabled`)) === true)
+    await ev(setInput('#free-name', 'Bolsa especial'))
+    await ev(setInput('#free-price', '2500'))
+    await ev(setInput('#free-qty', '2'))
+    await sleep(300)
+    await ev(clickText('Agregar al carrito', top9h))
+    await waitFor("!document.querySelector('dialog[open]')", 5000)
+    const cart9h = await ev('document.body.innerText')
+    check('9h queda en el carrito marcado LIBRE, sin código, por 2 × 2.500', cart9h.includes('Bolsa especial') && cart9h.includes('LIBRE') && cart9h.includes('Sin registrar') && cart9h.includes('5.000'), cart9h.slice(0, 600))
+    await shot(c, '14b-producto-sin-registrar')
+    const before9h = await control('/__test/state')
+    await ev(clickText('Cobrar'))
+    await waitFor("!!document.querySelector('dialog[open] button[data-enter]')", 8000)
+    await ev(clickText('Exacto', "document.querySelector('dialog[open]')"))
+    await ev(clickText('Confirmar cobro', "document.querySelector('dialog[open]')"))
+    const rcpt9h = (await waitFor("document.body.innerText.includes('RECIBO DE VENTA')", 15000)).ok ? await ev('document.body.innerText') : ''
+    check('9h se cobra y el recibo lo trae como [Libre]', rcpt9h.includes('Bolsa especial') && rcpt9h.includes('[Libre]'), rcpt9h.slice(0, 400))
+    const after9h = await control('/__test/state')
+    const sale9h = after9h.sales[after9h.sales.length - 1]
+    check(
+      '9h el servidor guardó la línea libre (2 × 2.500) sin tocar el stock',
+      after9h.sales.length === before9h.sales.length + 1 && sale9h.items.length === 1 && sale9h.items[0].isFree === true && sale9h.items[0].code.startsWith('FREE_') && sale9h.total === 5000 && JSON.stringify(after9h.stocks) === JSON.stringify(before9h.stocks),
+      { sale9h, stocks: [before9h.stocks, after9h.stocks] },
+    )
+    await closeSheet(c)
+
+    // 10. A newer version is published while the app is open: it restarts by itself — but not in the middle of a sale.
+    await ev(`document.querySelector('dialog[open] button[aria-label="Cerrar"]')?.click()`)
     await waitFor("!document.querySelector('dialog[open]')", 5000)
     const scriptOf = "[...document.scripts].map((s) => s.src).find((u) => /assets\\/index-[^/]+\\.js$/.test(u))"
     const v1 = await ev(scriptOf)
@@ -938,6 +970,24 @@ async function mainFlow(appUrl, webDir) {
     await ev(clickText('Ya llegó'))
     const sheet14 = await waitFor("(document.querySelector('dialog[open]')?.innerText||'').includes('Recibir pedido')", 15000)
     check('14 "Ya llegó" registra el pedido y abre su recepción con el precio nuevo', sheet14.ok && (await ev("document.querySelector('dialog[open] input[aria-label=\"Precio de venta de Vaso\"]')?.value")) === '1200', await dialogText())
+    // 14b. The invoice date and the due date are editable: it arrived today but was invoiced four days ago, and the days of
+    // credit count from the invoice.
+    const dayAt = (offset) => ev(`(()=>{const [y,m,d]=${TODAY_IN_PAGE}.split('-').map(Number);return new Date(Date.UTC(y,m-1,d+(${offset}))).toISOString().slice(0,10)})()`)
+    const field14 = (id) => ev(`document.querySelector('dialog[open] #${id}')?.value`)
+    const niceDay = (key) => ev(`new Date('${key}T12:00:00').toLocaleDateString('es-CO', { day: 'numeric', month: 'short', year: 'numeric' })`)
+    check('14b la recepción a crédito trae la fecha de la factura (hoy) y el vencimiento a 30 días', (await field14('receive-invoice-date')) === (await dayAt(0)) && (await field14('receive-due-date')) === (await dayAt(30)), await dialogText())
+    const invoiced14 = await dayAt(-4)
+    await ev(setInput('dialog[open] #receive-invoice-date', invoiced14))
+    await sleep(300)
+    check('14b al poner la factura de hace cuatro días, el vencimiento se corre con ella (26 días desde hoy)', (await field14('receive-due-date')) === (await dayAt(26)), await dialogText())
+    await ev(setInput('dialog[open] #receive-due-date', await dayAt(10)))
+    await sleep(300)
+    check('14b el vencimiento también se puede poner a mano, y dice los días que hay entre la factura y él', (await dialogText()).includes('14 días después de la factura') && (await field14('receive-due-date')) === (await dayAt(10)), await dialogText())
+    await ev(setInput('dialog[open] #receive-invoice-date', await dayAt(1)))
+    await sleep(300)
+    check('14b una factura de fecha futura se avisa y no deja recibir', (await dialogText()).includes('no puede ser futura') && (await ev("[...document.querySelectorAll('dialog[open] button')].find(b=>b.textContent.trim().startsWith('Recibir y registrar'))?.disabled")) === true)
+    await ev(setInput('dialog[open] #receive-invoice-date', invoiced14))
+    await sleep(300)
     await shot(c, '21-recibir-con-precio')
     await ev(clickText('Recibir y registrar', "document.querySelector('dialog[open]')"))
     await waitFor("!document.querySelector('dialog[open]')", 15000)
@@ -949,6 +999,22 @@ async function mainFlow(appUrl, webDir) {
     await waitFor("!!document.querySelector('#venta-search-input') || !!document.querySelector('[role=tablist]')", 30000)
     const vaso = await waitFor(`(${idb('products')}).then((ps) => { const p = ps.find((x) => x.code === 'N2'); return p && p.price === 1200 && p.stock === 10 ? p : null })`, 20000)
     check('14 el producto queda con su precio de venta nuevo ($1.200)', vaso.ok, vaso)
+    // 14b (cont.). After the reload (the stand-in plays no Realtime): the account payable is due on the day that was typed, and the
+    // order says when it was invoiced.
+    await ev("[...document.querySelectorAll('[role=tab]')].find((t) => t.textContent.startsWith('Por pagar')).click()")
+    const payable14 = await waitFor("[...document.querySelectorAll('[role=row]')].some((r) => r.innerText.includes('Plásticos del Valle') && r.innerText.includes('6.000,00'))", 10000)
+    const payableRow14 = await ev("[...document.querySelectorAll('[role=row]')].find((r) => r.innerText.includes('Plásticos del Valle') && r.innerText.includes('6.000,00'))?.innerText||''")
+    check('14b la cuenta por pagar vence el día que se puso (en 10 días)', payable14.ok && payableRow14.includes(await niceDay(await dayAt(10))) && payableRow14.includes('Vence en 10 días'), payableRow14)
+    await ev("[...document.querySelectorAll('[role=tab]')].find((t) => t.textContent.startsWith('Pedidos')).click()")
+    // The list opens on "Por recibir": the order that was just received is under "Recibidos".
+    await waitFor("!!document.querySelector('select[aria-label=\"Filtrar por estado\"]')", 8000)
+    await ev(`(() => { const s = document.querySelector('select[aria-label="Filtrar por estado"]'); Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value').set.call(s, 'recibido'); s.dispatchEvent(new Event('change', { bubbles: true })); return true })()`)
+    await waitFor("[...document.querySelectorAll('[role=row]')].some((r) => r.innerText.includes('Plásticos del Valle') && r.innerText.includes('6.000,00'))", 10000)
+    await ev("[...document.querySelectorAll('[role=row]')].find((r) => r.innerText.includes('Plásticos del Valle') && r.innerText.includes('6.000,00')).click()")
+    const detail14 = await waitFor("(document.querySelector('dialog[open]')?.innerText||'').includes('Facturado el')", 8000)
+    check('14b y el pedido dice que se facturó ese día', detail14.ok && (await dialogText()).includes(await niceDay(invoiced14)), await dialogText())
+    await ev(clickText('Cerrar', "document.querySelector('dialog[open]')"))
+    await sleep(300)
 
     // 15. Stock: the quick − / + of the table ask how many and why, and the Auditoría shows every change with who did it.
     await ev(goto('Stock'))

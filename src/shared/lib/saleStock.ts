@@ -3,8 +3,8 @@ import type { CartItem } from '../../types/cartItem'
 /** Same rounding as every stock write (`roundQty` in server/routes/generic.ts): kg and weighed sales drift otherwise. */
 const round4 = (n: number): number => Math.round(n * 10000) / 10000
 
-/** A line with an inventory product behind it. The `CORR` line of old corrections and the "producto libre" of
- * old sales have none, so they never touch the shelf. Decided from the code too — `isFree` alone is what the
+/** A line with an inventory product behind it. The `CORR` line of old corrections and a "producto sin registrar"
+ * (`FREE_…`) have none, so they never touch the shelf. Decided from the code too — `isFree` alone is what the
  * browser says. */
 export const isTracked = (i: Pick<CartItem, 'code' | 'isFree'>): boolean => !i.isFree && i.code !== 'CORR' && !i.code.startsWith('FREE_')
 

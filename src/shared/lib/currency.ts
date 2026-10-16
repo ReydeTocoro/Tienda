@@ -44,3 +44,9 @@ export function dayKeyOf(when: string | Date): string {
 export function todayKey(): string {
   return dayKeyOf(new Date())
 }
+
+/** Noon of a store day, as an instant: a date that has no time of its own (the day an invoice was made) still reads as
+ * that day in `dayKeyOf`. The store's zone has no daylight saving, so noon is always UTC−5. */
+export function noonOfDay(key: string): string {
+  return new Date(`${key}T12:00:00-05:00`).toISOString()
+}

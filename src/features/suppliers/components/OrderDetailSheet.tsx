@@ -1,7 +1,7 @@
 import { BottomSheet } from '../../../shared/components/BottomSheet'
 import { cancelOrder, sendOrder } from '../../../db/repositories/purchaseOrders'
-import { CAJA_LABEL } from '../../../shared/lib/cash'
-import { formatDateTime, formatMoney, formatQty } from '../../../shared/lib/currency'
+import { CAJA_LABEL, formatDayKey } from '../../../shared/lib/cash'
+import { dayKeyOf, formatDateTime, formatMoney, formatQty } from '../../../shared/lib/currency'
 import { formatOrderId } from '../../../shared/lib/id'
 import { useConfirm } from '../../../store/useConfirmStore'
 import { toast } from '../../../store/useToastStore'
@@ -48,6 +48,7 @@ export function OrderDetailSheet({ order, onClose, onEditDraft, onReceive }: Ord
             Creado {formatDateTime(order.createdAt)}
             {order.orderedAt && ` · Enviado ${formatDateTime(order.orderedAt)}`}
             {order.receivedAt && ` · Recibido ${formatDateTime(order.receivedAt)}`}
+            {order.invoiceDate && order.receivedAt && order.invoiceDate !== dayKeyOf(order.receivedAt) && ` · Facturado el ${formatDayKey(order.invoiceDate)}`}
           </div>
 
           <div className="mb-3 overflow-hidden rounded-xl border border-br">

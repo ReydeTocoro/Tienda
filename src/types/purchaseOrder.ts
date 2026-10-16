@@ -34,6 +34,9 @@ export interface PurchaseOrder {
   createdAt: string
   orderedAt?: string
   receivedAt?: string
+  /** 'YYYY-MM-DD' — the day the supplier invoiced it, typed when receiving (the credit days count from it, whenever the goods
+   * arrived); absent on an order received by a screen that doesn't send it. */
+  invoiceDate?: string
   cancelledAt?: string
   /** What was actually received × the final cost — what gets paid or owed. */
   receivedTotal?: number
@@ -57,8 +60,9 @@ export interface Payable {
   orderId: number
   amount: number
   paid: number
+  /** The invoice day (the reception day unless another was typed). */
   issuedAt: string
-  /** 'YYYY-MM-DD' — receipt day + the supplier's credit days. */
+  /** 'YYYY-MM-DD' — the invoice day + the supplier's credit days, unless a day was typed when receiving. */
   dueDate: string
   payments: PayablePayment[]
 }

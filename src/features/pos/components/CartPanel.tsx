@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { Banknote, Smartphone, Handshake, Tag, Trash2, FileText, ShoppingCart, X } from 'lucide-react'
+import { Banknote, Smartphone, Handshake, Tag, Trash2, FileText, ShoppingCart, X, PackagePlus } from 'lucide-react'
 import type { Product } from '../../../types/product'
 import { selectActiveCart, useActiveCart, useCartStore } from '../../../store/useCartStore'
 import { toast } from '../../../store/useToastStore'
@@ -11,6 +11,7 @@ import { MoneyInput } from '../../../shared/components/MoneyInput'
 import { CartTabs } from './CartTabs'
 import { ClientBar } from './ClientBar'
 import { CartLine } from './CartLine'
+import { FreeProductModal } from './FreeProductModal'
 import { BILLS } from '../../../shared/lib/bills'
 import { usePermission } from '../../pin/usePermission'
 import { countItems } from '../lib/cartCount'
@@ -53,6 +54,7 @@ export function CartPanel({ products, onEditMeasured, onOpenDiscount, onCheckout
   const setAmountReceived = useCartStore((s) => s.setAmountReceived)
 
   const [notesOpen, setNotesOpen] = useState(false)
+  const [freeOpen, setFreeOpen] = useState(false)
   const [checkoutOpen, setCheckoutOpen] = useState(false)
   // "Cambiar el total" approved by someone allowed, for this one charge.
   const [totalUnlocked, setTotalUnlocked] = useState(false)
@@ -93,6 +95,10 @@ export function CartPanel({ products, onEditMeasured, onOpenDiscount, onCheckout
   async function choosePayMethod(m: (typeof PAY_METHODS)[number]['key']) {
     if (m === 'fiado' && !(await requirePermission('ventas.fiar', 'Vender fiado', 'Fiar requiere autorización de alguien con permiso.'))) return
     setPayMethod(m)
+  }
+
+  async function openFree() {
+    if (await requirePermission('ventas.productoLibre', 'Producto sin registrar', 'Cobrar algo que no está en el inventario requiere autorización de alguien con permiso.')) setFreeOpen(true)
   }
 
   async function openDiscount() {
@@ -149,6 +155,13 @@ export function CartPanel({ products, onEditMeasured, onOpenDiscount, onCheckout
 
       <div className="flex-shrink-0 border-t border-br px-2.5 py-3 sm:px-3.5">
         <button
+          type="button"
+          onClick={openFree}
+          className="mb-2 flex w-full items-center justify-center gap-1.5 rounded-[10px] border border-dashed border-br2 py-2 text-[12px] font-semibold text-txt2 transition-colors hover:bg-s2 hover:text-txt"
+        >
+          <PackagePlus size={15} /> Producto sin registrar
+        </button>
+        <button
           onClick={startCheckout}
           aria-disabled={!items.length}
           className={`flex w-full items-center justify-between gap-2 rounded-[10px] bg-lime px-3 py-3 text-on-solid transition active:scale-[0.98] sm:px-4 ${items.length ? 'hover:brightness-110' : 'opacity-50'}`}
@@ -157,6 +170,8 @@ export function CartPanel({ products, onEditMeasured, onOpenDiscount, onCheckout
           <span className="font-mono text-[14px] font-bold sm:text-[17px]">{formatMoney(chargeAmount)}</span>
         </button>
       </div>
+
+      <FreeProductModal open={freeOpen} onClose={() => setFreeOpen(false)} />
 
       {/* Payment method, discount/notes shortcuts, and the final confirm all live here — pulled
        * out of the cart column so the product list above never has to compete for space. */}

@@ -178,6 +178,16 @@ assert.equal(r.status, 201)
 assert.match(r.body.sale.reviewNotes.join('|'), /"Producto viejo" ya no existe en el inventario/)
 assert.deepEqual(r.body.stocks, [{ code: 'A1', stock: (await stockOf('A1')) }], 'solo se descuenta lo que existe')
 assert.equal(r.body.sale.items.length, 2, 'la línea se conserva como se cobró')
+// A product sin registrar (typed at the till): kept as charged, no stock, nothing to review for the owner.
+const FREE = 'FREE_7a1d9c3e-0b2f-4e6a-8c5d-1f3b5d7e9a20'
+const a1Before = await stockOf('A1')
+r = await call('POST', '/api/sales/offline', offline(UUID(21), [{ ...line(FREE, 900, 2, 'Bolsa grande'), isFree: true }, line('A1', 2000)]))
+assert.equal(r.status, 201, JSON.stringify(r.body))
+assert.deepEqual(r.body.sale.items.map((i: { code: string; isFree: boolean }) => [i.code, i.isFree]), [[FREE, true], ['A1', false]], 'el producto sin registrar se guarda como libre')
+assert.equal(r.body.sale.reviewNotes, undefined, 'y no es nada raro: quien la hizo puede venderlo')
+assert.deepEqual(r.body.stocks, [{ code: 'A1', stock: a1Before - 1 }], 'solo baja el stock del producto del inventario')
+r = await call('POST', '/api/sales/offline', offline(UUID(22), [{ ...line(FREE, 900, 1, 'Bolsa grande'), isFree: true }], { seller: { id: 'u-pepe' } }))
+assert.match(r.body.sale.reviewNotes.join('|'), /Producto sin registrar vendido sin autorización/, 'quien no tenía el permiso: la venta se guarda y el dueño lo ve')
 // Totals that don't match the lines, a missing total.
 r = await call('POST', '/api/sales/offline', offline(UUID(14), [line('A1', 2000, 2)], { subtotal: 9999 }))
 assert.equal(r.body.sale.subtotal, 4000, 'el subtotal sale de los productos')

@@ -3,8 +3,8 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../../../db/index'
 import { BottomSheet } from '../../../shared/components/BottomSheet'
 import { receiveOrder } from '../../../db/repositories/purchaseOrders'
-import { CAJA_LABEL, dueDateFrom, formatDayKey, round2 } from '../../../shared/lib/cash'
-import { formatMoney, formatQty } from '../../../shared/lib/currency'
+import { addDaysToKey, CAJA_LABEL, daysBetween, formatDayKey, round2 } from '../../../shared/lib/cash'
+import { formatMoney, formatQty, todayKey } from '../../../shared/lib/currency'
 import { formatOrderId } from '../../../shared/lib/id'
 import { useMayorStore } from '../../../store/useMayorStore'
 import { toast } from '../../../store/useToastStore'
@@ -16,6 +16,7 @@ import { termsLabel } from '../lib/terms'
 
 /** Product, what arrived, its cost and its selling price from now on. */
 const RECEIVE_GRID = 'grid-cols-[minmax(0,1fr)_64px_84px_84px]'
+const DAY_KEY = /^\d{4}-\d{2}-\d{2}$/
 
 interface ReceiveOrderSheetProps {
   order: PurchaseOrder | null
@@ -47,6 +48,11 @@ function ReceiveForm({ order, onClose, onReceived }: { order: PurchaseOrder; onC
   const [mode, setMode] = useState<'contado' | 'credito'>(creditAllowed ? 'credito' : 'contado')
   const [caja, setCaja] = useState<CajaId>('mayor')
   const [busy, setBusy] = useState(false)
+  // On credit: the day the supplier invoiced it — the days of credit count from it, whenever the goods arrived — and the day
+  // it is due, which is that day + the supplier's days until one is typed by hand.
+  const today = todayKey()
+  const [invoiceDate, setInvoiceDate] = useState(today)
+  const [dueTyped, setDueTyped] = useState<string | null>(null)
 
   const lines = order.lines.map((l) => ({ ...l, qtyReceived: parseFloat(qtys[l.code]) || 0, unitCost: parseFloat(costs[l.code]) || 0, newPrice: parseFloat(priceText(l.code, l.salePrice)) || 0 }))
   const total = round2(lines.reduce((t, l) => t + l.qtyReceived * l.unitCost, 0))
@@ -57,21 +63,46 @@ function ReceiveForm({ order, onClose, onReceived }: { order: PurchaseOrder; onC
   const shows = (c: CajaId) => balancesKnown && (c !== 'mayor' || mayorOpen)
   // Without "ver el efectivo esperado" the balances never reach this device: the server decides.
   const insufficient = shows(caja) && mode === 'contado' && total > 0 && balances[caja] + 0.005 < total
-  const dueKey = order.paymentTerms.kind === 'credito' ? dueDateFrom(new Date(), order.paymentTerms.days) : null
+  const creditDays = order.paymentTerms.kind === 'credito' ? order.paymentTerms.days : 0
+  const invoiceOk = DAY_KEY.test(invoiceDate)
+  const dueKey = creditAllowed && invoiceOk ? (dueTyped ?? addDaysToKey(invoiceDate, creditDays)) : null
+  const dateProblem =
+    mode !== 'credito'
+      ? null
+      : !invoiceOk
+        ? 'Elige la fecha de la factura'
+        : invoiceDate > today
+          ? 'La fecha de la factura no puede ser futura'
+          : daysBetween(invoiceDate, today) > 365
+            ? 'La factura es de hace más de un año: revisa la fecha'
+            : !dueKey || !DAY_KEY.test(dueKey)
+              ? 'Elige la fecha de vencimiento'
+              : dueKey < invoiceDate
+                ? 'El vencimiento no puede ser antes de la factura'
+                : daysBetween(invoiceDate, dueKey) > 365
+                  ? 'El vencimiento está a más de un año de la factura: revísalo'
+                  : null
 
   async function submit() {
     if (!lines.some((l) => l.qtyReceived > 0)) {
       toast('Indica qué cantidades llegaron', 'orange')
       return
     }
+    if (dateProblem) {
+      toast(dateProblem, 'orange')
+      return
+    }
     setBusy(true)
     try {
-      await receiveOrder(order.id!, {
+      const done = await receiveOrder(order.id!, {
         // An empty price is "no change" (null), not "what the order planned".
         lines: lines.map((l) => ({ code: l.code, qtyReceived: l.qtyReceived, unitCost: l.unitCost, salePrice: l.newPrice > 0 ? l.newPrice : null })),
         payment: mode === 'contado' ? { mode: 'contado', caja } : { mode: 'credito' },
         by: actor,
+        ...(mode === 'credito' && dueKey ? { invoiceDate, dueDate: dueKey } : {}),
       })
+      // A server that doesn't know the dates yet would count the credit from today without a word.
+      if (mode === 'credito' && done.invoiceDate !== invoiceDate) toast('El servidor todavía no guarda la fecha de la factura: revisa la fecha de vencimiento en "Por pagar"', 'red')
       toast(`Pedido ${formatOrderId(order.id)} recibido · stock actualizado`, 'green')
       onReceived()
     } catch (err) {
@@ -167,8 +198,41 @@ function ReceiveForm({ order, onClose, onReceived }: { order: PurchaseOrder; onC
           {insufficient && <div className="mb-2 rounded-lg bg-red/10 px-3 py-2 text-[12px] font-semibold text-red">{CAJA_LABEL[caja]} no tiene saldo suficiente. Elige la otra caja o traslada fondos.</div>}
         </>
       ) : (
-        <div className="mb-2 rounded-lg bg-blue/10 px-3 py-2.5 text-[12px] text-blue">
-          Se crea una cuenta por pagar de <b className="font-mono">{formatMoney(total)}</b> con vencimiento el <b>{dueKey ? formatDayKey(dueKey) : ''}</b> ({order.paymentTerms.kind === 'credito' ? order.paymentTerms.days : 0} días).
+        <div className="mb-2 rounded-xl border border-br p-3">
+          <div className="grid grid-cols-2 gap-2.5">
+            <div>
+              <label htmlFor="receive-invoice-date" className="mb-1 block field-label">
+                Fecha de la factura
+              </label>
+              <input id="receive-invoice-date" type="date" className="input px-2.5 py-2 text-[13px]" max={today} value={invoiceDate} onChange={(e) => setInvoiceDate(e.target.value)} />
+            </div>
+            <div>
+              <label htmlFor="receive-due-date" className="mb-1 block field-label">
+                Vence el
+              </label>
+              <input id="receive-due-date" type="date" className="input px-2.5 py-2 text-[13px]" min={invoiceOk ? invoiceDate : undefined} value={dueKey ?? ''} onChange={(e) => setDueTyped(e.target.value)} />
+            </div>
+          </div>
+          {dateProblem ? (
+            <div className="mt-2 text-[12px] font-semibold text-red">{dateProblem}</div>
+          ) : (
+            dueKey && (
+              <div className="mt-2 text-[12px] text-blue">
+                Se crea una cuenta por pagar de <b className="font-mono">{formatMoney(total)}</b> que vence el <b>{formatDayKey(dueKey)}</b> ({daysBetween(invoiceDate, dueKey)} días después de la factura).
+                {dueKey < today && (
+                  <span className="font-semibold text-orange">
+                    {' '}
+                    Ya nace vencida (hace {daysBetween(dueKey, today)} {daysBetween(dueKey, today) === 1 ? 'día' : 'días'}).
+                  </span>
+                )}
+              </div>
+            )
+          )}
+          {dueTyped !== null && (
+            <button type="button" onClick={() => setDueTyped(null)} className="mt-1.5 text-[11px] font-semibold text-lime underline">
+              Volver a contar los {creditDays} días del proveedor desde la factura
+            </button>
+          )}
         </div>
       )}
 
@@ -176,7 +240,7 @@ function ReceiveForm({ order, onClose, onReceived }: { order: PurchaseOrder; onC
         <button onClick={onClose} className="flex-1 rounded-[10px] border border-br2 py-2.5 text-[13px] text-txt2">
           Cancelar
         </button>
-        <button disabled={busy || insufficient} onClick={submit} className="flex-[2] rounded-[10px] bg-lime py-2.5 text-[14px] font-bold text-on-solid disabled:opacity-50">
+        <button disabled={busy || insufficient || !!dateProblem} onClick={submit} className="flex-[2] rounded-[10px] bg-lime py-2.5 text-[14px] font-bold text-on-solid disabled:opacity-50">
           Recibir y registrar
         </button>
       </div>
